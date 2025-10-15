@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "resolve-library-id",
+        "get-library-docs"
+      ]
+    },
+    "gopls-mcp": {
+      "command": "gopls",
+      "args": [
+        "mcp"
+      ],
+      "disabled": false
+    }
+  }
+}

@@ -1,0 +1,13 @@
+
+*secret*
+*.log
+*.tar.gz
+*.zip
+
+mock_test.go
+cover.out
+
+junk/
+bin/
+
+.idea
