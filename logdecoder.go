@@ -7,35 +7,41 @@ import (
 	"github.com/pkg/errors"
 )
 
-// decodeLogs returns an io.Reader that decodes Docker's multiplexed stream format.
+const (
+	maxFrameSize uint32 = 65536
+)
+
 func decodeLogs(src io.Reader) io.Reader {
 	return &logDecoder{
 		src:    src,
 		header: make([]byte, 8),
+		buf:    make([]byte, 0, maxFrameSize),
 	}
 }
 
 type logDecoder struct {
-	src       io.Reader
-	header    []byte
-	buf       []byte // buffered decoded data
-	bufOffset int    // current position in buf
+	src    io.Reader
+	header []byte
+	buf    []byte
+	offset int
 }
 
-func (d *logDecoder) Read(p []byte) (n int, err error) {
+// Read implements io.Reader .
+func (dec *logDecoder) Read(dst []byte) (n int, err error) {
+
 	// If we have buffered data, return it first
-	if d.bufOffset < len(d.buf) {
-		n = copy(p, d.buf[d.bufOffset:])
-		d.bufOffset += n
-		if d.bufOffset >= len(d.buf) {
-			d.buf = nil
-			d.bufOffset = 0
+	if dec.offset < len(dec.buf) {
+		n = copy(dst, dec.buf[dec.offset:])
+		dec.offset += n
+		if dec.offset >= len(dec.buf) {
+			dec.buf = dec.buf[:0]
+			dec.offset = 0
 		}
 		return n, nil
 	}
 
 	// Read next frame header
-	_, err = io.ReadFull(d.src, d.header)
+	_, err = io.ReadFull(dec.src, dec.header)
 	if err == io.EOF {
 		return 0, io.EOF
 	}
@@ -43,19 +49,22 @@ func (d *logDecoder) Read(p []byte) (n int, err error) {
 		return 0, errors.Wrap(err, "failed to read docker log header")
 	}
 
-	// Extract frame size
-	frameSize := binary.BigEndian.Uint32(d.header[4:8])
-
 	// Read frame into buffer
-	d.buf = make([]byte, frameSize)
-	_, err = io.ReadFull(d.src, d.buf)
+	frameSize := binary.BigEndian.Uint32(dec.header[4:8])
+	if frameSize > maxFrameSize {
+		err = errors.Errorf("docker frame exceeds decoder buffer size: %d", maxFrameSize)
+		return 0, err
+	}
+
+	dec.buf = dec.buf[:frameSize]
+	_, err = io.ReadFull(dec.src, dec.buf)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to read docker log frame")
 	}
 
-	// Copy what we can to p
-	n = copy(p, d.buf)
-	d.bufOffset = n
+	// Copy what we can to dst
+	n = copy(dst, dec.buf)
+	dec.offset = n
 
 	return n, nil
 }
