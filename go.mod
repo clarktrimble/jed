@@ -3,6 +3,7 @@ module github.com/clarktrimble/jed
 go 1.25.1
 
 require (
+	github.com/clarktrimble/hondo v0.0.2
 	github.com/onsi/ginkgo/v2 v2.26.0
 	github.com/onsi/gomega v1.38.2
 	github.com/pkg/errors v0.9.1
