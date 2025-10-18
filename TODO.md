@@ -11,13 +11,13 @@
 - [ ] Make suffixPattern more specific: `-[a-zA-Z0-9]{7}$` instead of `-[^-]+$`
 - [ ] Add hondo package var for testable random source (predictable suffixes in tests)
 - [ ] Allow choosing stdout and/or stderr in Logs method
-- [ ] Consider adding more Statii helper methods:
-  - `State(baseName) string` - get container state
-  - `Exists(baseName) bool` - check if container exists
+- [ ] Consider adding more Containers helper methods:
+  - `State(serviceName) string` - get container state
+  - `Exists(serviceName) bool` - check if container exists
 
 ## Low Priority
 
-- [ ] Rename Status struct? (Docker calls this a "container")
+- [x] Rename Status struct? (Docker calls this a "container") - COMPLETED
 - [ ] Demajic the .env file path construction in loadEnv
 - [ ] Expose streaming logs - return io.ReadCloser instead of []byte
 - [ ] Add Logs options: timestamps, since, until, follow

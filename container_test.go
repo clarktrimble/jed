@@ -12,13 +12,13 @@ import (
 	"github.com/clarktrimble/jed"
 )
 
-var _ = Describe("Status", func() {
+var _ = Describe("Container", func() {
 	var (
 		cfg    *jed.Config
 		client *ClientMock
 		lgr    *LoggerMock
 		ctx    context.Context
-		svc    *jed.Svc
+		svc    *jed.Jed
 		err    error
 	)
 
@@ -39,22 +39,22 @@ var _ = Describe("Status", func() {
 				return nil
 			},
 		}
-		svc, err = cfg.NewSvc(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+		svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Describe("Statii", func() {
+	Describe("Containers", func() {
 		var (
-			statii jed.Statii
+			containers jed.Containers
 		)
 
 		JustBeforeEach(func() {
-			statii, err = svc.Statii(ctx)
+			containers, err = svc.Containers(ctx)
 		})
 
 		When("multiple containers are running", func() {
 			BeforeEach(func() {
-				statuses := []jed.Status{
+				statuses := []jed.Container{
 					{
 						Id:     "abc123",
 						Names:  []string{"/postgres-x7y9z2n"},
@@ -80,40 +80,40 @@ var _ = Describe("Status", func() {
 						Labels: map[string]string{"managed_by": "jed"},
 					},
 				}
-				client.SendObjectFunc = mockStatii(statuses)
+				client.SendObjectFunc = mockContainers(statuses)
 			})
 
-			It("should return statii without error", func() {
+			It("should return containers without error", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(statii).NotTo(BeNil())
+				Expect(containers).NotTo(BeNil())
 			})
 
-			It("should map by base name with suffix stripped", func() {
-				Expect(statii).To(HaveLen(3))
-				Expect(statii).To(HaveKey("postgres"))
-				Expect(statii).To(HaveKey("redis"))
-				Expect(statii).To(HaveKey("nginx"))
+			It("should map by service name with suffix stripped", func() {
+				Expect(containers).To(HaveLen(3))
+				Expect(containers).To(HaveKey("postgres"))
+				Expect(containers).To(HaveKey("redis"))
+				Expect(containers).To(HaveKey("nginx"))
 			})
 
-			It("should preserve full status details", func() {
-				Expect(statii["postgres"].Id).To(Equal("abc123"))
-				Expect(statii["postgres"].Names).To(Equal([]string{"/postgres-x7y9z2n"}))
-				Expect(statii["postgres"].Image).To(Equal("postgres:14"))
-				Expect(statii["postgres"].State).To(Equal("running"))
+			It("should preserve full container details", func() {
+				Expect(containers["postgres"].Id).To(Equal("abc123"))
+				Expect(containers["postgres"].Names).To(Equal([]string{"/postgres-x7y9z2n"}))
+				Expect(containers["postgres"].Image).To(Equal("postgres:14"))
+				Expect(containers["postgres"].State).To(Equal("running"))
 
-				Expect(statii["redis"].Id).To(Equal("def456"))
-				Expect(statii["nginx"].Id).To(Equal("ghi789"))
+				Expect(containers["redis"].Id).To(Equal("def456"))
+				Expect(containers["nginx"].Id).To(Equal("ghi789"))
 			})
 		})
 
 		When("no containers exist", func() {
 			BeforeEach(func() {
-				client.SendObjectFunc = mockStatii([]jed.Status{})
+				client.SendObjectFunc = mockContainers([]jed.Container{})
 			})
 
-			It("should return empty statii without error", func() {
+			It("should return empty containers without error", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(statii).To(HaveLen(0))
+				Expect(containers).To(HaveLen(0))
 			})
 		})
 
@@ -134,14 +134,14 @@ var _ = Describe("Status", func() {
 		})
 	})
 
-	Describe("Statii.DeployName", func() {
+	Describe("Containers.DeployName", func() {
 		var (
-			statii     jed.Statii
+			containers jed.Containers
 			deployName string
 		)
 
 		BeforeEach(func() {
-			statuses := []jed.Status{
+			statuses := []jed.Container{
 				{
 					Id:     "abc123",
 					Names:  []string{"/postgres-x7y9z2n"},
@@ -149,13 +149,13 @@ var _ = Describe("Status", func() {
 					Labels: map[string]string{"managed_by": "jed"},
 				},
 			}
-			client.SendObjectFunc = mockStatii(statuses)
-			statii, err = svc.Statii(ctx)
+			client.SendObjectFunc = mockContainers(statuses)
+			containers, err = svc.Containers(ctx)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		JustBeforeEach(func() {
-			deployName, err = statii.DeployName("postgres")
+			deployName, err = containers.DeployName("postgres")
 		})
 
 		When("container exists", func() {
@@ -171,7 +171,7 @@ var _ = Describe("Status", func() {
 			})
 
 			JustBeforeEach(func() {
-				deployName, err = statii.DeployName("nonexistent")
+				deployName, err = containers.DeployName("nonexistent")
 			})
 
 			It("should return error", func() {
@@ -181,14 +181,14 @@ var _ = Describe("Status", func() {
 		})
 	})
 
-	Describe("Statii.Id", func() {
+	Describe("Containers.Id", func() {
 		var (
-			statii jed.Statii
-			id     string
+			containers jed.Containers
+			id         string
 		)
 
 		BeforeEach(func() {
-			statuses := []jed.Status{
+			statuses := []jed.Container{
 				{
 					Id:     "abc123def456",
 					Names:  []string{"/postgres-x7y9z2n"},
@@ -196,13 +196,13 @@ var _ = Describe("Status", func() {
 					Labels: map[string]string{"managed_by": "jed"},
 				},
 			}
-			client.SendObjectFunc = mockStatii(statuses)
-			statii, err = svc.Statii(ctx)
+			client.SendObjectFunc = mockContainers(statuses)
+			containers, err = svc.Containers(ctx)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		JustBeforeEach(func() {
-			id, err = statii.Id("postgres")
+			id, err = containers.Id("postgres")
 		})
 
 		When("container exists", func() {
@@ -218,7 +218,7 @@ var _ = Describe("Status", func() {
 			})
 
 			JustBeforeEach(func() {
-				id, err = statii.Id("nonexistent")
+				id, err = containers.Id("nonexistent")
 			})
 
 			It("should return error", func() {

@@ -51,11 +51,11 @@ func findCall(calls []struct {
 	return nil
 }
 
-// mockStatii creates a mock response for Statii() call.
-func mockStatii(statuses []jed.Status) func(context.Context, string, string, any, any) error {
+// mockContainers creates a mock response for Containers() call.
+func mockContainers(containers []jed.Container) func(context.Context, string, string, any, any) error {
 	return func(ctx context.Context, method, path string, snd, rcv any) error {
 		if method == "GET" && strings.Contains(path, "/containers/json") {
-			mockResponse(statuses, rcv)
+			mockResponse(containers, rcv)
 		}
 		// Mock checkImage - always succeed
 		if method == "GET" && strings.Contains(path, "/images/") {
@@ -85,7 +85,7 @@ var _ = Describe("Jed", func() {
 		client *ClientMock
 		lgr    *LoggerMock
 		ctx    context.Context
-		svc    *jed.Svc
+		svc    *jed.Jed
 		err    error
 	)
 
@@ -114,7 +114,7 @@ var _ = Describe("Jed", func() {
 		)
 
 		JustBeforeEach(func() {
-			svc, err = cfg.NewSvc(ctx, client, lgr, os.DirFS(fsPath))
+			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS(fsPath))
 		})
 
 		When("given valid containers.yaml and env files", func() {
@@ -158,12 +158,12 @@ var _ = Describe("Jed", func() {
 
 	Describe("Deploy", func() {
 		var (
-			cntr *jed.Container
+			cntr *jed.Service
 			id   string
 		)
 
 		BeforeEach(func() {
-			cntr = &jed.Container{
+			cntr = &jed.Service{
 				Name:    "test-app",
 				Image:   "test:v1",
 				Network: "test-net",
@@ -174,7 +174,7 @@ var _ = Describe("Jed", func() {
 				Volumes: map[string]string{"/host/path": "/container/path"},
 			}
 			client.SendObjectFunc = mockCreate("abc123def456")
-			svc, err = cfg.NewSvc(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -206,16 +206,16 @@ var _ = Describe("Jed", func() {
 
 	Describe("Containers", func() {
 		var (
-			cntrs []jed.Container
+			cntrs []jed.Service
 		)
 
 		BeforeEach(func() {
-			svc, err = cfg.NewSvc(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		JustBeforeEach(func() {
-			cntrs = svc.Containers()
+			cntrs = svc.Services()
 		})
 
 		When("containers are loaded", func() {
@@ -270,14 +270,14 @@ var _ = Describe("Jed", func() {
 
 	Describe("Undeploy", func() {
 		var (
-			cntr *jed.Container
+			cntr *jed.Service
 		)
 
 		BeforeEach(func() {
-			cntr = &jed.Container{
+			cntr = &jed.Service{
 				Name: "test-app",
 			}
-			svc, err = cfg.NewSvc(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -287,7 +287,7 @@ var _ = Describe("Jed", func() {
 
 		When("container exists and stops successfully", func() {
 			BeforeEach(func() {
-				statuses := []jed.Status{
+				statuses := []jed.Container{
 					{
 						Id:     "abc123",
 						Names:  []string{"/test-app-x7y9z2n"},
@@ -295,7 +295,7 @@ var _ = Describe("Jed", func() {
 						Labels: map[string]string{"managed_by": "jed"},
 					},
 				}
-				client.SendObjectFunc = mockStatii(statuses)
+				client.SendObjectFunc = mockContainers(statuses)
 			})
 
 			It("should undeploy without error", func() {
@@ -304,7 +304,7 @@ var _ = Describe("Jed", func() {
 
 			It("should call stop and delete", func() {
 				calls := client.SendObjectCalls()
-				// 4 checkImage (from NewSvc) + Statii + stop + delete
+				// 4 checkImage (from NewSvc) + Containers + stop + delete
 				Expect(calls).To(HaveLen(7))
 
 				stopCall := findCall(calls, "POST", "/stop")
@@ -319,7 +319,7 @@ var _ = Describe("Jed", func() {
 
 		When("stop fails but delete succeeds", func() {
 			BeforeEach(func() {
-				statuses := []jed.Status{
+				statuses := []jed.Container{
 					{
 						Id:     "abc123",
 						Names:  []string{"/test-app-x7y9z2n"},
@@ -328,7 +328,7 @@ var _ = Describe("Jed", func() {
 					},
 				}
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
-					// Mock Statii() call
+					// Mock Containers() call
 					if method == "GET" && strings.Contains(path, "/containers/json") {
 						mockResponse(statuses, rcv)
 						return nil
@@ -356,7 +356,7 @@ var _ = Describe("Jed", func() {
 
 		When("delete fails", func() {
 			BeforeEach(func() {
-				statuses := []jed.Status{
+				statuses := []jed.Container{
 					{
 						Id:     "abc123",
 						Names:  []string{"/test-app-x7y9z2n"},
@@ -365,7 +365,7 @@ var _ = Describe("Jed", func() {
 					},
 				}
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
-					// Mock Statii() call
+					// Mock Containers() call
 					if method == "GET" && strings.Contains(path, "/containers/json") {
 						mockResponse(statuses, rcv)
 						return nil
@@ -387,7 +387,7 @@ var _ = Describe("Jed", func() {
 
 		When("container not found", func() {
 			BeforeEach(func() {
-				client.SendObjectFunc = mockStatii([]jed.Status{})
+				client.SendObjectFunc = mockContainers([]jed.Container{})
 			})
 
 			It("should return error", func() {
@@ -407,7 +407,7 @@ var _ = Describe("Jed", func() {
 			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 				return rawData, nil
 			}
-			svc, err = cfg.NewSvc(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 

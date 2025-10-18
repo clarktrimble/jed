@@ -29,23 +29,23 @@ import (
 //go:embed containers.yaml *.env
 var containerFS embed.FS
 
-// Create service
+// Create Jed instance
 cfg := &jed.Config{}
-svc, err := cfg.NewSvc(ctx, httpClient, logger, containerFS)
+j, err := cfg.NewJed(ctx, httpClient, logger, containerFS)
 
-// Deploy a container
-cntr := svc.Containers()[0]
-id, err := svc.Deploy(ctx, &cntr)
+// Deploy a service
+svc := j.Services()[0]
+id, err := j.Deploy(ctx, &svc)
 
-// Check status
-statii, err := svc.Statii(ctx)
-deployName, _ := statii.DeployName("postgres")
+// Check container status
+containers, err := j.Containers(ctx)
+deployName, _ := containers.DeployName("postgres")
 
 // Get logs
-logs, err := svc.Logs(ctx, id, "100")
+logs, err := j.Logs(ctx, id, "100")
 
 // Undeploy
-err = svc.Undeploy(ctx, &cntr)
+err = j.Undeploy(ctx, &svc)
 ```
 
 ## Architecture
@@ -54,10 +54,10 @@ err = svc.Undeploy(ctx, &cntr)
 
 ```
 jed/
-├── jed.go           # Public API: NewSvc, Deploy, Undeploy, Statii, Logs
-├── container.go     # Container loading, validation, config building
+├── jed.go           # Public API: NewJed, Deploy, Undeploy, Containers, Logs
+├── service.go       # Service loading, validation, config building
+├── container.go     # Container types and helpers
 ├── docker.go        # Docker API wrappers
-├── status.go        # Status/Statii types and helpers
 ├── logdecoder.go    # Docker log stream decoder
 └── test/
     └── data/        # Test configurations
@@ -65,19 +65,19 @@ jed/
 
 ### Key Design Decisions
 
-**Statii as Map**
-- `Statii()` returns `map[string]Status` keyed by base name
+**Containers as Map**
+- `Containers()` returns `map[string]Container` keyed by service name
 - Automatically strips random suffixes (e.g., `postgres-k7m9x2n` → `postgres`)
 - No caching - Docker is always the source of truth
 
-**Stateless Service**
+**Stateless Design**
 - No internal state tracking
-- Caller controls when to refresh status
+- Caller controls when to refresh container status
 - Prevents stale data issues
 
 **Optional .env Files**
 - Missing .env files return empty map (no error)
-- Per-container environment configuration
+- Per-service environment configuration
 
 **Best-Effort Undeploy**
 - Stop errors are logged but don't fail undeploy
@@ -90,19 +90,23 @@ jed/
 ```go
 type Config struct{}
 
-type Container struct {
+type Jed struct {
+    // Unexported fields
+}
+
+type Service struct {
     Name, Image, Network, Restart string
     Env, Ports, Labels, Volumes   map[string]string
 }
 
-type Status struct {
+type Container struct {
     Id, Image, State, Status string
     Names                    []string
     Labels                   map[string]string
     Created                  int64
 }
 
-type Statii map[string]Status
+type Containers map[string]Container
 ```
 
 ### Interfaces (User Implements)
@@ -123,23 +127,23 @@ type Logger interface {
 ### Methods
 
 ```go
-// Create service
-func (cfg *Config) NewSvc(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (*Svc, error)
+// Create Jed instance
+func (cfg *Config) NewJed(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (*Jed, error)
 
-// Get loaded containers
-func (svc *Svc) Containers() []Container
+// Get loaded services
+func (jed *Jed) Services() []Service
 
-// Container lifecycle
-func (svc *Svc) Deploy(ctx context.Context, cntr *Container) (id string, err error)
-func (svc *Svc) Undeploy(ctx context.Context, cntr *Container) error
+// Service lifecycle
+func (jed *Jed) Deploy(ctx context.Context, svc *Service) (id string, err error)
+func (jed *Jed) Undeploy(ctx context.Context, svc *Service) error
 
-// Status and logs
-func (svc *Svc) Statii(ctx context.Context) (Statii, error)
-func (svc *Svc) Logs(ctx context.Context, id, tail string) ([]byte, error)
+// Container status and logs
+func (jed *Jed) Containers(ctx context.Context) (Containers, error)
+func (jed *Jed) Logs(ctx context.Context, id, tail string) ([]byte, error)
 
-// Statii helpers
-func (statii Statii) DeployName(baseName string) (string, error)
-func (statii Statii) Id(baseName string) (string, error)
+// Containers helpers
+func (containers Containers) DeployName(serviceName string) (string, error)
+func (containers Containers) Id(serviceName string) (string, error)
 ```
 
 ## Container Configuration

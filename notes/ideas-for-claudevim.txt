@@ -1,0 +1,128 @@
+got it—let’s tune the Claude ↔︎ Neovim loop and add MCPs that make it blazing without bloating your editor.
+
+Claude + Neovim: fast interaction patterns
+
+Goals: (1) cheap, precise context; (2) small, safe write surfaces; (3) quick feedback on edits.
+
+1) Core MCPs to install
+
+Group these so Claude can read/search/patch/run without leaving your repo:
+
+I/O + Editing
+	•	filesystem – scoped to your repo root; enables byte-range reads/writes for surgical patches.
+	•	process or bash – run build/test tools (go test, golangci-lint, make, just).
+	•	git – get status/diff/apply patches, create branches, commit with conventional messages.
+	•	ripgrep (or search) – fast, structured code search; stream small excerpts as context.
+	•	sed/patch (optional) – apply unified diffs even if git is busy.
+
+Code Intel & Build
+	•	ctags (or a tiny wrapper) – generate/update tags; Claude can jump symbols without slurping whole files.
+	•	go-tools – wrappers for go list, go test -json, gofumpt, goimports, gomodifytags, impl.
+	•	golangci-lint – single command surfacing actionable diagnostics.
+
+Runtime & Env
+	•	docker – run test/build inside your project image for parity (map repo as volume, read-only by default).
+	•	env/secrets (read-only) – retrieve safe tokens/config without pasting into chat.
+
+Docs & Web
+	•	http – hit local services or external APIs during impl work.
+	•	openapi (optional) – load your service’s OpenAPI so Claude can propose handler stubs/tests correctly.
+
+Nice-to-haves
+	•	sqlite – local scratch DB for data tasks.
+	•	cron/watch – rerun tests/benchmarks on changed paths (Claude triggers; you view in Neovim).
+
+Tip: install MCPs as separate binaries/containers and expose only what you need. Keep each server’s root = your repo, deny .., and set allowlists for commands.
+
+2) Minimal mcp.json (tight, fast, safe)
+
+Put next to your Claude client config; adjust paths as needed:
+
+{
+  "servers": {
+    "fs": { "command": "mcp-filesystem", "args": ["--root", "/home/you/src/myrepo"] },
+    "sh": { "command": "mcp-bash", "args": ["--cwd", "/home/you/src/myrepo", "--timeout", "8000"] },
+    "git": { "command": "mcp-git", "args": ["--cwd", "/home/you/src/myrepo"] },
+    "rg":  { "command": "mcp-ripgrep", "args": ["--cwd", "/home/you/src/myrepo", "--max-bytes", "200000"] },
+    "go":  { "command": "mcp-go-tools", "args": ["--cwd", "/home/you/src/myrepo"] },
+    "lint":{ "command": "mcp-golangci", "args": ["--cwd", "/home/you/src/myrepo", "--timeout", "20s"] },
+    "http":{ "command": "mcp-http" },
+    "dock":{ "command": "mcp-docker", "args": ["--workdir", "/work"], "env": {"DOCKER_HOST": "unix:///var/run/docker.sock"} }
+  }
+}
+
+Hardening flags to use where supported
+	•	--read-only for fs (use explicit write ops only).
+	•	--deny-globs like node_modules/**, .git/**, **/*.bin, **/*.pdf.
+	•	--max-file-size (e.g., 512 KB) and --max-results for ripgrep.
+	•	--require-confirmation write, patch, commit (Claude proposes; you approve).
+
+3) Claude “workflows” that feel instant in Neovim
+
+Bind a few keys (via which-key) that simply call a small shell script or local API your Claude client watches. Each workflow is a scriptable recipe Claude follows using MCP tools:
+
+A) Surgical edit (nearest function)
+	1.	Neovim key: select function → call “surgical-edit”.
+	2.	Claude: rg for usages (limit 20 lines each), fs.read the target slice only, propose unified diff.
+	3.	You approve → git apply -p0 via git MCP → go test ./... -run '^TestFoo$' via sh.
+	4.	Claude reads test JSON, fixes until green.
+
+B) Red-green-refactor (package scope)
+	•	Claude creates a temp branch (git), generates failing tests (go test -run filter), implements minimal pass, runs golangci-lint, opens PR-style summary (diff + checklist). You squash/merge when happy.
+
+C) “Explain failing build”
+	•	Claude runs go build ./... or go test -json, collects first 30 errors, clusters by file/symbol, and opens a short diagnosis with jump links (fs.read byte ranges). Much faster than dumping logs.
+
+D) Safe large-file ops
+	•	For big files, force fs.read with byte ranges (e.g., ±120 lines of target hunk). Keep tokens low and speed high.
+
+4) Prompts that make Claude fast (paste into system/instructions)
+	•	Tooling contract
+“Only read small slices. Prefer ripgrep → symbol shortlist → fs.read ranges. Propose minimal unified diffs. After edits, run go test ./pkg/... -run '<nearest>' -json and summarize failures with file:line. Never cat large files; read ranges.”
+	•	Write guardrails
+“All writes: produce a single unified diff rooted at repo root. Never write lock files except when explicitly asked. Keep changes under 150 lines unless I say ‘go broad’.”
+	•	Search discipline
+“When searching, return top 10 hits with start_line, end_line, and a one-line reason. Avoid duplicate files. If no high-signal hits, stop and ask.”
+	•	Test discipline
+“After edits, always run the narrowest test first; if pass, then broaden. If test takes > 8s, switch to -run filtered subsets.”
+
+5) Neovim glue (tiny, reliable)
+
+You don’t need a special plugin; a couple commands wired to your Claude client is enough:
+
+-- Example: send visual selection to Claude with an action label
+vim.keymap.set("v", "<leader>cs", function()
+  local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+  vim.api.nvim_feedkeys(esc, "x", false)
+  local start_pos = vim.fn.getpos("'<")
+  local end_pos   = vim.fn.getpos("'>'")
+  local file = vim.fn.expand("%:p")
+  local payload = vim.json.encode({
+    action = "surgical-edit",
+    file = file,
+    start = start_pos[2], -- line
+    stop  = end_pos[2]
+  })
+  -- Replace with your local Claude client command/socket
+  vim.fn.jobstart({ "claude-cli", "neovim", payload }, { detach = true })
+end, { desc = "Claude: surgical edit of selection" })
+
+Pair that with Telescope git_status / ripgrep pickers so you can quickly feed single files or symbols into the same action.
+
+6) Speed levers that matter
+	•	Index once, query often: prebuild ctags and keep a lightweight symbol map (tags.json). Let Claude consult it before any fs.read.
+	•	Ripgrep JSON mode: use rg --json --max-columns 200 --max-count 200 --no-ignore -g '!{.git,node_modules,dist,build,coverage}'.
+	•	Byte-ranged reads: never stream whole files for context; ±120 lines around the edit hunk is usually enough.
+	•	Tight timeouts: set per-tool timeouts (e.g., sh 8s, lint 20s, http 5s).
+	•	Dockerized builds: identical environment = fewer thrashy loops.
+	•	Branch-per-task: isolates patches; lets Claude rebase/merge cleanly.
+
+7) Opinionated recipes (copy/paste into Claude as “tools”)
+	•	“Generate tests for this function” → go test -run '' -list to locate suites, gotests -w -only <Func> to scaffold, then refine.
+	•	“Add JSON tags to struct” → gomodifytags -file <f> -struct <S> -add-tags json -w.
+	•	“Implement interface” → impl 'r *Receiver' package.Interface >> file.go.
+	•	“Fix imports + format” → gofumpt -w . && goimports -w . (or run per-file after patch).
+
+⸻
+
+If you want, tell me how you’re launching Claude (desktop vs CLI vs custom client) and I’ll give you a drop-in mcp.json, hardened fs/git/rg args, and 3 Neovim keymaps wired to your exact client so you can start using surgical-edit, explain-failure, and generate-tests today.

@@ -9,62 +9,62 @@ var (
 	empty = map[string]string{}
 )
 
-func (svc *Svc) create(ctx context.Context, name string, cfg containerConfig) (id string, err error) {
+func (jed *Jed) create(ctx context.Context, name string, cfg containerConfig) (id string, err error) {
 
-	svc.logger.Info(ctx, "creating container", "name", name)
+	jed.logger.Info(ctx, "creating container", "name", name)
 
 	var response struct {
 		Id string `json:"Id"`
 	}
 
 	path := fmt.Sprintf("/containers/create?name=%s", name)
-	err = svc.client.SendObject(ctx, "POST", path, cfg, &response)
+	err = jed.client.SendObject(ctx, "POST", path, cfg, &response)
 	if err != nil {
 		return
 	}
 
 	id = response.Id
-	svc.logger.Info(ctx, "created container", "name", name, "id", id)
+	jed.logger.Info(ctx, "created container", "name", name, "id", id)
 	return
 }
 
-func (svc *Svc) containers(ctx context.Context) (statuses []Status, err error) {
+func (jed *Jed) containers(ctx context.Context) (containers []Container, err error) {
 
 	path := `/containers/json?all=true&filters={"label":["managed_by=jed"]}`
-	err = svc.client.SendObject(ctx, "GET", path, nil, &statuses)
+	err = jed.client.SendObject(ctx, "GET", path, nil, &containers)
 	return
 }
 
-func (svc *Svc) start(ctx context.Context, name string) (err error) {
+func (jed *Jed) start(ctx context.Context, name string) (err error) {
 
-	svc.logger.Info(ctx, "starting container", "name", name)
+	jed.logger.Info(ctx, "starting container", "name", name)
 
 	path := fmt.Sprintf("/containers/%s/start", name)
-	err = svc.client.SendObject(ctx, "POST", path, empty, nil)
+	err = jed.client.SendObject(ctx, "POST", path, empty, nil)
 	return
 }
 
-func (svc *Svc) stop(ctx context.Context, name string) (err error) {
+func (jed *Jed) stop(ctx context.Context, name string) (err error) {
 
-	svc.logger.Info(ctx, "stopping container", "name", name)
+	jed.logger.Info(ctx, "stopping container", "name", name)
 
 	path := fmt.Sprintf("/containers/%s/stop", name)
-	err = svc.client.SendObject(ctx, "POST", path, empty, nil)
+	err = jed.client.SendObject(ctx, "POST", path, empty, nil)
 	return
 }
 
-func (svc *Svc) delete(ctx context.Context, name string) (err error) {
+func (jed *Jed) delete(ctx context.Context, name string) (err error) {
 
-	svc.logger.Info(ctx, "deleting container", "name", name)
+	jed.logger.Info(ctx, "deleting container", "name", name)
 
 	path := fmt.Sprintf("/containers/%s", name)
-	err = svc.client.SendObject(ctx, "DELETE", path, nil, nil)
+	err = jed.client.SendObject(ctx, "DELETE", path, nil, nil)
 	return
 }
 
-func (svc *Svc) checkImage(ctx context.Context, name string) (err error) {
+func (jed *Jed) checkImage(ctx context.Context, name string) (err error) {
 
 	path := fmt.Sprintf("/images/%s/json", name)
-	err = svc.client.SendObject(ctx, "GET", path, nil, nil)
+	err = jed.client.SendObject(ctx, "GET", path, nil, nil)
 	return
 }

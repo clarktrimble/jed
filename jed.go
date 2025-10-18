@@ -32,40 +32,40 @@ type Logger interface {
 	Error(ctx context.Context, msg string, err error, kv ...any)
 }
 
-// Config is Svc configurables.
+// Config is Jed configurables.
 type Config struct{}
 
-// Svc is the service.
-// Container and Status relationship:
-// - Container is input config (immutable, user-facing base names like "postgres")
-// - Status is runtime state from Docker (actual deployed names like "postgres-k7m9x2n")
-// - Deploy adds random suffix to Container.Name to create unique deployed names
-// - Statii() returns map keyed by base name for easy lookup
-// - Statii are filtered by managed_by=jed label
+// Jed is the service.
+// Service and Container relationship:
+// - Service is input config (immutable, user-facing base names like "postgres")
+// - Container is runtime state from Docker (actual deployed names like "postgres-k7m9x2n")
+// - Deploy adds random suffix to Service.Name to create unique deployed names
+// - Containers() returns map keyed by service name for easy lookup
+// - Containers are filtered by managed_by=jed label
 //
-// Todo: implement container loading that adds managed_by=jed label
-type Svc struct {
+// Todo: implement service loading that adds managed_by=jed label
+type Jed struct {
 	client Client
 	logger Logger
-	cntrs  []Container
+	svcs   []Service
 }
 
-// NewSvc creates an Svc from Config.
-func (cfg *Config) NewSvc(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (svc *Svc, err error) {
+// NewJed creates a Jed from Config.
+func (cfg *Config) NewJed(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (jed *Jed, err error) {
 
-	containers, err := loadContainers(cfs)
+	services, err := loadServices(cfs)
 	if err != nil {
 		return
 	}
 
-	svc = &Svc{
+	jed = &Jed{
 		client: client,
 		logger: lgr,
-		cntrs:  containers,
+		svcs:   services,
 	}
 
-	for _, cntr := range svc.cntrs {
-		err = svc.checkImage(ctx, cntr.Image)
+	for _, service := range jed.svcs {
+		err = jed.checkImage(ctx, service.Image)
 		if err != nil {
 			return
 		}
@@ -74,28 +74,33 @@ func (cfg *Config) NewSvc(ctx context.Context, client Client, lgr Logger, cfs fs
 	return
 }
 
-// Containers returns a copy of the loaded containers.
-func (svc *Svc) Containers() []Container {
-	return slices.Clone(svc.cntrs)
+// Services returns a copy of the loaded services.
+func (jed *Jed) Services() []Service {
+
+	// Todo: actual non-mutable copy please!
+	//       `copy := maps.Clone(original)` for map fields
+
+	// Todo: should these be mapped by name?
+	return slices.Clone(jed.svcs)
 }
 
 // Deploy creates and starts a container.
-func (svc *Svc) Deploy(ctx context.Context, cntr *Container) (id string, err error) {
+func (jed *Jed) Deploy(ctx context.Context, service *Service) (id string, err error) {
 
 	suffix := hondo.Rand(7)
-	deployName := cntr.Name + "-" + suffix
+	deployName := service.Name + "-" + suffix
 
-	cfg, err := cntr.config()
+	cfg, err := service.config()
 	if err != nil {
 		return
 	}
 
-	id, err = svc.create(ctx, deployName, cfg)
+	id, err = jed.create(ctx, deployName, cfg)
 	if err != nil {
 		return
 	}
 
-	err = svc.start(ctx, deployName)
+	err = jed.start(ctx, deployName)
 	if err != nil {
 		return
 	}
@@ -104,51 +109,51 @@ func (svc *Svc) Deploy(ctx context.Context, cntr *Container) (id string, err err
 }
 
 // Undeploy stops and removes a container.
-func (svc *Svc) Undeploy(ctx context.Context, cntr *Container) (err error) {
+func (jed *Jed) Undeploy(ctx context.Context, service *Service) (err error) {
 
-	statii, err := svc.Statii(ctx)
+	containers, err := jed.Containers(ctx)
 	if err != nil {
 		return
 	}
 
-	deployName, err := statii.DeployName(cntr.Name)
+	deployName, err := containers.DeployName(service.Name)
 	if err != nil {
 		return
 	}
 
-	err = svc.stop(ctx, deployName)
+	err = jed.stop(ctx, deployName)
 	if err != nil {
 		// best effort, we could check for "304 already stopped"
-		svc.logger.Error(ctx, "failed to stop container", err)
+		jed.logger.Error(ctx, "failed to stop container", err)
 	}
 
-	err = svc.delete(ctx, deployName)
+	err = jed.delete(ctx, deployName)
 	return
 }
 
-// Statii returns all containers managed by this service.
-func (svc *Svc) Statii(ctx context.Context) (statii Statii, err error) {
+// Containers returns all containers managed by this service.
+func (jed *Jed) Containers(ctx context.Context) (result Containers, err error) {
 
-	statuses, err := svc.containers(ctx)
+	containers, err := jed.containers(ctx)
 	if err != nil {
 		return
 		// Todo: think about best effort here (with logses of course!)
 	}
 
-	statii = newStatii(statuses)
+	result = newContainers(containers)
 	return
 }
 
 // Logs retrieves logs from a container using Docker API.
 // Todo: consider additional options (timestamps, since, until, follow)
-func (svc *Svc) Logs(ctx context.Context, id, tail string) (logs []byte, err error) {
+func (jed *Jed) Logs(ctx context.Context, id, tail string) (logs []byte, err error) {
 
-	svc.logger.Info(ctx, "getting container logs", "id", id)
+	jed.logger.Info(ctx, "getting container logs", "id", id)
 
 	// Todo: allow for stdout and/or stderr
 	path := fmt.Sprintf("/containers/%s/logs?stdout=true&stderr=true&tail=%s", id, tail)
 
-	rawLogs, err := svc.client.SendJson(ctx, "GET", path, nil)
+	rawLogs, err := jed.client.SendJson(ctx, "GET", path, nil)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to get logs for container")
 		return
