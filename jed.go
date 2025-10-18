@@ -42,8 +42,6 @@ type Config struct{}
 // - Deploy adds random suffix to Service.Name to create unique deployed names
 // - Containers() returns map keyed by service name for easy lookup
 // - Containers are filtered by managed_by=jed label
-//
-// Todo: implement service loading that adds managed_by=jed label
 type Jed struct {
 	client Client
 	logger Logger

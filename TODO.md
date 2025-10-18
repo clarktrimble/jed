@@ -8,7 +8,7 @@
 
 ## Medium Priority
 
-- [ ] Make suffixPattern more specific: `-[a-zA-Z0-9]{7}$` instead of `-[^-]+$`
+- [x] Make suffixPattern more specific: `-[a-zA-Z0-9]{7}$` instead of `-[^-]+$` - COMPLETED
 - [ ] Add hondo package var for testable random source (predictable suffixes in tests)
 - [ ] Allow choosing stdout and/or stderr in Logs method
 - [ ] Consider adding more Containers helper methods:
@@ -39,7 +39,8 @@
 - [x] Remove redundant validate calls (completed)
 - [x] Fix linter warnings (completed)
 - [x] Add findCall helper for tests (completed)
-- [ ] Consider extracting BeforeEach setup to shared helper (decided against - clarity over DRY)
+- [x] Add testContainerList helper to reduce test duplication (completed)
+- [x] Move managed_by label addition to loadServices (completed)
 
 ## Documentation
 

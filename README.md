@@ -180,7 +180,7 @@ POSTGRES_DB=mydb
 
 ## Testing
 
-- **30 passing tests**
+- **32 passing tests**
 - **87.8% coverage**
 - Uses Ginkgo/Gomega for BDD-style tests
 - Mock Docker client and logger

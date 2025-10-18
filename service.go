@@ -54,8 +54,6 @@ func (service *Service) config() (cfg containerConfig, err error) {
 
 	exposedPorts, portBindings := buildPortConfig(service.Ports)
 
-	service.Labels["managed_by"] = "jed"
-
 	hostConfig := map[string]any{
 		"PortBindings": portBindings,
 		"Binds":        buildVolumeConfig(service.Volumes),
@@ -130,6 +128,12 @@ func loadServices(cfs fs.FS) (services []Service, err error) {
 			return
 		}
 		services[i].Env = env
+
+		// Ensure managed_by label is set
+		if services[i].Labels == nil {
+			services[i].Labels = make(map[string]string)
+		}
+		services[i].Labels["managed_by"] = "jed"
 	}
 
 	return
