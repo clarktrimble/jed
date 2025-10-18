@@ -31,10 +31,11 @@ var containerFS embed.FS
 
 // Create Jed instance
 cfg := &jed.Config{}
-j, err := cfg.NewJed(ctx, httpClient, logger, containerFS)
+j, err := cfg.New(ctx, httpClient, logger, containerFS)
 
 // Deploy a service
-svc := j.Services()[0]
+services := j.Services()
+svc := services["postgres"]
 id, err := j.Deploy(ctx, &svc)
 
 // Check container status
@@ -54,7 +55,7 @@ err = j.Undeploy(ctx, &svc)
 
 ```
 jed/
-├── jed.go           # Public API: NewJed, Deploy, Undeploy, Containers, Logs
+├── jed.go           # Public API: New, Deploy, Undeploy, Services, Containers, Logs
 ├── service.go       # Service loading, validation, config building
 ├── container.go     # Container types and helpers
 ├── docker.go        # Docker API wrappers
@@ -65,7 +66,8 @@ jed/
 
 ### Key Design Decisions
 
-**Containers as Map**
+**Services and Containers as Maps**
+- `Services()` returns `map[string]Service` keyed by service name (deep copy with cloned maps)
 - `Containers()` returns `map[string]Container` keyed by service name
 - Automatically strips random suffixes (e.g., `postgres-k7m9x2n` → `postgres`)
 - No caching - Docker is always the source of truth
@@ -128,10 +130,10 @@ type Logger interface {
 
 ```go
 // Create Jed instance
-func (cfg *Config) NewJed(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (*Jed, error)
+func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (*Jed, error)
 
-// Get loaded services
-func (jed *Jed) Services() []Service
+// Get loaded services (returns deep copy mapped by name)
+func (jed *Jed) Services() map[string]Service
 
 // Service lifecycle
 func (jed *Jed) Deploy(ctx context.Context, svc *Service) (id string, err error)
@@ -181,7 +183,7 @@ POSTGRES_DB=mydb
 ## Testing
 
 - **32 passing tests**
-- **87.8% coverage**
+- **86.9% coverage**
 - Uses Ginkgo/Gomega for BDD-style tests
 - Mock Docker client and logger
 - Real Docker log data for decoder tests
@@ -199,7 +201,7 @@ make lint       # Run golangci-lint
 Containers are deployed with random 7-character suffixes to avoid name collisions:
 - `postgres` → `postgres-x7y9z2n`
 - Uses `hondo.Rand(7)` for generation
-- Suffix pattern: `-[^-]+$` (regex for stripping)
+- Suffix pattern: `^/(.+)-[a-zA-Z0-9]{7}$` (regex for parsing Docker names with leading slash)
 
 ### Label-Based Management
 

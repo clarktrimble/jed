@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Container is container status returned from docker
+// Container is docker api container.
 type Container struct {
 	Id      string            `json:"Id"`
 	Names   []string          `json:"Names"`
@@ -17,10 +17,10 @@ type Container struct {
 	Created int64             `json:"Created"`
 }
 
-// Containers maps service names to their runtime container status.
+// Containers maps service names to container.
 type Containers map[string]Container
 
-// DeployName returns the deployed name given a service name.
+// DeployName returns the deployed name of a given service.
 func (containers Containers) DeployName(serviceName string) (deployName string, err error) {
 	container, ok := containers[serviceName]
 	if !ok {
@@ -44,22 +44,20 @@ func (containers Containers) Id(serviceName string) (id string, err error) {
 
 // unexported
 
-func newContainers(containers []Container) (result Containers, err error) {
+func newContainers(containers []Container) (byName Containers, noMatch []string) {
 
-	result = Containers{}
+	byName = Containers{}
 	for _, container := range containers {
 		for _, name := range container.Names {
-			fullName := strings.TrimPrefix(name, "/")
-
-			matches := suffixPattern.FindStringSubmatch(fullName)
+			matches := suffixPattern.FindStringSubmatch(name)
 			if matches == nil {
-				err = errors.Errorf("container name %q does not match expected pattern <service>-<7-char-suffix>", fullName)
-				return
+				noMatch = append(noMatch, name)
+				continue
 			}
 
 			serviceName := matches[1]
-			result[serviceName] = container
+			byName[serviceName] = container
 		}
 	}
-	return result, nil
+	return
 }

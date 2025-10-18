@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"regexp"
-	"slices"
 
 	"github.com/clarktrimble/hondo"
 	"github.com/pkg/errors"
@@ -15,8 +15,13 @@ import (
 
 //go:generate moq -out mock_test.go -pkg jed_test . Logger Client
 
+const (
+	configFile string = "services.yaml"
+	envSuffix  string = "env"
+)
+
 var (
-	suffixPattern = regexp.MustCompile(`^(.+)-[a-zA-Z0-9]{7}$`)
+	suffixPattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
 )
 
 // Client specifies an http client by which stuff can be sent and received.
@@ -48,8 +53,8 @@ type Jed struct {
 	svcs   []Service
 }
 
-// NewJed creates a Jed from Config.
-func (cfg *Config) NewJed(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (jed *Jed, err error) {
+// New creates a Jed from Config.
+func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (jed *Jed, err error) {
 
 	services, err := loadServices(cfs)
 	if err != nil {
@@ -72,14 +77,23 @@ func (cfg *Config) NewJed(ctx context.Context, client Client, lgr Logger, cfs fs
 	return
 }
 
-// Services returns a copy of the loaded services.
-func (jed *Jed) Services() []Service {
+// Services returns a copy of services mapped by name.
+func (jed *Jed) Services() map[string]Service {
 
-	// Todo: actual non-mutable copy please!
-	//       `copy := maps.Clone(original)` for map fields
-
-	// Todo: should these be mapped by name?
-	return slices.Clone(jed.svcs)
+	services := make(map[string]Service, len(jed.svcs))
+	for _, svc := range jed.svcs {
+		services[svc.Name] = Service{
+			Name:    svc.Name,
+			Image:   svc.Image,
+			Network: svc.Network,
+			Restart: svc.Restart,
+			Env:     maps.Clone(svc.Env),
+			Ports:   maps.Clone(svc.Ports),
+			Labels:  maps.Clone(svc.Labels),
+			Volumes: maps.Clone(svc.Volumes),
+		}
+	}
+	return services
 }
 
 // Deploy creates and starts a container.
@@ -130,27 +144,27 @@ func (jed *Jed) Undeploy(ctx context.Context, service *Service) (err error) {
 }
 
 // Containers returns all containers managed by this service.
-func (jed *Jed) Containers(ctx context.Context) (result Containers, err error) {
+func (jed *Jed) Containers(ctx context.Context) (Containers, error) {
 
 	containers, err := jed.containers(ctx)
 	if err != nil {
-		return
-		// Todo: think about best effort here (with logses of course!)
+		return Containers{}, err
 	}
 
-	result, err = newContainers(containers)
-	return
+	byName, noMatch := newContainers(containers)
+	if len(noMatch) != 0 {
+		err = errors.Errorf("unexpected container names")
+		jed.logger.Error(ctx, "ignoring managed_by=jed containers", err, "names", noMatch)
+	}
+	return byName, nil
 }
 
 // Logs retrieves logs from a container using Docker API.
-// Todo: consider additional options (timestamps, since, until, follow)
 func (jed *Jed) Logs(ctx context.Context, id, tail string) (logs []byte, err error) {
 
 	jed.logger.Info(ctx, "getting container logs", "id", id)
 
-	// Todo: allow for stdout and/or stderr
 	path := fmt.Sprintf("/containers/%s/logs?stdout=true&stderr=true&tail=%s", id, tail)
-
 	rawLogs, err := jed.client.SendJson(ctx, "GET", path, nil)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to get logs for container")

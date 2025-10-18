@@ -39,7 +39,7 @@ var _ = Describe("Container", func() {
 				return nil
 			},
 		}
-		svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+		svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -122,10 +122,12 @@ var _ = Describe("Container", func() {
 				client.SendObjectFunc = mockContainers(cntrs)
 			})
 
-			It("should return error about invalid suffix", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("does not match expected pattern"))
-				Expect(err.Error()).To(ContainSubstring("postgres"))
+			It("should skip non-matching containers and log error", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(containers).To(HaveLen(0))
+				Expect(lgr.ErrorCalls()).To(HaveLen(1))
+				Expect(lgr.ErrorCalls()[0].Msg).To(Equal("ignoring managed_by=jed containers"))
+				Expect(lgr.ErrorCalls()[0].Err.Error()).To(ContainSubstring("unexpected container names"))
 			})
 		})
 	})

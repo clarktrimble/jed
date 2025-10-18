@@ -15,9 +15,9 @@ type Service struct {
 	Name    string
 	Image   string
 	Env     map[string]string `json:"env"`
-	Ports   map[string]string `json:"ports"` //,omitempty" Todo:
+	Ports   map[string]string `json:"ports"`
 	Labels  map[string]string `json:"labels"`
-	Volumes map[string]string `json:"volumes"` //,omitempty" Todo:
+	Volumes map[string]string `json:"volumes"`
 	Network string            `json:"network"`
 	Restart string            `json:"restart"`
 }
@@ -31,9 +31,6 @@ func (service *Service) validate() error {
 	if service.Name == "" {
 		issues = append(issues, "name is required")
 	}
-	//if service.EnvForm == "" {
-	//issues = append(issues, "env_form is required")
-	//}
 	if service.Network == "" {
 		issues = append(issues, "network is required")
 	}
@@ -102,8 +99,7 @@ func buildVolumeConfig(volumes map[string]string) []string {
 
 func loadServices(cfs fs.FS) (services []Service, err error) {
 
-	// Todo: hardcoded filename is awkward here, rethink
-	data, err := fs.ReadFile(cfs, "containers.yaml")
+	data, err := fs.ReadFile(cfs, configFile)
 	if err != nil {
 		err = errors.Wrap(err, "failed to read containers.yaml")
 		return
@@ -129,7 +125,7 @@ func loadServices(cfs fs.FS) (services []Service, err error) {
 		}
 		services[i].Env = env
 
-		// Ensure managed_by label is set
+		// Todo: newServices without nil molehill
 		if services[i].Labels == nil {
 			services[i].Labels = make(map[string]string)
 		}
@@ -141,8 +137,7 @@ func loadServices(cfs fs.FS) (services []Service, err error) {
 
 func loadEnv(cfs fs.FS, name string) (env map[string]string, err error) {
 
-	// Todo: demajic
-	file := fmt.Sprintf("%s.env", name)
+	file := fmt.Sprintf("%s.%s", name, envSuffix)
 
 	env = map[string]string{}
 	envData, err := fs.ReadFile(cfs, file)

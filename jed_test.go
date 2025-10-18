@@ -138,18 +138,18 @@ var _ = Describe("Jed", func() {
 		}
 	})
 
-	Describe("NewSvc", func() {
+	Describe("New", func() {
 		var (
 			fsPath string
 		)
 
 		JustBeforeEach(func() {
-			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS(fsPath))
+			svc, err = cfg.New(ctx, client, lgr, os.DirFS(fsPath))
 		})
 
 		When("given valid containers.yaml and env files", func() {
 			BeforeEach(func() {
-				fsPath = "test/data/cntr-cfg"
+				fsPath = "test/data/svc-cfg"
 				// Mock checkImage calls for all images
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 					if method == "GET" && strings.Contains(path, "/images/") {
@@ -175,7 +175,7 @@ var _ = Describe("Jed", func() {
 
 		When("given missing containers.yaml", func() {
 			BeforeEach(func() {
-				fsPath = "test/data/cntr-cfg-empty"
+				fsPath = "test/data/svc-cfg-empty"
 			})
 
 			It("should return error", func() {
@@ -185,7 +185,7 @@ var _ = Describe("Jed", func() {
 
 		When("given invalid container", func() {
 			BeforeEach(func() {
-				fsPath = "test/data/cntr-cfg-invalid"
+				fsPath = "test/data/svc-cfg-invalid"
 			})
 
 			It("should return error", func() {
@@ -212,7 +212,7 @@ var _ = Describe("Jed", func() {
 				Volumes: map[string]string{"/host/path": "/container/path"},
 			}
 			client.SendObjectFunc = mockCreate("abc123def456")
-			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -242,35 +242,34 @@ var _ = Describe("Jed", func() {
 		})
 	})
 
-	Describe("Containers", func() {
+	Describe("Services", func() {
 		var (
-			cntrs []jed.Service
+			services map[string]jed.Service
 		)
 
 		BeforeEach(func() {
-			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		JustBeforeEach(func() {
-			cntrs = svc.Services()
+			services = svc.Services()
 		})
 
-		When("containers are loaded", func() {
-			It("should return 4 containers", func() {
-				Expect(cntrs).To(HaveLen(4))
+		When("services are loaded", func() {
+			It("should return 4 services", func() {
+				Expect(services).To(HaveLen(4))
 			})
 
 			It("should have correct names", func() {
-				names := []string{}
-				for _, cntr := range cntrs {
-					names = append(names, cntr.Name)
-				}
-				Expect(names).To(ContainElements("traefik", "axis-camera-1", "logscale-1", "borken-1"))
+				Expect(services).To(HaveKey("traefik"))
+				Expect(services).To(HaveKey("axis-camera-1"))
+				Expect(services).To(HaveKey("logscale-1"))
+				Expect(services).To(HaveKey("borken-1"))
 			})
 
-			It("should load container properties from YAML", func() {
-				traefik := cntrs[0] // traefik is first in containers.yaml
+			It("should load service properties from YAML", func() {
+				traefik := services["traefik"]
 				Expect(traefik.Name).To(Equal("traefik"))
 				Expect(traefik.Image).To(Equal("traefik:v3.0"))
 				Expect(traefik.Network).To(Equal("admin-int"))
@@ -283,23 +282,23 @@ var _ = Describe("Jed", func() {
 			})
 
 			It("should load existing labels from YAML", func() {
-				axisCamera := cntrs[1] // axis-camera-1 is second in containers.yaml
+				axisCamera := services["axis-camera-1"]
 				Expect(axisCamera.Name).To(Equal("axis-camera-1"))
 				Expect(axisCamera.Labels["traefik.enable"]).To(Equal("true"))
 				Expect(axisCamera.Labels["traefik.http.routers.axis-camera-1.tls"]).To(Equal("true"))
 				Expect(axisCamera.Labels["traefik.http.routers.axis-camera-1.rule"]).To(Equal("Host(`axis.int.bastille.cloud`)"))
 			})
 
-			It("should load env files for containers that have them", func() {
-				traefik := cntrs[0] // traefik is first in containers.yaml
+			It("should load env files for services that have them", func() {
+				traefik := services["traefik"]
 				Expect(traefik.Name).To(Equal("traefik"))
 				Expect(traefik.Env["TRAEFIK_API_DASHBOARD"]).To(Equal("true"))
 				Expect(traefik.Env["TRAEFIK_PROVIDERS_DOCKER"]).To(Equal("true"))
 				Expect(traefik.Env["TRAEFIK_ENTRYPOINTS_WEB_ADDRESS"]).To(Equal(":80"))
 			})
 
-			It("should handle containers without env files", func() {
-				borken := cntrs[3] // borken-1 has no .env file
+			It("should handle services without env files", func() {
+				borken := services["borken-1"]
 				Expect(borken.Name).To(Equal("borken-1"))
 				Expect(borken.Env).To(BeEmpty())
 			})
@@ -315,7 +314,7 @@ var _ = Describe("Jed", func() {
 			cntr = &jed.Service{
 				Name: "test-app",
 			}
-			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -428,7 +427,7 @@ var _ = Describe("Jed", func() {
 			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 				return rawData, nil
 			}
-			svc, err = cfg.NewJed(ctx, client, lgr, os.DirFS("test/data/cntr-cfg"))
+			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
