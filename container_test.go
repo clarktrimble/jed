@@ -54,33 +54,7 @@ var _ = Describe("Container", func() {
 
 		When("multiple containers are running", func() {
 			BeforeEach(func() {
-				statuses := []jed.Container{
-					{
-						Id:     "abc123",
-						Names:  []string{"/postgres-x7y9z2n"},
-						Image:  "postgres:14",
-						State:  "running",
-						Status: "Up 2 hours",
-						Labels: map[string]string{"managed_by": "jed"},
-					},
-					{
-						Id:     "def456",
-						Names:  []string{"/redis-k3m5p1q"},
-						Image:  "redis:7",
-						State:  "running",
-						Status: "Up 1 hour",
-						Labels: map[string]string{"managed_by": "jed"},
-					},
-					{
-						Id:     "ghi789",
-						Names:  []string{"/nginx-w8x2y4z"},
-						Image:  "nginx:latest",
-						State:  "exited",
-						Status: "Exited (0) 5 minutes ago",
-						Labels: map[string]string{"managed_by": "jed"},
-					},
-				}
-				client.SendObjectFunc = mockContainers(statuses)
+				client.SendObjectFunc = mockContainers(testContainerList())
 			})
 
 			It("should return containers without error", func() {
@@ -132,6 +106,28 @@ var _ = Describe("Container", func() {
 				Expect(err).To(Equal(io.ErrUnexpectedEOF))
 			})
 		})
+
+		When("container name doesn't match suffix pattern", func() {
+			BeforeEach(func() {
+				cntrs := []jed.Container{
+					{
+						Id:     "abc123",
+						Names:  []string{"/postgres"},
+						Image:  "postgres:14",
+						State:  "running",
+						Status: "Up 2 hours",
+						Labels: map[string]string{"managed_by": "jed"},
+					},
+				}
+				client.SendObjectFunc = mockContainers(cntrs)
+			})
+
+			It("should return error about invalid suffix", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("does not match expected pattern"))
+				Expect(err.Error()).To(ContainSubstring("postgres"))
+			})
+		})
 	})
 
 	Describe("Containers.DeployName", func() {
@@ -141,15 +137,8 @@ var _ = Describe("Container", func() {
 		)
 
 		BeforeEach(func() {
-			statuses := []jed.Container{
-				{
-					Id:     "abc123",
-					Names:  []string{"/postgres-x7y9z2n"},
-					State:  "running",
-					Labels: map[string]string{"managed_by": "jed"},
-				},
-			}
-			client.SendObjectFunc = mockContainers(statuses)
+			cntrs := testContainerList()
+			client.SendObjectFunc = mockContainers(cntrs[:1])
 			containers, err = svc.Containers(ctx)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -188,15 +177,9 @@ var _ = Describe("Container", func() {
 		)
 
 		BeforeEach(func() {
-			statuses := []jed.Container{
-				{
-					Id:     "abc123def456",
-					Names:  []string{"/postgres-x7y9z2n"},
-					State:  "running",
-					Labels: map[string]string{"managed_by": "jed"},
-				},
-			}
-			client.SendObjectFunc = mockContainers(statuses)
+			cntrs := testContainerList()
+			cntrs[0].Id = "abc123def456"
+			client.SendObjectFunc = mockContainers(cntrs[:1])
 			containers, err = svc.Containers(ctx)
 			Expect(err).NotTo(HaveOccurred())
 		})

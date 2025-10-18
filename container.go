@@ -44,16 +44,22 @@ func (containers Containers) Id(serviceName string) (id string, err error) {
 
 // unexported
 
-func newContainers(containers []Container) (result Containers) {
+func newContainers(containers []Container) (result Containers, err error) {
 
 	result = Containers{}
 	for _, container := range containers {
 		for _, name := range container.Names {
 			fullName := strings.TrimPrefix(name, "/")
-			serviceName := suffixPattern.ReplaceAllString(fullName, "")
 
+			matches := suffixPattern.FindStringSubmatch(fullName)
+			if matches == nil {
+				err = errors.Errorf("container name %q does not match expected pattern <service>-<7-char-suffix>", fullName)
+				return
+			}
+
+			serviceName := matches[1]
 			result[serviceName] = container
 		}
 	}
-	return result
+	return result, nil
 }

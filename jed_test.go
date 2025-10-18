@@ -65,6 +65,36 @@ func mockContainers(containers []jed.Container) func(context.Context, string, st
 	}
 }
 
+// testContainerList returns a standard set of test containers for mocking.
+func testContainerList() []jed.Container {
+	return []jed.Container{
+		{
+			Id:     "abc123",
+			Names:  []string{"/postgres-x7y9z2n"},
+			Image:  "postgres:14",
+			State:  "running",
+			Status: "Up 2 hours",
+			Labels: map[string]string{"managed_by": "jed"},
+		},
+		{
+			Id:     "def456",
+			Names:  []string{"/redis-k3m5p1q"},
+			Image:  "redis:7",
+			State:  "running",
+			Status: "Up 1 hour",
+			Labels: map[string]string{"managed_by": "jed"},
+		},
+		{
+			Id:     "ghi789",
+			Names:  []string{"/nginx-w8x2y4z"},
+			Image:  "nginx:latest",
+			State:  "exited",
+			Status: "Exited (0) 5 minutes ago",
+			Labels: map[string]string{"managed_by": "jed"},
+		},
+	}
+}
+
 // mockCreate creates a mock response for Deploy() create call.
 func mockCreate(containerID string) func(context.Context, string, string, any, any) error {
 	return func(ctx context.Context, method, path string, snd, rcv any) error {
@@ -287,15 +317,9 @@ var _ = Describe("Jed", func() {
 
 		When("container exists and stops successfully", func() {
 			BeforeEach(func() {
-				statuses := []jed.Container{
-					{
-						Id:     "abc123",
-						Names:  []string{"/test-app-x7y9z2n"},
-						State:  "running",
-						Labels: map[string]string{"managed_by": "jed"},
-					},
-				}
-				client.SendObjectFunc = mockContainers(statuses)
+				cntrs := testContainerList()
+				cntrs[0].Names = []string{"/test-app-x7y9z2n"}
+				client.SendObjectFunc = mockContainers(cntrs[:1])
 			})
 
 			It("should undeploy without error", func() {
@@ -319,18 +343,13 @@ var _ = Describe("Jed", func() {
 
 		When("stop fails but delete succeeds", func() {
 			BeforeEach(func() {
-				statuses := []jed.Container{
-					{
-						Id:     "abc123",
-						Names:  []string{"/test-app-x7y9z2n"},
-						State:  "created",
-						Labels: map[string]string{"managed_by": "jed"},
-					},
-				}
+				cntrs := testContainerList()
+				cntrs[0].Names = []string{"/test-app-x7y9z2n"}
+				cntrs[0].State = "created"
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 					// Mock Containers() call
 					if method == "GET" && strings.Contains(path, "/containers/json") {
-						mockResponse(statuses, rcv)
+						mockResponse(cntrs[:1], rcv)
 						return nil
 					}
 					// Mock stop() - fails
@@ -356,18 +375,12 @@ var _ = Describe("Jed", func() {
 
 		When("delete fails", func() {
 			BeforeEach(func() {
-				statuses := []jed.Container{
-					{
-						Id:     "abc123",
-						Names:  []string{"/test-app-x7y9z2n"},
-						State:  "running",
-						Labels: map[string]string{"managed_by": "jed"},
-					},
-				}
+				cntrs := testContainerList()
+				cntrs[0].Names = []string{"/test-app-x7y9z2n"}
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 					// Mock Containers() call
 					if method == "GET" && strings.Contains(path, "/containers/json") {
-						mockResponse(statuses, rcv)
+						mockResponse(cntrs[:1], rcv)
 						return nil
 					}
 					// Mock delete() - fails

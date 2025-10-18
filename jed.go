@@ -16,7 +16,7 @@ import (
 //go:generate moq -out mock_test.go -pkg jed_test . Logger Client
 
 var (
-	suffixPattern = regexp.MustCompile(`-[^-]+$`) // Todo: make specific
+	suffixPattern = regexp.MustCompile(`^(.+)-[a-zA-Z0-9]{7}$`)
 )
 
 // Client specifies an http client by which stuff can be sent and received.
@@ -140,7 +140,7 @@ func (jed *Jed) Containers(ctx context.Context) (result Containers, err error) {
 		// Todo: think about best effort here (with logses of course!)
 	}
 
-	result = newContainers(containers)
+	result, err = newContainers(containers)
 	return
 }
 
