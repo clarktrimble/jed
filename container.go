@@ -2,19 +2,22 @@ package jed
 
 import (
 	"fmt"
+	"io/fs"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 )
 
-// Container is service container config.
-// Todo: pub?
+// Container is service Container config.
 type Container struct {
 	Name    string
 	Image   string
-	Ports   map[string]string `json:"ports,omitempty"`
-	Labels  map[string]string `json:"labels,omitempty"`
-	Volumes map[string]string `json:"volumes,omitempty"`
+	Env     map[string]string `json:"env"`
+	Ports   map[string]string `json:"ports"` //,omitempty" Todo:
+	Labels  map[string]string `json:"labels"`
+	Volumes map[string]string `json:"volumes"` //,omitempty" Todo:
 	Network string            `json:"network"`
 	Restart string            `json:"restart"`
 }
@@ -49,21 +52,9 @@ type containerConfig map[string]any
 
 func (cntr *Container) config() (cfg containerConfig, err error) {
 
-	err = cntr.validate()
-	// Todo: best effort valicate on load maybe?  But what if we change sommat?
-	if err != nil {
-		return
-	}
-
-	// Todo: elsewhere plz
-	//err = svc.checkImage(ctx, cntr.Image)
-	//if err != nil {
-	//return
-	//}
-
 	exposedPorts, portBindings := buildPortConfig(cntr.Ports)
 
-	// Todo: add managed_by=jed label when loading containers
+	cntr.Labels["managed_by"] = "jed"
 
 	hostConfig := map[string]any{
 		"PortBindings": portBindings,
@@ -74,8 +65,8 @@ func (cntr *Container) config() (cfg containerConfig, err error) {
 	}
 
 	cfg = map[string]any{
-		"Image": cntr.Image,
-		//"Env":          envLines(cntr.Env),
+		"Image":        cntr.Image,
+		"Env":          envLines(cntr.Env),
 		"Labels":       cntr.Labels,
 		"ExposedPorts": exposedPorts,
 		"HostConfig":   hostConfig,
@@ -109,4 +100,69 @@ func buildVolumeConfig(volumes map[string]string) []string {
 		binds = append(binds, fmt.Sprintf("%s:%s", hostPath, containerPath))
 	}
 	return binds
+}
+
+func loadContainers(cfs fs.FS) (containers []Container, err error) {
+
+	// Todo: hardcoded filename is awkward here, rethink
+	data, err := fs.ReadFile(cfs, "containers.yaml")
+	if err != nil {
+		err = errors.Wrap(err, "failed to read containers.yaml")
+		return
+	}
+
+	err = yaml.Unmarshal(data, &containers)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to decode containers config")
+		return
+	}
+
+	for i, container := range containers {
+
+		err = container.validate()
+		if err != nil {
+			return
+		}
+
+		var env map[string]string
+		env, err = loadEnv(cfs, container.Name)
+		if err != nil {
+			return
+		}
+		containers[i].Env = env
+	}
+
+	return
+}
+
+func loadEnv(cfs fs.FS, name string) (env map[string]string, err error) {
+
+	// Todo: demajic
+	file := fmt.Sprintf("%s.env", name)
+
+	env = map[string]string{}
+	envData, err := fs.ReadFile(cfs, file)
+	if errors.Is(err, fs.ErrNotExist) {
+		err = nil
+		return
+	}
+	if err != nil {
+		err = errors.Wrapf(err, "cannot read %s", file)
+		return
+	}
+
+	env, err = godotenv.Unmarshal(string(envData))
+	err = errors.Wrapf(err, "cannot unmarshal %s", file)
+	return
+}
+
+func envLines(env map[string]string) (lines []string) {
+
+	// godotenv.Marshal mangled the vals, maybe with quotes? anyway ..
+
+	for key, value := range env {
+		lines = append(lines, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return
 }

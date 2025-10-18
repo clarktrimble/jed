@@ -1,0 +1,52 @@
+- image: traefik:v3.0
+  name: traefik
+  env_form: none
+  restart: always
+  auto_deploy: true
+  network: admin-int
+  ports:
+    "80/tcp": "80"
+    "443/tcp": "443"
+    "8080/tcp": "8080"
+  volumes:
+    "/var/run/docker.sock": "/var/run/docker.sock"
+    "/home/debian/proj/admin-int/certs": "/certs"
+    # Todo: tfk labels here ?? (run.sh has em)
+    #"/home/bn/admin-int/certs": "/certs"
+    # Todo: fix path issue ^^
+- image: axis-camera:36e0971
+  name: axis-camera-1
+  env_form: axis-camera
+  restart: "no"
+  network: admin-int
+  features:
+  - settings
+  - metrics
+  - edit_config
+  - api_docs
+  labels:
+    traefik.enable: "true"
+    traefik.http.routers.axis-camera-1.tls: true
+    traefik.http.routers.axis-camera-1.rule: "Host(`axis.int.bastille.cloud`)"
+    traefik.http.services.axis-camera-1.loadbalancer.server.port: "3030"
+- image: logscale:ec0d40e
+  name: logscale-1
+  env_form: none
+  restart: "no"
+  network: admin-int
+  labels:
+    traefik.enable: "true"
+    traefik.http.routers.logscale-1.tls: true
+    traefik.http.routers.logscale-1.rule: "Host(`logscale.int.bastille.cloud`)"
+    traefik.http.services.logscale-1.loadbalancer.server.port: "3030"
+
+- image: borken:ea0d70f
+  name: borken-1
+  env_form: none
+  restart: "no"
+  network: admin-int
+  labels:
+    traefik.enable: "true"
+    traefik.http.routers.borken-1.tls: true
+    traefik.http.routers.borken-1.rule: "Host(`borken.int.bastille.cloud`)"
+    traefik.http.services.borken-1.loadbalancer.server.port: "3030"

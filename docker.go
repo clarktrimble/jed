@@ -28,6 +28,13 @@ func (svc *Svc) create(ctx context.Context, name string, cfg containerConfig) (i
 	return
 }
 
+func (svc *Svc) containers(ctx context.Context) (statuses []Status, err error) {
+
+	path := `/containers/json?all=true&filters={"label":["managed_by=jed"]}`
+	err = svc.client.SendObject(ctx, "GET", path, nil, &statuses)
+	return
+}
+
 func (svc *Svc) start(ctx context.Context, name string) (err error) {
 
 	svc.logger.Info(ctx, "starting container", "name", name)
@@ -55,10 +62,9 @@ func (svc *Svc) delete(ctx context.Context, name string) (err error) {
 	return
 }
 
-/*
 func (svc *Svc) checkImage(ctx context.Context, name string) (err error) {
 
-	err = svc.client.SendObject(ctx, "GET", fmt.Sprintf("/images/%s/json", name), nil, nil)
+	path := fmt.Sprintf("/images/%s/json", name)
+	err = svc.client.SendObject(ctx, "GET", path, nil, nil)
 	return
 }
-*/

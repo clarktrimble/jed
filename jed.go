@@ -5,13 +5,19 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
+	"io/fs"
+	"regexp"
+	"slices"
 
 	"github.com/clarktrimble/hondo"
 	"github.com/pkg/errors"
 )
 
 //go:generate moq -out mock_test.go -pkg jed_test . Logger Client
+
+var (
+	suffixPattern = regexp.MustCompile(`-[^-]+$`) // Todo: make specific
+)
 
 // Client specifies an http client by which stuff can be sent and received.
 type Client interface {
@@ -34,39 +40,43 @@ type Config struct{}
 // - Container is input config (immutable, user-facing base names like "postgres")
 // - Status is runtime state from Docker (actual deployed names like "postgres-k7m9x2n")
 // - Deploy adds random suffix to Container.Name to create unique deployed names
-// - Undeploy matches Container.Name to Status via prefix matching
+// - Statii() returns map keyed by base name for easy lookup
 // - Statii are filtered by managed_by=jed label
-// - Caller maintains svc.statii via Statii() calls
 //
 // Todo: implement container loading that adds managed_by=jed label
-// Todo: ensure statii are kept up-to-date by caller (refresh strategy?)
-// Todo: consider regex validation of suffix format in findDeployName
 type Svc struct {
 	client Client
 	logger Logger
-	statii []Status
+	cntrs  []Container
 }
 
 // NewSvc creates an Svc from Config.
-func (cfg *Config) NewSvc(client Client, lgr Logger) *Svc {
+func (cfg *Config) NewSvc(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (svc *Svc, err error) {
 
-	return &Svc{
+	containers, err := loadContainers(cfs)
+	if err != nil {
+		return
+	}
+
+	svc = &Svc{
 		client: client,
 		logger: lgr,
+		cntrs:  containers,
 	}
+
+	for _, cntr := range svc.cntrs {
+		err = svc.checkImage(ctx, cntr.Image)
+		if err != nil {
+			return
+		}
+	}
+
+	return
 }
 
-// Status is container status returned from docker
-// Todo: rename?
-// Todo: think thru how we'll structure this relative to services
-type Status struct {
-	Id      string            `json:"Id"`
-	Names   []string          `json:"Names"`
-	Image   string            `json:"Image"`
-	State   string            `json:"State"`
-	Status  string            `json:"Status"`
-	Labels  map[string]string `json:"Labels"`
-	Created int64             `json:"Created"`
+// Containers returns a copy of the loaded containers.
+func (svc *Svc) Containers() []Container {
+	return slices.Clone(svc.cntrs)
 }
 
 // Deploy creates and starts a container.
@@ -85,74 +95,47 @@ func (svc *Svc) Deploy(ctx context.Context, cntr *Container) (id string, err err
 		return
 	}
 
-	//cntr.Id = id
-
 	err = svc.start(ctx, deployName)
 	if err != nil {
 		return
 	}
 
-	//cntr.Condition = Unchecked
 	return
 }
 
 // Undeploy stops and removes a container.
 func (svc *Svc) Undeploy(ctx context.Context, cntr *Container) (err error) {
 
-	deployName, err := svc.findDeployName(cntr.Name)
+	statii, err := svc.Statii(ctx)
+	if err != nil {
+		return
+	}
+
+	deployName, err := statii.DeployName(cntr.Name)
 	if err != nil {
 		return
 	}
 
 	err = svc.stop(ctx, deployName)
 	if err != nil {
-		// Todo: easy to get hung up on created but not started, think thru
-		//return
+		// best effort, we could check for "304 already stopped"
 		svc.logger.Error(ctx, "failed to stop container", err)
-		// best effort
 	}
 
 	err = svc.delete(ctx, deployName)
-	if err != nil {
-		return
-	}
-
-	//cntr.Id = ""
-	//cntr.Condition = Undeployed
-	return
-}
-
-// findDeployName finds the deployed container name from base name by matching statii.
-func (svc *Svc) findDeployName(baseName string) (deployName string, err error) {
-
-	prefix := baseName + "-"
-	for _, status := range svc.statii {
-		for _, name := range status.Names {
-			// Docker prepends "/" to names, strip it
-			cleanName := strings.TrimPrefix(name, "/")
-			if strings.HasPrefix(cleanName, prefix) {
-				return cleanName, nil
-			}
-		}
-	}
-
-	err = errors.Errorf("container with base name %s not found", baseName)
 	return
 }
 
 // Statii returns all containers managed by this service.
-func (svc *Svc) Statii(ctx context.Context) (statii []Status, err error) {
+func (svc *Svc) Statii(ctx context.Context) (statii Statii, err error) {
 
-	err = svc.client.SendObject(ctx, "GET", "/containers/json?all=true&filters={\"label\":[\"managed_by=jed\"]}", nil, &statii)
+	statuses, err := svc.containers(ctx)
 	if err != nil {
 		return
+		// Todo: think about best effort here (with logses of course!)
 	}
 
-	//statii = map[string]Status{}
-	//for _, status := range filtered {
-	//statii[status.Id] = status
-	//}
-
+	statii = newStatii(statuses)
 	return
 }
 
