@@ -21,6 +21,7 @@ func TestJed(t *testing.T) {
 
 // Test helpers
 
+
 // mockResponse marshals obj to JSON and unmarshals into rcv.
 func mockResponse(obj, rcv any) {
 	data, err := json.Marshal(obj)
@@ -111,12 +112,14 @@ func mockCreate(containerID string) func(context.Context, string, string, any, a
 
 var _ = Describe("Jed", func() {
 	var (
-		cfg    *jed.Config
-		client *ClientMock
-		lgr    *LoggerMock
-		ctx    context.Context
-		svc    *jed.Jed
-		err    error
+		cfg          *jed.Config
+		client       *ClientMock
+		lgr          *LoggerMock
+		ctx          context.Context
+		svc          *jed.Jed
+		err          error
+		serviceStore jed.ServiceStore
+		envStore     jed.EnvStore
 	)
 
 	BeforeEach(func() {
@@ -136,20 +139,19 @@ var _ = Describe("Jed", func() {
 				return nil
 			},
 		}
+		serviceStore = NewMemoryServiceStore()
+		envStore = NewMemoryEnvStore()
 	})
 
 	Describe("New", func() {
-		var (
-			fsPath string
-		)
 
 		JustBeforeEach(func() {
-			svc, err = cfg.New(ctx, client, lgr, os.DirFS(fsPath))
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
 		})
 
 		When("given valid containers.yaml and env files", func() {
 			BeforeEach(func() {
-				fsPath = "test/data/svc-cfg"
+				serviceStore = loadMemoryStoreFromFS("test/data/svc-cfg")
 				// Mock checkImage calls for all images
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 					if method == "GET" && strings.Contains(path, "/images/") {
@@ -165,7 +167,8 @@ var _ = Describe("Jed", func() {
 			})
 
 			It("should add managed_by label to all services", func() {
-				services := svc.Services()
+				services, err := svc.Services(ctx)
+				Expect(err).NotTo(HaveOccurred())
 				Expect(services).NotTo(BeEmpty())
 				for _, service := range services {
 					Expect(service.Labels).To(HaveKeyWithValue("managed_by", "jed"))
@@ -175,7 +178,8 @@ var _ = Describe("Jed", func() {
 
 		When("given missing containers.yaml", func() {
 			BeforeEach(func() {
-				fsPath = "test/data/svc-cfg-empty"
+				// Use FSServiceStore directly for error testing
+				serviceStore = NewFSServiceStore(os.DirFS("test/data/svc-cfg-empty"))
 			})
 
 			It("should return error", func() {
@@ -185,7 +189,8 @@ var _ = Describe("Jed", func() {
 
 		When("given invalid container", func() {
 			BeforeEach(func() {
-				fsPath = "test/data/svc-cfg-invalid"
+				// Use FSServiceStore directly for error testing
+				serviceStore = NewFSServiceStore(os.DirFS("test/data/svc-cfg-invalid"))
 			})
 
 			It("should return error", func() {
@@ -212,7 +217,9 @@ var _ = Describe("Jed", func() {
 				Volumes: map[string]string{"/host/path": "/container/path"},
 			}
 			client.SendObjectFunc = mockCreate("abc123def456")
-			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
+			serviceStore = loadMemoryStoreFromFS("test/data/svc-cfg")
+			envStore = NewMemoryEnvStore()
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -248,12 +255,15 @@ var _ = Describe("Jed", func() {
 		)
 
 		BeforeEach(func() {
-			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
+			serviceStore = loadMemoryStoreFromFS("test/data/svc-cfg")
+			envStore = NewFSEnvStore(os.DirFS("test/data/svc-cfg"))
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		JustBeforeEach(func() {
-			services = svc.Services()
+			services, err = svc.Services(ctx)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		When("services are loaded", func() {
@@ -314,7 +324,9 @@ var _ = Describe("Jed", func() {
 			cntr = jed.Service{
 				Name: "test-app",
 			}
-			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
+			serviceStore = loadMemoryStoreFromFS("test/data/svc-cfg")
+			envStore = NewMemoryEnvStore()
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -427,7 +439,9 @@ var _ = Describe("Jed", func() {
 			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 				return rawData, nil
 			}
-			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
+			serviceStore = loadMemoryStoreFromFS("test/data/svc-cfg")
+			envStore = NewMemoryEnvStore()
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -469,6 +483,287 @@ var _ = Describe("Jed", func() {
 			It("should return empty output without error", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(decoded).To(BeEmpty())
+			})
+		})
+	})
+
+	Describe("CreateService", func() {
+		var (
+			serviceStore *MemoryServiceStore
+			newService   jed.Service
+		)
+
+		BeforeEach(func() {
+			serviceStore = NewMemoryServiceStore()
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
+			Expect(err).NotTo(HaveOccurred())
+
+			newService = jed.Service{
+				Name:    "new-service",
+				Image:   "nginx:latest",
+				Network: "test-net",
+				Restart: "always",
+			}
+		})
+
+		JustBeforeEach(func() {
+			err = svc.CreateService(ctx, newService)
+		})
+
+		When("creating a valid service", func() {
+			It("should create without error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should add service to Services()", func() {
+				services, err := svc.Services(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(services).To(HaveKey("new-service"))
+				Expect(services["new-service"].Image).To(Equal("nginx:latest"))
+			})
+
+			It("should persist service to store", func() {
+				stored, err := serviceStore.Get(ctx, "new-service")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(stored.Name).To(Equal("new-service"))
+				Expect(stored.Image).To(Equal("nginx:latest"))
+			})
+		})
+
+		When("creating a duplicate service", func() {
+			BeforeEach(func() {
+				// Create the service first
+				err := svc.CreateService(ctx, newService)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should return error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("already exists"))
+			})
+		})
+
+		When("creating an invalid service", func() {
+			BeforeEach(func() {
+				newService = jed.Service{
+					Name: "invalid",
+					// Missing required fields
+				}
+			})
+
+			It("should return validation error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid"))
+			})
+		})
+	})
+
+	Describe("DeleteService", func() {
+		var (
+			serviceStore *MemoryServiceStore
+			envStore     *MemoryEnvStore
+			serviceName  string
+		)
+
+		BeforeEach(func() {
+			serviceStore = NewMemoryServiceStore()
+			envStore = NewMemoryEnvStore()
+			// Pre-populate with a service
+			testService := jed.Service{
+				Name:    "test-service",
+				Image:   "test:v1",
+				Network: "test-net",
+				Restart: "always",
+			}
+			err := serviceStore.Set(ctx, testService)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Pre-populate with env for the service
+			testEnv := map[string]string{
+				"TEST_VAR": "test_value",
+			}
+			err = envStore.Set(ctx, "test-service", testEnv)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
+			Expect(err).NotTo(HaveOccurred())
+
+			serviceName = "test-service"
+		})
+
+		JustBeforeEach(func() {
+			err = svc.DeleteService(ctx, serviceName)
+		})
+
+		When("deleting an existing service", func() {
+			It("should delete without error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should remove service from Services()", func() {
+				services, err := svc.Services(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(services).NotTo(HaveKey("test-service"))
+			})
+
+			It("should remove service from store", func() {
+				_, err := serviceStore.Get(ctx, "test-service")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not found"))
+			})
+
+			It("should remove env vars from envStore", func() {
+				env, err := envStore.Get(ctx, "test-service")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(env).To(BeEmpty())
+			})
+		})
+
+		When("deleting a non-existent service", func() {
+			BeforeEach(func() {
+				serviceName = "nonexistent"
+			})
+
+			It("should return error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not found"))
+			})
+		})
+	})
+
+	Describe("SetEnv", func() {
+		var (
+			serviceStore *MemoryServiceStore
+			envStore     *MemoryEnvStore
+			serviceName  string
+			env          map[string]string
+		)
+
+		BeforeEach(func() {
+			serviceStore = NewMemoryServiceStore()
+			envStore = NewMemoryEnvStore()
+			// Pre-populate with a service
+			testService := jed.Service{
+				Name:    "test-service",
+				Image:   "test:v1",
+				Network: "test-net",
+				Restart: "always",
+			}
+			err := serviceStore.Set(ctx, testService)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
+			Expect(err).NotTo(HaveOccurred())
+
+			serviceName = "test-service"
+			env = map[string]string{
+				"FOO": "bar",
+				"BAZ": "qux",
+			}
+		})
+
+		JustBeforeEach(func() {
+			err = svc.SetEnv(ctx, serviceName, env)
+		})
+
+		When("setting env for existing service", func() {
+			It("should set without error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should persist env to store", func() {
+				stored, err := envStore.Get(ctx, "test-service")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(stored).To(HaveKeyWithValue("FOO", "bar"))
+				Expect(stored).To(HaveKeyWithValue("BAZ", "qux"))
+			})
+
+			It("should be retrievable via GetEnv", func() {
+				retrieved, err := svc.GetEnv(ctx, "test-service")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(retrieved).To(Equal(env))
+			})
+		})
+
+		When("setting env for non-existent service", func() {
+			BeforeEach(func() {
+				serviceName = "nonexistent"
+			})
+
+			It("should return error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not found"))
+			})
+		})
+	})
+
+	Describe("GetEnv", func() {
+		var (
+			serviceStore *MemoryServiceStore
+			envStore     *MemoryEnvStore
+			serviceName  string
+			retrieved    map[string]string
+		)
+
+		BeforeEach(func() {
+			serviceStore = NewMemoryServiceStore()
+			envStore = NewMemoryEnvStore()
+			// Pre-populate with a service
+			testService := jed.Service{
+				Name:    "test-service",
+				Image:   "test:v1",
+				Network: "test-net",
+				Restart: "always",
+			}
+			err := serviceStore.Set(ctx, testService)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Pre-populate with env
+			testEnv := map[string]string{
+				"DB_HOST": "localhost",
+				"DB_PORT": "5432",
+			}
+			err = envStore.Set(ctx, "test-service", testEnv)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, err = cfg.New(ctx, client, lgr, serviceStore, envStore)
+			Expect(err).NotTo(HaveOccurred())
+
+			serviceName = "test-service"
+		})
+
+		JustBeforeEach(func() {
+			retrieved, err = svc.GetEnv(ctx, serviceName)
+		})
+
+		When("getting env for service with env", func() {
+			It("should get without error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should return stored env", func() {
+				Expect(retrieved).To(HaveKeyWithValue("DB_HOST", "localhost"))
+				Expect(retrieved).To(HaveKeyWithValue("DB_PORT", "5432"))
+			})
+		})
+
+		When("getting env for service without env", func() {
+			BeforeEach(func() {
+				// Create another service without env
+				anotherService := jed.Service{
+					Name:    "no-env-service",
+					Image:   "test:v2",
+					Network: "test-net",
+					Restart: "always",
+				}
+				err := serviceStore.Set(ctx, anotherService)
+				Expect(err).NotTo(HaveOccurred())
+				serviceName = "no-env-service"
+			})
+
+			It("should return empty map", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(retrieved).To(BeEmpty())
 			})
 		})
 	})

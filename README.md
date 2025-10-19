@@ -22,20 +22,29 @@ go get github.com/clarktrimble/jed
 ```go
 import (
     "context"
-    "embed"
     "github.com/clarktrimble/jed"
 )
 
-//go:embed containers.yaml *.env
-var containerFS embed.FS
+// Implement ServiceStore and EnvStore interfaces
+// (see test/helper_test.go for example implementations)
+var serviceStore jed.ServiceStore = // your implementation
+var envStore jed.EnvStore = // your implementation
 
 // Create Jed instance
 cfg := &jed.Config{}
-j, err := cfg.New(ctx, httpClient, logger, containerFS)
+j, err := cfg.New(ctx, httpClient, logger, serviceStore, envStore)
+
+// Set environment variables
+err = j.SetEnv(ctx, "postgres", map[string]string{
+    "POSTGRES_PASSWORD": "secret123",
+    "POSTGRES_USER": "admin",
+})
+
+// Get services (env auto-populated from envStore)
+services, err := j.Services(ctx)
+svc := services["postgres"]
 
 // Deploy a service
-services := j.Services()
-svc := services["postgres"]
 id, err := j.Deploy(ctx, svc)
 
 // Check container status
@@ -66,20 +75,34 @@ jed/
 
 ### Key Design Decisions
 
+**Store-Based Architecture**
+- `ServiceStore` is the source of truth for service definitions (image, ports, volumes, etc.)
+- `EnvStore` is the source of truth for environment variables (required, not optional)
+- `Services()` queries both stores and assembles complete Service structs
+- No caching - stores are always queried fresh
+- You implement the stores - Jed only defines interfaces
+
+**Environment Variable Flow**
+- `Services()` populates `Service.Env` from `envStore.Get()` for each service
+- `Deploy()` uses `Service.Env` when creating containers
+- `SetEnv()` / `GetEnv()` manage env vars in envStore
+- `DeleteService()` automatically cleans up env vars
+
 **Services and Containers as Maps**
-- `Services()` returns `map[string]Service` keyed by service name (deep copy with cloned maps)
-- `Containers()` returns `map[string]Container` keyed by service name
+- `Services(ctx)` returns `map[string]Service` keyed by service name
+- `Containers(ctx)` queries Docker and returns `map[string]Container` keyed by service name
 - Automatically strips random suffixes (e.g., `postgres-k7m9x2n` → `postgres`)
-- No caching - Docker is always the source of truth
 
 **Stateless Design**
-- No internal state tracking
-- Caller controls when to refresh container status
+- No internal state caching
+- Stores and Docker are the sources of truth
+- Caller controls when to refresh data
 - Prevents stale data issues
 
-**Optional .env Files**
-- Missing .env files return empty map (no error)
-- Per-service environment configuration
+**Interface-Only Public API**
+- Jed exports only interfaces (ServiceStore, EnvStore)
+- Store implementations are in `helper_test.go` for testing
+- Users implement their own stores (filesystem, database, Redis, etc.)
 
 **Best-Effort Undeploy**
 - Stop errors are logged but don't fail undeploy
@@ -124,20 +147,43 @@ type Logger interface {
     Debug(ctx context.Context, msg string, kv ...any)
     Error(ctx context.Context, msg string, err error, kv ...any)
 }
+
+type ServiceStore interface {
+    Get(ctx context.Context, serviceName string) (Service, error)
+    Set(ctx context.Context, svc Service) error
+    Del(ctx context.Context, serviceName string) error
+    List(ctx context.Context) ([]Service, error)
+}
+
+type EnvStore interface {
+    Get(ctx context.Context, serviceName string) (map[string]string, error)
+    Set(ctx context.Context, serviceName string, env map[string]string) error
+    Del(ctx context.Context, serviceName string) error
+}
 ```
 
 ### Methods
 
 ```go
 // Create Jed instance
-func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (*Jed, error)
+func (cfg *Config) New(ctx context.Context, client Client, lgr Logger,
+                       serviceStore ServiceStore, envStore EnvStore) (*Jed, error)
 
-// Get loaded services (returns deep copy mapped by name)
-func (jed *Jed) Services() map[string]Service
+// Query services from store
+func (jed *Jed) Services(ctx context.Context) (map[string]Service, error)
 
-// Service lifecycle
+// Service management
+func (jed *Jed) CreateService(ctx context.Context, svc Service) error
+func (jed *Jed) DeleteService(ctx context.Context, serviceName string) error
+
+// Environment management
+func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]string) error
+func (jed *Jed) GetEnv(ctx context.Context, serviceName string) (map[string]string, error)
+
+// Container lifecycle
 func (jed *Jed) Deploy(ctx context.Context, svc Service) (id string, err error)
 func (jed *Jed) Undeploy(ctx context.Context, svc Service) error
+func (jed *Jed) Redeploy(ctx context.Context, svc Service) error
 
 // Container status and logs
 func (jed *Jed) Containers(ctx context.Context) (Containers, error)
@@ -147,6 +193,79 @@ func (jed *Jed) Logs(ctx context.Context, id, tail string) ([]byte, error)
 func (containers Containers) DeployName(serviceName string) (string, error)
 func (containers Containers) Id(serviceName string) (string, error)
 ```
+
+### Implementing Stores
+
+Jed exports only interfaces - you implement the stores. Example implementations are in `helper_test.go`:
+
+**Example: Filesystem Stores**
+```go
+// See helper_test.go for complete implementations
+type FSServiceStore struct {
+    fs fs.FS
+}
+
+func (s *FSServiceStore) List(ctx) ([]Service, error) {
+    // Load from services.yaml
+}
+
+type FSEnvStore struct {
+    fs fs.FS
+}
+
+func (s *FSEnvStore) Get(ctx, serviceName) (map[string]string, error) {
+    // Load from {serviceName}.env file
+}
+```
+
+**Example: In-Memory Stores**
+```go
+// See helper_test.go for complete implementations
+type MemoryServiceStore struct {
+    mu   sync.RWMutex
+    svcs map[string]Service
+}
+
+type MemoryEnvStore struct {
+    mu   sync.RWMutex
+    envs map[string]map[string]string
+}
+```
+
+**Your Custom Stores**
+Implement `ServiceStore` and `EnvStore` for your backend:
+- Database (PostgreSQL, MySQL, etc.)
+- Key-value store (Redis, etcd, etc.)
+- Cloud storage (S3, GCS, etc.)
+- Any storage system you need
+
+## Environment Variable Management
+
+Environment variables flow through envStore:
+
+```go
+// Set env vars
+err := j.SetEnv(ctx, "postgres", map[string]string{
+    "POSTGRES_PASSWORD": "secret123",
+})
+
+// Services() automatically populates env from envStore
+services, _ := j.Services(ctx)
+svc := services["postgres"]  // svc.Env contains env from envStore
+
+// Deploy uses the env
+j.Deploy(ctx, svc)  // Container created with env vars
+
+// DeleteService cleans up env
+j.DeleteService(ctx, "postgres")  // Removes service + env
+```
+
+**Key Points:**
+- EnvStore is required when creating Jed
+- `Services()` populates `Service.Env` from envStore
+- `SetEnv()` validates service exists
+- `GetEnv()` returns empty map for unknown services (no error)
+- Env vars stored separately from service definitions
 
 ## Container Configuration
 
@@ -182,11 +301,12 @@ POSTGRES_DB=mydb
 
 ## Testing
 
-- **32 passing tests**
-- **86.9% coverage**
+- **49 passing tests**
+- **85.0% coverage**
 - Uses Ginkgo/Gomega for BDD-style tests
 - Mock Docker client and logger
 - Real Docker log data for decoder tests
+- Store implementations in `helper_test.go` for testing
 
 ```bash
 make test       # Run tests

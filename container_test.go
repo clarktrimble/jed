@@ -3,7 +3,6 @@ package jed_test
 import (
 	"context"
 	"io"
-	"os"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -39,7 +38,8 @@ var _ = Describe("Container", func() {
 				return nil
 			},
 		}
-		svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))
+		serviceStore := loadMemoryStoreFromFS("test/data/svc-cfg")
+		svc, err = cfg.New(ctx, client, lgr, serviceStore, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

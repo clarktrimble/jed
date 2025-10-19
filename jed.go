@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"maps"
 	"regexp"
 
@@ -14,11 +13,6 @@ import (
 )
 
 //go:generate moq -out mock_test.go -pkg jed_test . Logger Client
-
-const (
-	configFile string = "services.yaml"
-	envSuffix  string = "env"
-)
 
 var (
 	suffixPattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
@@ -37,6 +31,36 @@ type Logger interface {
 	Error(ctx context.Context, msg string, err error, kv ...any)
 }
 
+// ServiceStore persists service definitions.
+// Implementations must be safe for concurrent use.
+type ServiceStore interface {
+	// Get retrieves a service definition by name.
+	Get(ctx context.Context, serviceName string) (Service, error)
+
+	// Set persists a service definition.
+	Set(ctx context.Context, svc Service) error
+
+	// Del removes a service definition.
+	Del(ctx context.Context, serviceName string) error
+
+	// List retrieves all service definitions.
+	List(ctx context.Context) ([]Service, error)
+}
+
+// EnvStore persists environment variables for services.
+// Implementations must be safe for concurrent use.
+type EnvStore interface {
+	// Get retrieves all env vars for a service.
+	// Returns empty map (not error) if service has no stored env.
+	Get(ctx context.Context, serviceName string) (map[string]string, error)
+
+	// Set persists all env vars for a service, replacing any existing values.
+	Set(ctx context.Context, serviceName string, env map[string]string) error
+
+	// Del removes all stored env vars for a service.
+	Del(ctx context.Context, serviceName string) error
+}
+
 // Config is Jed configurables.
 type Config struct{}
 
@@ -47,27 +71,31 @@ type Config struct{}
 // - Deploy adds random suffix to Service.Name to create unique deployed names
 // - Containers() returns map keyed by service name for easy lookup
 // - Containers are filtered by managed_by=jed label
+// - ServiceStore is the source of truth for service definitions (no caching)
 type Jed struct {
-	client Client
-	logger Logger
-	svcs   []Service
+	client       Client
+	logger       Logger
+	serviceStore ServiceStore // Required: source of truth for service definitions
+	envStore     EnvStore     // Required: source of truth for environment variables
 }
 
 // New creates a Jed from Config.
-func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, cfs fs.FS) (jed *Jed, err error) {
+func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, serviceStore ServiceStore, envStore EnvStore) (jed *Jed, err error) {
 
-	services, err := loadServices(cfs)
+	jed = &Jed{
+		client:       client,
+		logger:       lgr,
+		serviceStore: serviceStore,
+		envStore:     envStore,
+	}
+
+	// Validate images exist for all services
+	services, err := serviceStore.List(ctx)
 	if err != nil {
 		return
 	}
 
-	jed = &Jed{
-		client: client,
-		logger: lgr,
-		svcs:   services,
-	}
-
-	for _, service := range jed.svcs {
+	for _, service := range services {
 		err = jed.checkImage(ctx, service.Image)
 		if err != nil {
 			return
@@ -77,23 +105,37 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, cfs fs.FS
 	return
 }
 
-// Services returns a copy of services mapped by name.
-func (jed *Jed) Services() map[string]Service {
+// Services returns all services mapped by name.
+// Env is populated from envStore.
+func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
 
-	services := make(map[string]Service, len(jed.svcs))
-	for _, svc := range jed.svcs {
+	// Todo: this is all a bit much
+	//       let service store clone
+	//       think about injecting env elsewhere (again)
+	list, err := jed.serviceStore.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	services := make(map[string]Service, len(list))
+	for _, svc := range list {
+		env, err := jed.envStore.Get(ctx, svc.Name)
+		if err != nil {
+			return nil, err
+		}
+
 		services[svc.Name] = Service{
 			Name:    svc.Name,
 			Image:   svc.Image,
 			Network: svc.Network,
 			Restart: svc.Restart,
-			Env:     maps.Clone(svc.Env),
+			Env:     env,
 			Ports:   maps.Clone(svc.Ports),
 			Labels:  maps.Clone(svc.Labels),
 			Volumes: maps.Clone(svc.Volumes),
 		}
 	}
-	return services
+	return services, nil
 }
 
 // Deploy creates and starts a container.
@@ -152,6 +194,79 @@ func (jed *Jed) Redeploy(ctx context.Context, service Service) (err error) {
 	}
 
 	_, err = jed.Deploy(ctx, service)
+	return
+}
+
+// CreateService adds a new service definition.
+func (jed *Jed) CreateService(ctx context.Context, svc Service) (err error) {
+
+	err = svc.validate()
+	if err != nil {
+		return
+	}
+
+	// Todo: Using Services() instead of serviceStore.Get() to check existence.
+	// serviceStore.Get() errors are ambiguous (not found vs other errors).
+	// Services() reliably returns existing services or fails with a clear error.
+	services, err := jed.Services(ctx)
+	if err != nil {
+		return
+	}
+
+	if _, ok := services[svc.Name]; ok {
+		err = errors.Errorf("service %s already exists", svc.Name)
+		return
+	}
+
+	err = jed.serviceStore.Set(ctx, svc)
+	return
+}
+
+// DeleteService removes a service definition and its env vars.
+func (jed *Jed) DeleteService(ctx context.Context, serviceName string) (err error) {
+
+	services, err := jed.Services(ctx)
+	if err != nil {
+		return
+	}
+
+	if _, ok := services[serviceName]; !ok {
+		err = errors.Errorf("service %s not found", serviceName)
+		return
+	}
+
+	// Todo: Partial failure leaves inconsistent state (service deleted, env orphaned).
+	err = jed.serviceStore.Del(ctx, serviceName)
+	if err != nil {
+		return
+	}
+
+	err = jed.envStore.Del(ctx, serviceName)
+	return
+}
+
+// SetEnv sets environment variables for a service.
+func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]string) (err error) {
+
+	// Todo: Using Services() to check existence. See CreateService for rationale.
+	services, err := jed.Services(ctx)
+	if err != nil {
+		return
+	}
+
+	if _, ok := services[serviceName]; !ok {
+		err = errors.Errorf("service %s not found", serviceName)
+		return
+	}
+
+	err = jed.envStore.Set(ctx, serviceName, env)
+	return
+}
+
+// GetEnv retrieves environment variables for a service.
+func (jed *Jed) GetEnv(ctx context.Context, serviceName string) (env map[string]string, err error) {
+
+	env, err = jed.envStore.Get(ctx, serviceName)
 	return
 }
 
