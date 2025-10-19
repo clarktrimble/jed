@@ -97,7 +97,7 @@ func (jed *Jed) Services() map[string]Service {
 }
 
 // Deploy creates and starts a container.
-func (jed *Jed) Deploy(ctx context.Context, service *Service) (id string, err error) {
+func (jed *Jed) Deploy(ctx context.Context, service Service) (id string, err error) {
 
 	suffix := hondo.Rand(7)
 	deployName := service.Name + "-" + suffix
@@ -121,7 +121,7 @@ func (jed *Jed) Deploy(ctx context.Context, service *Service) (id string, err er
 }
 
 // Undeploy stops and removes a container.
-func (jed *Jed) Undeploy(ctx context.Context, service *Service) (err error) {
+func (jed *Jed) Undeploy(ctx context.Context, service Service) (err error) {
 
 	containers, err := jed.Containers(ctx)
 	if err != nil {
@@ -140,6 +140,18 @@ func (jed *Jed) Undeploy(ctx context.Context, service *Service) (err error) {
 	}
 
 	err = jed.delete(ctx, deployName)
+	return
+}
+
+// Redeploy undeploys and deploys a container.
+func (jed *Jed) Redeploy(ctx context.Context, service Service) (err error) {
+
+	err = jed.Undeploy(ctx, service)
+	if err != nil {
+		return
+	}
+
+	_, err = jed.Deploy(ctx, service)
 	return
 }
 

@@ -196,12 +196,12 @@ var _ = Describe("Jed", func() {
 
 	Describe("Deploy", func() {
 		var (
-			cntr *jed.Service
+			cntr jed.Service
 			id   string
 		)
 
 		BeforeEach(func() {
-			cntr = &jed.Service{
+			cntr = jed.Service{
 				Name:    "test-app",
 				Image:   "test:v1",
 				Network: "test-net",
@@ -307,11 +307,11 @@ var _ = Describe("Jed", func() {
 
 	Describe("Undeploy", func() {
 		var (
-			cntr *jed.Service
+			cntr jed.Service
 		)
 
 		BeforeEach(func() {
-			cntr = &jed.Service{
+			cntr = jed.Service{
 				Name: "test-app",
 			}
 			svc, err = cfg.New(ctx, client, lgr, os.DirFS("test/data/svc-cfg"))

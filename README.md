@@ -36,7 +36,7 @@ j, err := cfg.New(ctx, httpClient, logger, containerFS)
 // Deploy a service
 services := j.Services()
 svc := services["postgres"]
-id, err := j.Deploy(ctx, &svc)
+id, err := j.Deploy(ctx, svc)
 
 // Check container status
 containers, err := j.Containers(ctx)
@@ -46,7 +46,7 @@ deployName, _ := containers.DeployName("postgres")
 logs, err := j.Logs(ctx, id, "100")
 
 // Undeploy
-err = j.Undeploy(ctx, &svc)
+err = j.Undeploy(ctx, svc)
 ```
 
 ## Architecture
@@ -136,8 +136,8 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, cfs fs.FS
 func (jed *Jed) Services() map[string]Service
 
 // Service lifecycle
-func (jed *Jed) Deploy(ctx context.Context, svc *Service) (id string, err error)
-func (jed *Jed) Undeploy(ctx context.Context, svc *Service) error
+func (jed *Jed) Deploy(ctx context.Context, svc Service) (id string, err error)
+func (jed *Jed) Undeploy(ctx context.Context, svc Service) error
 
 // Container status and logs
 func (jed *Jed) Containers(ctx context.Context) (Containers, error)

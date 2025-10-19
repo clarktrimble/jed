@@ -22,7 +22,7 @@ type Service struct {
 	Restart string            `json:"restart"`
 }
 
-func (service *Service) validate() error {
+func (service Service) validate() error {
 	var issues []string
 
 	if service.Image == "" {
@@ -47,7 +47,7 @@ func (service *Service) validate() error {
 
 type containerConfig map[string]any
 
-func (service *Service) config() (cfg containerConfig, err error) {
+func (service Service) config() (cfg containerConfig, err error) {
 
 	exposedPorts, portBindings := buildPortConfig(service.Ports)
 
