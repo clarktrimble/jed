@@ -7,6 +7,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Todo: move me
+type Env struct {
+	Name string
+	Vars map[string]string
+}
+
 // Service is a service configuration.
 type Service struct {
 	Name    string

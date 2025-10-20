@@ -2,11 +2,11 @@ package jed_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
-	"sync"
+	"strings"
 
 	"github.com/clarktrimble/jed"
 	"github.com/joho/godotenv"
@@ -68,187 +68,173 @@ func loadEnv(cfs fs.FS, name string) (env map[string]string, err error) {
 	return
 }
 
-// FSServiceStore implements ServiceStore using an fs.FS.
-// This is a read-only store that loads services from a filesystem.
-type FSServiceStore struct {
-	fs fs.FS
-}
+// newMockStore creates a new in-memory mock store for testing.
+// This is the preferred way to create stores for unit tests.
+func newMockStore() *StoreMock {
+	// Internal storage
+	services := make(map[string]jed.Service)
+	envs := make(map[string]jed.Env)
 
-// NewFSServiceStore creates a new FSServiceStore from an fs.FS.
-func NewFSServiceStore(filesystem fs.FS) *FSServiceStore {
-	return &FSServiceStore{fs: filesystem}
-}
-
-// Get retrieves a service definition by name.
-func (s *FSServiceStore) Get(ctx context.Context, serviceName string) (jed.Service, error) {
-	services, err := s.List(ctx)
-	if err != nil {
-		return jed.Service{}, err
-	}
-
-	for _, svc := range services {
-		if svc.Name == serviceName {
+	return &StoreMock{
+		GetServiceFunc: func(ctx context.Context, name string) (jed.Service, error) {
+			svc, ok := services[name]
+			if !ok {
+				return jed.Service{}, errors.Errorf("service not found: %s", name)
+			}
 			return svc, nil
+		},
+		SetServiceFunc: func(ctx context.Context, svc jed.Service) error {
+			services[svc.Name] = svc
+			return nil
+		},
+		DelServiceFunc: func(ctx context.Context, name string) error {
+			delete(services, name)
+			return nil
+		},
+		ServicesFunc: func(ctx context.Context) ([]jed.Service, error) {
+			result := make([]jed.Service, 0, len(services))
+			for _, svc := range services {
+				result = append(result, svc)
+			}
+			return result, nil
+		},
+		GetEnvFunc: func(ctx context.Context, name string) (jed.Env, error) {
+			env, ok := envs[name]
+			if !ok {
+				return jed.Env{}, errors.Errorf("env not found: %s", name)
+			}
+			return env, nil
+		},
+		SetEnvFunc: func(ctx context.Context, env jed.Env) error {
+			envs[env.Name] = env
+			return nil
+		},
+		DelEnvFunc: func(ctx context.Context, name string) error {
+			delete(envs, name)
+			return nil
+		},
+		EnvsFunc: func(ctx context.Context) ([]jed.Env, error) {
+			result := make([]jed.Env, 0, len(envs))
+			for _, env := range envs {
+				result = append(result, env)
+			}
+			return result, nil
+		},
+	}
+}
+
+// loadMockStoreFromFS loads services and envs from filesystem into a mock store.
+func loadMockStoreFromFS(fsPath string) *StoreMock {
+	ctx := context.Background()
+	filesystem := os.DirFS(fsPath)
+
+	store := newMockStore()
+
+	// Load services from filesystem
+	services, err := loadServices(filesystem)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Populate store with services and envs
+	for _, svc := range services {
+		err = store.SetServiceFunc(ctx, svc)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Load and set env vars if they exist
+		envVars, err := loadEnv(filesystem, svc.Name)
+		Expect(err).NotTo(HaveOccurred())
+		if len(envVars) > 0 {
+			err = store.SetEnvFunc(ctx, jed.Env{Name: svc.Name, Vars: envVars})
+			Expect(err).NotTo(HaveOccurred())
 		}
 	}
 
-	return jed.Service{}, errors.Errorf("service %s not found", serviceName)
+	return store
 }
 
-// Set is not supported for FSServiceStore (read-only).
-func (s *FSServiceStore) Set(ctx context.Context, svc jed.Service) error {
-	return errors.New("FSServiceStore is read-only")
-}
-
-// Del is not supported for FSServiceStore (read-only).
-func (s *FSServiceStore) Del(ctx context.Context, serviceName string) error {
-	return errors.New("FSServiceStore is read-only")
-}
-
-// List retrieves all service definitions from the filesystem.
-func (s *FSServiceStore) List(ctx context.Context) ([]jed.Service, error) {
-	return loadServices(s.fs)
-}
-
-// MemoryServiceStore implements ServiceStore using in-memory storage.
-// Safe for concurrent use.
-type MemoryServiceStore struct {
-	mu   sync.RWMutex
-	svcs map[string]jed.Service
-}
-
-// NewMemoryServiceStore creates a new empty MemoryServiceStore.
-func NewMemoryServiceStore() *MemoryServiceStore {
-	return &MemoryServiceStore{
-		svcs: make(map[string]jed.Service),
-	}
-}
-
-// Get retrieves a service definition by name.
-func (s *MemoryServiceStore) Get(ctx context.Context, serviceName string) (jed.Service, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	svc, ok := s.svcs[serviceName]
-	if !ok {
-		return jed.Service{}, errors.Errorf("service %s not found", serviceName)
-	}
-	return svc, nil
-}
-
-// Set persists a service definition.
-func (s *MemoryServiceStore) Set(ctx context.Context, svc jed.Service) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.svcs[svc.Name] = svc
-	return nil
-}
-
-// Del removes a service definition.
-func (s *MemoryServiceStore) Del(ctx context.Context, serviceName string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	delete(s.svcs, serviceName)
-	return nil
-}
-
-// List retrieves all service definitions.
-func (s *MemoryServiceStore) List(ctx context.Context) ([]jed.Service, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	services := make([]jed.Service, 0, len(s.svcs))
-	for _, svc := range s.svcs {
-		services = append(services, svc)
-	}
-	return services, nil
-}
-
-// FSEnvStore implements EnvStore using an fs.FS.
-// This is a read-only store that loads env vars from .env files.
-type FSEnvStore struct {
-	fs fs.FS
-}
-
-// NewFSEnvStore creates a new FSEnvStore from an fs.FS.
-func NewFSEnvStore(filesystem fs.FS) *FSEnvStore {
-	return &FSEnvStore{fs: filesystem}
-}
-
-// Get retrieves env vars for a service from a .env file.
-func (s *FSEnvStore) Get(ctx context.Context, serviceName string) (map[string]string, error) {
-	return loadEnv(s.fs, serviceName)
-}
-
-// Set is not supported for FSEnvStore (read-only).
-func (s *FSEnvStore) Set(ctx context.Context, serviceName string, env map[string]string) error {
-	return errors.New("FSEnvStore is read-only")
-}
-
-// Del is not supported for FSEnvStore (read-only).
-func (s *FSEnvStore) Del(ctx context.Context, serviceName string) error {
-	return errors.New("FSEnvStore is read-only")
-}
-
-// MemoryEnvStore implements EnvStore using in-memory storage.
-// Safe for concurrent use.
-type MemoryEnvStore struct {
-	mu   sync.RWMutex
-	envs map[string]map[string]string
-}
-
-// NewMemoryEnvStore creates a new empty MemoryEnvStore.
-func NewMemoryEnvStore() *MemoryEnvStore {
-	return &MemoryEnvStore{
-		envs: make(map[string]map[string]string),
-	}
-}
-
-// Get retrieves all env vars for a service.
-func (s *MemoryEnvStore) Get(ctx context.Context, serviceName string) (map[string]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	env, ok := s.envs[serviceName]
-	if !ok {
-		return make(map[string]string), nil // Return empty map, not error
-	}
-
-	// Return a copy to prevent external modification
-	return maps.Clone(env), nil
-}
-
-// Set persists all env vars for a service.
-func (s *MemoryEnvStore) Set(ctx context.Context, serviceName string, env map[string]string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Store a copy to prevent external modification
-	s.envs[serviceName] = maps.Clone(env)
-	return nil
-}
-
-// Del removes all stored env vars for a service.
-func (s *MemoryEnvStore) Del(ctx context.Context, serviceName string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	delete(s.envs, serviceName)
-	return nil
-}
-
-// loadMemoryStoreFromFS loads services from a filesystem into a MemoryServiceStore.
-func loadMemoryStoreFromFS(fsPath string) *MemoryServiceStore {
-	fsStore := NewFSServiceStore(os.DirFS(fsPath))
-	services, err := fsStore.List(context.Background())
+// mockResponse marshals obj to JSON and unmarshals into rcv.
+func mockResponse(obj, rcv any) {
+	data, err := json.Marshal(obj)
 	Expect(err).NotTo(HaveOccurred())
+	err = json.Unmarshal(data, rcv)
+	Expect(err).NotTo(HaveOccurred())
+}
 
-	memStore := NewMemoryServiceStore()
-	for _, svc := range services {
-		err = memStore.Set(context.Background(), svc)
-		Expect(err).NotTo(HaveOccurred())
+// findCall searches for a call matching method and path substring.
+func findCall(calls []struct {
+	Ctx    context.Context
+	Method string
+	Path   string
+	Snd    any
+	Rcv    any
+}, method, pathSubstring string) *struct {
+	Ctx    context.Context
+	Method string
+	Path   string
+	Snd    any
+	Rcv    any
+} {
+	for i := range calls {
+		if calls[i].Method == method && strings.Contains(calls[i].Path, pathSubstring) {
+			return &calls[i]
+		}
 	}
-	return memStore
+	return nil
+}
+
+// mockContainers creates a mock response for Containers() call.
+func mockContainers(containers []jed.Container) func(context.Context, string, string, any, any) error {
+	return func(ctx context.Context, method, path string, snd, rcv any) error {
+		if method == "GET" && strings.Contains(path, "/containers/json") {
+			mockResponse(containers, rcv)
+		}
+		// Mock checkImage - always succeed
+		if method == "GET" && strings.Contains(path, "/images/") {
+			return nil
+		}
+		return nil
+	}
+}
+
+// testContainerList returns a standard set of test containers for mocking.
+func testContainerList() []jed.Container {
+	return []jed.Container{
+		{
+			Id:     "abc123",
+			Names:  []string{"/postgres-x7y9z2n"},
+			Image:  "postgres:14",
+			State:  "running",
+			Status: "Up 2 hours",
+			Labels: map[string]string{"managed_by": "jed"},
+		},
+		{
+			Id:     "def456",
+			Names:  []string{"/redis-k3m5p1q"},
+			Image:  "redis:7",
+			State:  "running",
+			Status: "Up 1 hour",
+			Labels: map[string]string{"managed_by": "jed"},
+		},
+		{
+			Id:     "ghi789",
+			Names:  []string{"/nginx-w8x2y4z"},
+			Image:  "nginx:latest",
+			State:  "exited",
+			Status: "Exited (0) 5 minutes ago",
+			Labels: map[string]string{"managed_by": "jed"},
+		},
+	}
+}
+
+// mockCreate creates a mock response for Deploy() create call.
+func mockCreate(containerID string) func(context.Context, string, string, any, any) error {
+	return func(ctx context.Context, method, path string, snd, rcv any) error {
+		if method == "POST" && strings.Contains(path, "/containers/create") && rcv != nil {
+			mockResponse(map[string]string{"Id": containerID}, rcv)
+		}
+		// Mock checkImage - always succeed
+		if method == "GET" && strings.Contains(path, "/images/") {
+			return nil
+		}
+		return nil
+	}
 }

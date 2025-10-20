@@ -19,6 +19,7 @@ var _ = Describe("Container", func() {
 		ctx    context.Context
 		svc    *jed.Jed
 		err    error
+		store  *StoreMock
 	)
 
 	BeforeEach(func() {
@@ -38,8 +39,9 @@ var _ = Describe("Container", func() {
 				return nil
 			},
 		}
-		serviceStore := loadMemoryStoreFromFS("test/data/svc-cfg")
-		svc, err = cfg.New(ctx, client, lgr, serviceStore, nil)
+		// Use mock store instead of bbolt for faster, isolated tests
+		store = loadMockStoreFromFS("test/data/svc-cfg")
+		svc, err = cfg.New(ctx, client, lgr, store)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -157,10 +159,6 @@ var _ = Describe("Container", func() {
 		})
 
 		When("container not found", func() {
-			BeforeEach(func() {
-				deployName = ""
-			})
-
 			JustBeforeEach(func() {
 				deployName, err = containers.DeployName("nonexistent")
 			})
@@ -198,10 +196,6 @@ var _ = Describe("Container", func() {
 		})
 
 		When("container not found", func() {
-			BeforeEach(func() {
-				id = ""
-			})
-
 			JustBeforeEach(func() {
 				id, err = containers.Id("nonexistent")
 			})

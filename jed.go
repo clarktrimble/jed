@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate moq -out mock_test.go -pkg jed_test . Logger Client
+//go:generate moq -out mock_test.go -pkg jed_test . Logger Client Store
 
 var (
 	suffixPattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
@@ -31,34 +31,20 @@ type Logger interface {
 	Error(ctx context.Context, msg string, err error, kv ...any)
 }
 
-// ServiceStore persists service definitions.
+// Store persists services and environment variables.
 // Implementations must be safe for concurrent use.
-type ServiceStore interface {
-	// Get retrieves a service definition by name.
-	Get(ctx context.Context, serviceName string) (Service, error)
+type Store interface {
+	// Service operations
+	GetService(ctx context.Context, name string) (Service, error)
+	SetService(ctx context.Context, svc Service) error
+	DelService(ctx context.Context, name string) error
+	Services(ctx context.Context) ([]Service, error)
 
-	// Set persists a service definition.
-	Set(ctx context.Context, svc Service) error
-
-	// Del removes a service definition.
-	Del(ctx context.Context, serviceName string) error
-
-	// List retrieves all service definitions.
-	List(ctx context.Context) ([]Service, error)
-}
-
-// EnvStore persists environment variables for services.
-// Implementations must be safe for concurrent use.
-type EnvStore interface {
-	// Get retrieves all env vars for a service.
-	// Returns empty map (not error) if service has no stored env.
-	Get(ctx context.Context, serviceName string) (map[string]string, error)
-
-	// Set persists all env vars for a service, replacing any existing values.
-	Set(ctx context.Context, serviceName string, env map[string]string) error
-
-	// Del removes all stored env vars for a service.
-	Del(ctx context.Context, serviceName string) error
+	// Env operations
+	GetEnv(ctx context.Context, name string) (Env, error)
+	SetEnv(ctx context.Context, env Env) error
+	DelEnv(ctx context.Context, name string) error
+	Envs(ctx context.Context) ([]Env, error)
 }
 
 // Config is Jed configurables.
@@ -71,26 +57,24 @@ type Config struct{}
 // - Deploy adds random suffix to Service.Name to create unique deployed names
 // - Containers() returns map keyed by service name for easy lookup
 // - Containers are filtered by managed_by=jed label
-// - ServiceStore is the source of truth for service definitions (no caching)
+// - Store is the source of truth for service definitions and environment variables (no caching)
 type Jed struct {
-	client       Client
-	logger       Logger
-	serviceStore ServiceStore // Required: source of truth for service definitions
-	envStore     EnvStore     // Required: source of truth for environment variables
+	client Client
+	logger Logger
+	store  Store // Required: source of truth for services and environment variables
 }
 
 // New creates a Jed from Config.
-func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, serviceStore ServiceStore, envStore EnvStore) (jed *Jed, err error) {
+func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, store Store) (jed *Jed, err error) {
 
 	jed = &Jed{
-		client:       client,
-		logger:       lgr,
-		serviceStore: serviceStore,
-		envStore:     envStore,
+		client: client,
+		logger: lgr,
+		store:  store,
 	}
 
 	// Validate images exist for all services
-	services, err := serviceStore.List(ctx)
+	services, err := store.Services(ctx)
 	if err != nil {
 		return
 	}
@@ -106,22 +90,25 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, serviceSt
 }
 
 // Services returns all services mapped by name.
-// Env is populated from envStore.
+// Env is populated from store.
 func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
 
 	// Todo: this is all a bit much
 	//       let service store clone
 	//       think about injecting env elsewhere (again)
-	list, err := jed.serviceStore.List(ctx)
+	list, err := jed.store.Services(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	services := make(map[string]Service, len(list))
 	for _, svc := range list {
-		env, err := jed.envStore.Get(ctx, svc.Name)
-		if err != nil {
-			return nil, err
+		// Todo: GetEnv returns error when env not found, but we want to ignore that case
+		//       Need to distinguish "not found" from actual errors, or change interface
+		env, err := jed.store.GetEnv(ctx, svc.Name)
+		var envVars map[string]string
+		if err == nil {
+			envVars = env.Vars
 		}
 
 		services[svc.Name] = Service{
@@ -129,7 +116,7 @@ func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
 			Image:   svc.Image,
 			Network: svc.Network,
 			Restart: svc.Restart,
-			Env:     env,
+			Env:     envVars,
 			Ports:   maps.Clone(svc.Ports),
 			Labels:  maps.Clone(svc.Labels),
 			Volumes: maps.Clone(svc.Volumes),
@@ -218,7 +205,7 @@ func (jed *Jed) CreateService(ctx context.Context, svc Service) (err error) {
 		return
 	}
 
-	err = jed.serviceStore.Set(ctx, svc)
+	err = jed.store.SetService(ctx, svc)
 	return
 }
 
@@ -236,12 +223,12 @@ func (jed *Jed) DeleteService(ctx context.Context, serviceName string) (err erro
 	}
 
 	// Todo: Partial failure leaves inconsistent state (service deleted, env orphaned).
-	err = jed.serviceStore.Del(ctx, serviceName)
+	err = jed.store.DelService(ctx, serviceName)
 	if err != nil {
 		return
 	}
 
-	err = jed.envStore.Del(ctx, serviceName)
+	err = jed.store.DelEnv(ctx, serviceName)
 	return
 }
 
@@ -259,14 +246,20 @@ func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]s
 		return
 	}
 
-	err = jed.envStore.Set(ctx, serviceName, env)
+	err = jed.store.SetEnv(ctx, Env{Name: serviceName, Vars: env})
 	return
 }
 
 // GetEnv retrieves environment variables for a service.
 func (jed *Jed) GetEnv(ctx context.Context, serviceName string) (env map[string]string, err error) {
 
-	env, err = jed.envStore.Get(ctx, serviceName)
+	// Todo: Store returns Env struct but this method returns just the map for backward compat.
+	//       Consider returning Env or changing Store interface.
+	e, err := jed.store.GetEnv(ctx, serviceName)
+	if err != nil {
+		return
+	}
+	env = e.Vars
 	return
 }
 
