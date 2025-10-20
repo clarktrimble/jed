@@ -457,9 +457,9 @@ var _ = Describe("Jed", func() {
 			})
 
 			It("should remove env vars from store", func() {
-				_, err := store.GetEnvFunc(ctx, "traefik")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("not found"))
+				env, err := store.GetEnvFunc(ctx, "traefik")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(env.Vars).To(BeEmpty())
 			})
 		})
 
@@ -544,7 +544,7 @@ var _ = Describe("Jed", func() {
 		})
 
 		When("getting env for service without env", func() {
-			PIt("should return empty map", func() {
+			It("should return empty map", func() {
 				retrieved, err := svc.GetEnv(ctx, "borken-1")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(retrieved).To(BeEmpty())

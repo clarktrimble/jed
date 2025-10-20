@@ -77,7 +77,8 @@ func (s *Store) GetEnv(ctx context.Context, name string) (jed.Env, error) {
 
 	env, ok := s.envs[name]
 	if !ok {
-		return jed.Env{}, errors.Errorf("env not found: %s", name)
+		// Return empty env when not found (not an error condition)
+		return jed.Env{Name: name, Vars: make(map[string]string)}, nil
 	}
 
 	// Return a copy to prevent external modification

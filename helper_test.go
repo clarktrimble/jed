@@ -101,7 +101,8 @@ func newMockStore() *StoreMock {
 		GetEnvFunc: func(ctx context.Context, name string) (jed.Env, error) {
 			env, ok := envs[name]
 			if !ok {
-				return jed.Env{}, errors.Errorf("env not found: %s", name)
+				// Return empty env when not found (not an error condition)
+				return jed.Env{Name: name, Vars: make(map[string]string)}, nil
 			}
 			return env, nil
 		},

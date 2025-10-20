@@ -41,6 +41,8 @@ type Store interface {
 	Services(ctx context.Context) ([]Service, error)
 
 	// Env operations
+	// GetEnv returns environment variables for a service.
+	// Returns empty Env with initialized Vars map when service has no env (not an error).
 	GetEnv(ctx context.Context, name string) (Env, error)
 	SetEnv(ctx context.Context, env Env) error
 	DelEnv(ctx context.Context, name string) error
@@ -103,13 +105,11 @@ func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
 
 	services := make(map[string]Service, len(list))
 	for _, svc := range list {
-		// Todo: GetEnv returns error when env not found, but we want to ignore that case
-		//       Need to distinguish "not found" from actual errors, or change interface
 		env, err := jed.store.GetEnv(ctx, svc.Name)
-		var envVars map[string]string
-		if err == nil {
-			envVars = env.Vars
+		if err != nil {
+			return nil, err
 		}
+		envVars := env.Vars
 
 		services[svc.Name] = Service{
 			Name:    svc.Name,
@@ -253,8 +253,6 @@ func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]s
 // GetEnv retrieves environment variables for a service.
 func (jed *Jed) GetEnv(ctx context.Context, serviceName string) (env map[string]string, err error) {
 
-	// Todo: Store returns Env struct but this method returns just the map for backward compat.
-	//       Consider returning Env or changing Store interface.
 	e, err := jed.store.GetEnv(ctx, serviceName)
 	if err != nil {
 		return

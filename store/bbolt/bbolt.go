@@ -129,7 +129,9 @@ func (str *Store) GetEnv(ctx context.Context, name string) (env jed.Env, err err
 		bkt := tx.Bucket(envsBucket)
 		data := bkt.Get([]byte(name))
 		if data == nil {
-			return errors.Errorf("env not found: %s", name)
+			// Return empty env when not found (not an error condition)
+			env = jed.Env{Name: name, Vars: make(map[string]string)}
+			return nil
 		}
 		err := json.Unmarshal(data, &env)
 		err = errors.Wrapf(err, "failed to decode env")
