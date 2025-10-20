@@ -64,21 +64,33 @@ var _ = Describe("Container", func() {
 				Expect(containers).NotTo(BeNil())
 			})
 
-			It("should map by service name with suffix stripped", func() {
+			It("should contain containers with service names parsed", func() {
 				Expect(containers).To(HaveLen(3))
-				Expect(containers).To(HaveKey("postgres"))
-				Expect(containers).To(HaveKey("redis"))
-				Expect(containers).To(HaveKey("nginx"))
+
+				services := make(map[string]bool)
+				for _, c := range containers {
+					services[c.Service] = true
+				}
+				Expect(services).To(HaveKey("postgres"))
+				Expect(services).To(HaveKey("redis"))
+				Expect(services).To(HaveKey("nginx"))
 			})
 
 			It("should preserve full container details", func() {
-				Expect(containers["postgres"].Id).To(Equal("abc123"))
-				Expect(containers["postgres"].Names).To(Equal([]string{"/postgres-x7y9z2n"}))
-				Expect(containers["postgres"].Image).To(Equal("postgres:14"))
-				Expect(containers["postgres"].State).To(Equal("running"))
+				postgres, err := containers.Find("postgres")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(postgres.Id).To(Equal("abc123"))
+				Expect(postgres.Names).To(Equal([]string{"/postgres-x7y9z2n"}))
+				Expect(postgres.Image).To(Equal("postgres:14"))
+				Expect(postgres.State).To(Equal("running"))
 
-				Expect(containers["redis"].Id).To(Equal("def456"))
-				Expect(containers["nginx"].Id).To(Equal("ghi789"))
+				redis, err := containers.Find("redis")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(redis.Id).To(Equal("def456"))
+
+				nginx, err := containers.Find("nginx")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nginx.Id).To(Equal("ghi789"))
 			})
 		})
 
@@ -129,80 +141,67 @@ var _ = Describe("Container", func() {
 				Expect(containers).To(HaveLen(0))
 				Expect(lgr.ErrorCalls()).To(HaveLen(1))
 				Expect(lgr.ErrorCalls()[0].Msg).To(Equal("ignoring managed_by=jed containers"))
-				Expect(lgr.ErrorCalls()[0].Err.Error()).To(ContainSubstring("unexpected container names"))
+				Expect(lgr.ErrorCalls()[0].Err.Error()).To(ContainSubstring("unexpected containers"))
 			})
 		})
 	})
 
-	Describe("Containers.DeployName", func() {
+	Describe("Containers.Find", func() {
 		var (
 			containers jed.Containers
+			ctr        jed.Container
+		)
+
+		BeforeEach(func() {
+			cntrs := testContainerList()
+			client.SendObjectFunc = mockContainers(cntrs[:1])
+			containers, err = svc.Containers(ctx)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		JustBeforeEach(func() {
+			ctr, err = containers.Find("postgres")
+		})
+
+		When("container exists", func() {
+			It("should return container without error", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ctr.Id).To(Equal("abc123"))
+				Expect(ctr.Service).To(Equal("postgres"))
+			})
+		})
+
+		When("container not found", func() {
+			JustBeforeEach(func() {
+				ctr, err = containers.Find("nonexistent")
+			})
+
+			It("should return error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("container nonexistent not found"))
+			})
+		})
+	})
+
+	Describe("Container.DeployName", func() {
+		var (
+			ctr        jed.Container
 			deployName string
 		)
 
 		BeforeEach(func() {
-			cntrs := testContainerList()
-			client.SendObjectFunc = mockContainers(cntrs[:1])
-			containers, err = svc.Containers(ctx)
-			Expect(err).NotTo(HaveOccurred())
+			ctr = jed.Container{
+				Names: []string{"/postgres-x7y9z2n"},
+			}
 		})
 
 		JustBeforeEach(func() {
-			deployName, err = containers.DeployName("postgres")
+			deployName = ctr.DeployName()
 		})
 
-		When("container exists", func() {
-			It("should return deploy name without error", func() {
-				Expect(err).NotTo(HaveOccurred())
+		When("container has name with leading slash", func() {
+			It("should return deploy name without leading slash", func() {
 				Expect(deployName).To(Equal("postgres-x7y9z2n"))
-			})
-		})
-
-		When("container not found", func() {
-			JustBeforeEach(func() {
-				deployName, err = containers.DeployName("nonexistent")
-			})
-
-			It("should return error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("container nonexistent not found"))
-			})
-		})
-	})
-
-	Describe("Containers.Id", func() {
-		var (
-			containers jed.Containers
-			id         string
-		)
-
-		BeforeEach(func() {
-			cntrs := testContainerList()
-			cntrs[0].Id = "abc123def456"
-			client.SendObjectFunc = mockContainers(cntrs[:1])
-			containers, err = svc.Containers(ctx)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		JustBeforeEach(func() {
-			id, err = containers.Id("postgres")
-		})
-
-		When("container exists", func() {
-			It("should return container ID without error", func() {
-				Expect(err).NotTo(HaveOccurred())
-				Expect(id).To(Equal("abc123def456"))
-			})
-		})
-
-		When("container not found", func() {
-			JustBeforeEach(func() {
-				id, err = containers.Id("nonexistent")
-			})
-
-			It("should return error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("container nonexistent not found"))
 			})
 		})
 	})

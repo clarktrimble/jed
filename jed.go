@@ -93,6 +93,7 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, store Sto
 
 // Services returns all services mapped by name.
 // Env is populated from store.
+// Todo: just let store carry the water?? Env too
 func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
 
 	// Todo: this is all a bit much
@@ -157,18 +158,18 @@ func (jed *Jed) Undeploy(ctx context.Context, service Service) (err error) {
 		return
 	}
 
-	deployName, err := containers.DeployName(service.Name)
+	ctr, err := containers.Find(service.Name)
 	if err != nil {
 		return
 	}
 
-	err = jed.stop(ctx, deployName)
+	err = jed.stop(ctx, ctr.DeployName())
 	if err != nil {
 		// best effort, we could check for "304 already stopped"
 		jed.logger.Error(ctx, "failed to stop container", err)
 	}
 
-	err = jed.delete(ctx, deployName)
+	err = jed.delete(ctx, ctr.DeployName())
 	return
 }
 
@@ -262,19 +263,19 @@ func (jed *Jed) GetEnv(ctx context.Context, serviceName string) (env map[string]
 }
 
 // Containers returns all containers managed by this service.
-func (jed *Jed) Containers(ctx context.Context) (Containers, error) {
+func (jed *Jed) Containers(ctx context.Context) (mgd Containers, err error) {
 
-	containers, err := jed.containers(ctx)
+	ctrs, err := jed.containers(ctx)
 	if err != nil {
-		return Containers{}, err
+		return
 	}
 
-	byName, noMatch := newContainers(containers)
+	mgd, noMatch := managed(ctrs)
 	if len(noMatch) != 0 {
-		err = errors.Errorf("unexpected container names")
-		jed.logger.Error(ctx, "ignoring managed_by=jed containers", err, "names", noMatch)
+		jed.logger.Error(ctx, "ignoring managed_by=jed containers",
+			errors.Errorf("unexpected containers"), "names", noMatch)
 	}
-	return byName, nil
+	return
 }
 
 // Logs retrieves logs from a container using Docker API.

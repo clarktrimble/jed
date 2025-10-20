@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Container is docker api container.
+// Container is from docker api.
 type Container struct {
 	Id      string            `json:"Id"`
 	Names   []string          `json:"Names"`
@@ -15,48 +15,45 @@ type Container struct {
 	Status  string            `json:"Status"`
 	Labels  map[string]string `json:"Labels"`
 	Created int64             `json:"Created"`
+	Service string            `json:"-"`
 }
 
-// Containers maps service names to container.
-type Containers map[string]Container
-
-// DeployName returns the deployed name of a given service.
-func (containers Containers) DeployName(serviceName string) (deployName string, err error) {
-	container, ok := containers[serviceName]
-	if !ok {
-		err = errors.Errorf("container %s not found", serviceName)
-		return
-	}
-	deployName = strings.TrimPrefix(container.Names[0], "/")
-	return
+// DeployName returns the container's deployed name with leading slash removed.
+func (c Container) DeployName() string {
+	return strings.TrimPrefix(c.Names[0], "/")
 }
 
-// Id returns the container ID given a service name.
-func (containers Containers) Id(serviceName string) (id string, err error) {
-	container, ok := containers[serviceName]
-	if !ok {
-		err = errors.Errorf("container %s not found", serviceName)
-		return
+// Containers is a slice of containers.
+type Containers []Container
+
+// Find returns the container for a given service name.
+func (ctrs Containers) Find(serviceName string) (ctr Container, err error) {
+
+	for _, ctr = range ctrs {
+		if ctr.Service == serviceName {
+			return
+		}
 	}
-	id = container.Id
+	err = errors.Errorf("container %s not found", serviceName)
 	return
 }
 
 // unexported
 
-func newContainers(containers []Container) (byName Containers, noMatch []string) {
+func managed(ctrs []Container) (mgd Containers, noMatch []string) {
 
-	byName = Containers{}
-	for _, container := range containers {
-		for _, name := range container.Names {
-			matches := suffixPattern.FindStringSubmatch(name)
-			if matches == nil {
+	mgd = Containers{}
+	for _, ctr := range ctrs {
+		for _, name := range ctr.Names {
+
+			match := suffixPattern.FindStringSubmatch(name)
+			if match == nil {
 				noMatch = append(noMatch, name)
 				continue
 			}
 
-			serviceName := matches[1]
-			byName[serviceName] = container
+			ctr.Service = match[1]
+			mgd = append(mgd, ctr)
 		}
 	}
 	return
