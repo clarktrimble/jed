@@ -20,13 +20,18 @@ type Container struct {
 
 // DeployName returns the container's deployed name with leading slash removed.
 func (c Container) DeployName() string {
+
+	if len(c.Names) == 0 {
+		return "container has no names, most unexpected"
+	}
+
 	return strings.TrimPrefix(c.Names[0], "/")
 }
 
 // Containers is a slice of containers.
 type Containers []Container
 
-// Find returns the container for a given service name.
+// Find finds a container given a service name.
 func (ctrs Containers) Find(serviceName string) (ctr Container, err error) {
 
 	for _, ctr = range ctrs {

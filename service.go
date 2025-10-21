@@ -1,13 +1,14 @@
 package jed
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 )
 
-// Todo: move me
+// Todo: move me?
 type Env struct {
 	Name string
 	Vars map[string]string
@@ -24,6 +25,76 @@ type Service struct {
 	Network string            `json:"network"`
 	Restart string            `json:"restart"`
 }
+
+// Services is a slice of services.
+type Services []Service
+
+// Services gets services from the store.
+func (jed *Jed) Services(ctx context.Context) (services Services, err error) {
+
+	services, err = jed.store.Services(ctx)
+	return
+}
+
+// Find finds a service given its name.
+func (services Services) Find(name string) (service Service, err error) {
+
+	for _, service = range services {
+		if service.Name == name {
+			return
+		}
+	}
+	err = errors.Errorf("service %s not found", name)
+	return
+}
+
+// CreateService adds a new service definition.
+func (jed *Jed) CreateService(ctx context.Context, service Service) (err error) {
+
+	err = service.validate()
+	if err != nil {
+		return
+	}
+
+	services, err := jed.Services(ctx)
+	if err != nil {
+		return
+	}
+
+	_, err = services.Find(service.Name)
+	if err == nil {
+		err = errors.Errorf("service %s already exists", service.Name)
+		return
+	}
+
+	err = jed.store.SetService(ctx, service)
+	return
+}
+
+// DeleteService removes a service definition and its env vars.
+func (jed *Jed) DeleteService(ctx context.Context, serviceName string) (err error) {
+
+	services, err := jed.Services(ctx)
+	if err != nil {
+		return
+	}
+
+	_, err = services.Find(serviceName)
+	if err != nil {
+		return
+	}
+
+	// Todo: Partial failure leaves inconsistent state (service deleted, env orphaned).
+	err = jed.store.DelService(ctx, serviceName)
+	if err != nil {
+		return
+	}
+
+	err = jed.store.DelEnv(ctx, serviceName)
+	return
+}
+
+// unexported
 
 func (service Service) validate() error {
 	var issues []string
@@ -50,7 +121,7 @@ func (service Service) validate() error {
 
 type containerConfig map[string]any
 
-func (service Service) config() (cfg containerConfig, err error) {
+func (service Service) config(env Env) (cfg containerConfig, err error) {
 
 	exposedPorts, portBindings := buildPortConfig(service.Ports)
 
@@ -64,7 +135,7 @@ func (service Service) config() (cfg containerConfig, err error) {
 
 	cfg = map[string]any{
 		"Image":        service.Image,
-		"Env":          envLines(service.Env),
+		"Env":          envLines(env.Vars),
 		"Labels":       service.Labels,
 		"ExposedPorts": exposedPorts,
 		"HostConfig":   hostConfig,

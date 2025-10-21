@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"regexp"
 
 	"github.com/clarktrimble/hondo"
@@ -15,6 +14,7 @@ import (
 //go:generate moq -out mock_test.go -pkg jed_test . Logger Client Store
 
 var (
+	// Todo: round these up and rename
 	suffixPattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
 )
 
@@ -43,6 +43,7 @@ type Store interface {
 	// Env operations
 	// GetEnv returns environment variables for a service.
 	// Returns empty Env with initialized Vars map when service has no env (not an error).
+	// Todo: godoc properly
 	GetEnv(ctx context.Context, name string) (Env, error)
 	SetEnv(ctx context.Context, env Env) error
 	DelEnv(ctx context.Context, name string) error
@@ -91,6 +92,8 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, store Sto
 	return
 }
 
+// Todo: deep copy service and env, or let store imp do this?
+/*
 // Services returns all services mapped by name.
 // Env is populated from store.
 // Todo: just let store carry the water?? Env too
@@ -125,18 +128,22 @@ func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
 	}
 	return services, nil
 }
+*/
 
 // Deploy creates and starts a container.
 func (jed *Jed) Deploy(ctx context.Context, service Service) (id string, err error) {
 
-	suffix := hondo.Rand(7)
-	deployName := service.Name + "-" + suffix
-
-	cfg, err := service.config()
+	env, err := jed.store.GetEnv(ctx, service.Name)
 	if err != nil {
 		return
 	}
 
+	cfg, err := service.config(env)
+	if err != nil {
+		return
+	}
+
+	deployName := service.Name + "-" + hondo.Rand(7)
 	id, err = jed.create(ctx, deployName, cfg)
 	if err != nil {
 		return
@@ -185,65 +192,16 @@ func (jed *Jed) Redeploy(ctx context.Context, service Service) (err error) {
 	return
 }
 
-// CreateService adds a new service definition.
-func (jed *Jed) CreateService(ctx context.Context, svc Service) (err error) {
-
-	err = svc.validate()
-	if err != nil {
-		return
-	}
-
-	// Todo: Using Services() instead of serviceStore.Get() to check existence.
-	// serviceStore.Get() errors are ambiguous (not found vs other errors).
-	// Services() reliably returns existing services or fails with a clear error.
-	services, err := jed.Services(ctx)
-	if err != nil {
-		return
-	}
-
-	if _, ok := services[svc.Name]; ok {
-		err = errors.Errorf("service %s already exists", svc.Name)
-		return
-	}
-
-	err = jed.store.SetService(ctx, svc)
-	return
-}
-
-// DeleteService removes a service definition and its env vars.
-func (jed *Jed) DeleteService(ctx context.Context, serviceName string) (err error) {
-
-	services, err := jed.Services(ctx)
-	if err != nil {
-		return
-	}
-
-	if _, ok := services[serviceName]; !ok {
-		err = errors.Errorf("service %s not found", serviceName)
-		return
-	}
-
-	// Todo: Partial failure leaves inconsistent state (service deleted, env orphaned).
-	err = jed.store.DelService(ctx, serviceName)
-	if err != nil {
-		return
-	}
-
-	err = jed.store.DelEnv(ctx, serviceName)
-	return
-}
-
 // SetEnv sets environment variables for a service.
 func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]string) (err error) {
 
-	// Todo: Using Services() to check existence. See CreateService for rationale.
 	services, err := jed.Services(ctx)
 	if err != nil {
 		return
 	}
 
-	if _, ok := services[serviceName]; !ok {
-		err = errors.Errorf("service %s not found", serviceName)
+	_, err = services.Find(serviceName)
+	if err != nil {
 		return
 	}
 

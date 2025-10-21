@@ -87,7 +87,6 @@ var _ = Describe("Jed", func() {
 				Image:   "test:v1",
 				Network: "test-net",
 				Restart: "always",
-				Env:     map[string]string{"FOO": "bar", "BAZ": "qux"},
 				Ports:   map[string]string{"8080/tcp": "8080"},
 				Labels:  map[string]string{"app": "test", "version": "1.0"},
 				Volumes: map[string]string{"/host/path": "/container/path"},
@@ -125,7 +124,7 @@ var _ = Describe("Jed", func() {
 
 	Describe("Services", func() {
 		var (
-			services map[string]jed.Service
+			services jed.Services
 		)
 
 		BeforeEach(func() {
@@ -144,14 +143,19 @@ var _ = Describe("Jed", func() {
 			})
 
 			It("should have correct names", func() {
-				Expect(services).To(HaveKey("traefik"))
-				Expect(services).To(HaveKey("axis-camera-1"))
-				Expect(services).To(HaveKey("logscale-1"))
-				Expect(services).To(HaveKey("borken-1"))
+				_, err := services.Find("traefik")
+				Expect(err).NotTo(HaveOccurred())
+				_, err = services.Find("axis-camera-1")
+				Expect(err).NotTo(HaveOccurred())
+				_, err = services.Find("logscale-1")
+				Expect(err).NotTo(HaveOccurred())
+				_, err = services.Find("borken-1")
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should load service properties from YAML", func() {
-				traefik := services["traefik"]
+				traefik, err := services.Find("traefik")
+				Expect(err).NotTo(HaveOccurred())
 				Expect(traefik.Name).To(Equal("traefik"))
 				Expect(traefik.Image).To(Equal("traefik:v3.0"))
 				Expect(traefik.Network).To(Equal("admin-int"))
@@ -164,26 +168,32 @@ var _ = Describe("Jed", func() {
 			})
 
 			It("should load existing labels from YAML", func() {
-				axisCamera := services["axis-camera-1"]
+				axisCamera, err := services.Find("axis-camera-1")
+				Expect(err).NotTo(HaveOccurred())
 				Expect(axisCamera.Name).To(Equal("axis-camera-1"))
 				Expect(axisCamera.Labels["traefik.enable"]).To(Equal("true"))
 				Expect(axisCamera.Labels["traefik.http.routers.axis-camera-1.tls"]).To(Equal("true"))
 				Expect(axisCamera.Labels["traefik.http.routers.axis-camera-1.rule"]).To(Equal("Host(`axis.int.bastille.cloud`)"))
 			})
 
-			It("should load env files for services that have them", func() {
-				traefik := services["traefik"]
-				Expect(traefik.Name).To(Equal("traefik"))
-				Expect(traefik.Env["TRAEFIK_API_DASHBOARD"]).To(Equal("true"))
-				Expect(traefik.Env["TRAEFIK_PROVIDERS_DOCKER"]).To(Equal("true"))
-				Expect(traefik.Env["TRAEFIK_ENTRYPOINTS_WEB_ADDRESS"]).To(Equal(":80"))
-			})
+			// Todo: env is now decoupled from services - decide if these tests should move to GetEnv or be deleted
+			/*
+				It("should load env files for services that have them", func() {
+					traefik, err := services.Find("traefik")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(traefik.Name).To(Equal("traefik"))
+					Expect(traefik.Env["TRAEFIK_API_DASHBOARD"]).To(Equal("true"))
+					Expect(traefik.Env["TRAEFIK_PROVIDERS_DOCKER"]).To(Equal("true"))
+					Expect(traefik.Env["TRAEFIK_ENTRYPOINTS_WEB_ADDRESS"]).To(Equal(":80"))
+				})
 
-			It("should handle services without env files", func() {
-				borken := services["borken-1"]
-				Expect(borken.Name).To(Equal("borken-1"))
-				Expect(borken.Env).To(BeEmpty())
-			})
+				It("should handle services without env files", func() {
+					borken, err := services.Find("borken-1")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(borken.Name).To(Equal("borken-1"))
+					Expect(borken.Env).To(BeEmpty())
+				})
+			*/
 		})
 	})
 
@@ -383,8 +393,10 @@ var _ = Describe("Jed", func() {
 			It("should add service to Services()", func() {
 				services, err := svc.Services(ctx)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(services).To(HaveKey("new-service"))
-				Expect(services["new-service"].Image).To(Equal("nginx:latest"))
+
+				newSvc, err := services.Find("new-service")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(newSvc.Image).To(Equal("nginx:latest"))
 			})
 
 			It("should persist service to store", func() {
@@ -447,7 +459,10 @@ var _ = Describe("Jed", func() {
 			It("should remove service from Services()", func() {
 				services, err := svc.Services(ctx)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(services).NotTo(HaveKey("traefik"))
+
+				_, err = services.Find("traefik")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("service traefik not found"))
 			})
 
 			It("should remove service from store", func() {
