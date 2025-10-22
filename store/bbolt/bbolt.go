@@ -1,3 +1,6 @@
+// Package bbolt provides a persistent implementation of jed.Store using BoltDB.
+//
+// Data is stored in a local BoltDB file for persistence across restarts.
 package bbolt
 
 import (

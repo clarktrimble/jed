@@ -1,3 +1,7 @@
+// Package memo provides an in-memory implementation of jed.Store.
+//
+// The in-memory store is useful for testing and development.
+// All data is lost when the process exits.
 package memo
 
 import (

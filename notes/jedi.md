@@ -3,6 +3,10 @@
 A docker mgmt web UI.
 Todo: more about purpose/rationale/reason-de-tor
 
+## from other doc
+o service creation: start from image and mostly traefik labels (in jedi)
+o env creation: start with help from service if available (in jedi)
+
 ## contstraints
 - single node
 - rely on local docker images

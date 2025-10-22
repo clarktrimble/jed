@@ -1,3 +1,25 @@
+// Package jed manages Docker containers as services with persistent configuration.
+//
+// # Abstractions
+//
+//   - Service:   Persistent configuration defining what to deploy (image, ports, volumes, etc.)
+//   - Env:       A container's environment variables
+//   - Container: Selected fields from Docker API's container data, augmented with service name
+//
+// # Lifecycle
+//
+//   - Deploy() creates and starts a Container from a Service
+//   - Undeploy() stops and removes a Container
+//   - Redeploy() stops, removes, creates, and starts a Container with fresh cfg and env
+//
+// # Identification
+//
+//   - Containers managed by Jed have the "managed_by=jed" label
+//   - Containers are named by appending a random suffix to the service name (e.g., "postgres-k7m9x2n")
+//
+// # Stateless
+//
+// Jed relies on the Docker API and Service/Env Store for all state, maintaining no internal cache.
 package jed
 
 import (
@@ -18,7 +40,7 @@ var (
 	suffixPattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
 )
 
-// Client specifies an http client by which stuff can be sent and received.
+// Client is an HTTP client for communicating with the Docker API.
 type Client interface {
 	SendObject(ctx context.Context, method, path string, snd, rcv any) (err error)
 	SendJson(ctx context.Context, method, path string, body io.Reader) (data []byte, err error)
@@ -32,39 +54,46 @@ type Logger interface {
 }
 
 // Store persists services and environment variables.
-// Implementations must be safe for concurrent use.
+//
+// Implementations must be safe for concurrent use. The Store is the source
+// of truth for all service definitions and environment variables.
 type Store interface {
-	// Service operations
+	// GetService retrieves a service definition by name.
+	// Returns an error if the service does not exist.
 	GetService(ctx context.Context, name string) (Service, error)
+
+	// SetService creates or updates a service definition.
 	SetService(ctx context.Context, svc Service) error
+
+	// DelService removes a service definition by name.
 	DelService(ctx context.Context, name string) error
+
+	// Services returns all service definitions.
 	Services(ctx context.Context) ([]Service, error) // Todo: deep copy?
 
-	// Env operations
-	// GetEnv returns environment variables for a service.
-	// Returns empty Env with initialized Vars map when service has no env (not an error).
-	// Todo: godoc properly
+	// GetEnv retrieves environment variables for a service.
+	// Returns an empty Env with initialized Vars map when the service has no
+	// environment variables (not an error). Returns an error only on storage failures.
 	GetEnv(ctx context.Context, name string) (Env, error)
+
+	// SetEnv creates or updates environment variables for a service.
 	SetEnv(ctx context.Context, env Env) error
+
+	// DelEnv removes environment variables for a service by name.
 	DelEnv(ctx context.Context, name string) error
+
+	// Envs returns all environment variable sets for all services.
 	Envs(ctx context.Context) ([]Env, error)
 }
 
-// Config is Jed configurables.
+// Config holds configuration for creating a Jed instance.
 type Config struct{}
 
-// Jed is the service.
-// Service and Container relationship:
-// - Service is input config (immutable, user-facing base names like "postgres")
-// - Container is runtime state from Docker (actual deployed names like "postgres-k7m9x2n")
-// - Deploy adds random suffix to Service.Name to create unique deployed names
-// - Containers() returns map keyed by service name for easy lookup
-// - Containers are filtered by managed_by=jed label
-// - Store is the source of truth for service definitions and environment variables (no caching)
+// Jed manages Docker containers as services.
 type Jed struct {
 	client Client
 	logger Logger
-	store  Store // Required: source of truth for services and environment variables
+	store  Store
 }
 
 // New creates a Jed from Config.
@@ -94,6 +123,9 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, store Sto
 
 // Deploy creates and starts a container.
 func (jed *Jed) Deploy(ctx context.Context, service Service) (id string, err error) {
+
+	// Todo: just take name and lookup?
+	// Todo: handle already deployed
 
 	env, err := jed.store.GetEnv(ctx, service.Name)
 	if err != nil {
@@ -156,6 +188,8 @@ func (jed *Jed) Redeploy(ctx context.Context, service Service) (err error) {
 
 // SetEnv sets environment variables for a service.
 func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]string) (err error) {
+
+	// Todo: do SetEnv and GetEnv really make sense here?  Doc ffs!
 
 	services, err := jed.Services(ctx)
 	if err != nil {

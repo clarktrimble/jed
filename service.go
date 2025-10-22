@@ -8,21 +8,29 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Env holds environment variables for a service.
 // Todo: move me?
 type Env struct {
 	Name string
 	Vars map[string]string
 }
 
-// Service is a service configuration.
+// Service is a service's configuration.
 type Service struct {
-	Name    string
-	Image   string
-	Ports   map[string]string `json:"ports"`
-	Labels  map[string]string `json:"labels"`
+	// Name is the service name (e.g., "postgres").
+	Name string
+	// Image is the Docker image (e.g., "postgres:16").
+	Image string
+	// Ports maps container ports to host ports (e.g., "5432/tcp": "5432").
+	Ports map[string]string `json:"ports"`
+	// Labels are Docker container labels.
+	Labels map[string]string `json:"labels"`
+	// Volumes maps host paths to container paths.
 	Volumes map[string]string `json:"volumes"`
-	Network string            `json:"network"`
-	Restart string            `json:"restart"`
+	// Network is the Docker network name.
+	Network string `json:"network"`
+	// Restart is the restart policy (e.g., "unless-stopped", "always").
+	Restart string `json:"restart"`
 }
 
 // Services is a slice of services.

@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Container is from docker api.
+// Container represents a Docker container as returned by the Docker API.
 type Container struct {
 	Id      string            `json:"Id"`
 	Names   []string          `json:"Names"`
@@ -15,7 +15,8 @@ type Container struct {
 	Status  string            `json:"Status"`
 	Labels  map[string]string `json:"Labels"`
 	Created int64             `json:"Created"`
-	Service string            `json:"-"`
+	// Service is the service name parsed from the first container name.
+	Service string `json:"-"`
 }
 
 // DeployName returns the container's deployed name with leading slash removed.
