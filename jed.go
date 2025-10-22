@@ -38,7 +38,7 @@ type Store interface {
 	GetService(ctx context.Context, name string) (Service, error)
 	SetService(ctx context.Context, svc Service) error
 	DelService(ctx context.Context, name string) error
-	Services(ctx context.Context) ([]Service, error)
+	Services(ctx context.Context) ([]Service, error) // Todo: deep copy?
 
 	// Env operations
 	// GetEnv returns environment variables for a service.
@@ -91,44 +91,6 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, store Sto
 
 	return
 }
-
-// Todo: deep copy service and env, or let store imp do this?
-/*
-// Services returns all services mapped by name.
-// Env is populated from store.
-// Todo: just let store carry the water?? Env too
-func (jed *Jed) Services(ctx context.Context) (map[string]Service, error) {
-
-	// Todo: this is all a bit much
-	//       let service store clone
-	//       think about injecting env elsewhere (again)
-	list, err := jed.store.Services(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	services := make(map[string]Service, len(list))
-	for _, svc := range list {
-		env, err := jed.store.GetEnv(ctx, svc.Name)
-		if err != nil {
-			return nil, err
-		}
-		envVars := env.Vars
-
-		services[svc.Name] = Service{
-			Name:    svc.Name,
-			Image:   svc.Image,
-			Network: svc.Network,
-			Restart: svc.Restart,
-			Env:     envVars,
-			Ports:   maps.Clone(svc.Ports),
-			Labels:  maps.Clone(svc.Labels),
-			Volumes: maps.Clone(svc.Volumes),
-		}
-	}
-	return services, nil
-}
-*/
 
 // Deploy creates and starts a container.
 func (jed *Jed) Deploy(ctx context.Context, service Service) (id string, err error) {

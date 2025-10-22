@@ -175,25 +175,6 @@ var _ = Describe("Jed", func() {
 				Expect(axisCamera.Labels["traefik.http.routers.axis-camera-1.tls"]).To(Equal("true"))
 				Expect(axisCamera.Labels["traefik.http.routers.axis-camera-1.rule"]).To(Equal("Host(`axis.int.bastille.cloud`)"))
 			})
-
-			// Todo: env is now decoupled from services - decide if these tests should move to GetEnv or be deleted
-			/*
-				It("should load env files for services that have them", func() {
-					traefik, err := services.Find("traefik")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(traefik.Name).To(Equal("traefik"))
-					Expect(traefik.Env["TRAEFIK_API_DASHBOARD"]).To(Equal("true"))
-					Expect(traefik.Env["TRAEFIK_PROVIDERS_DOCKER"]).To(Equal("true"))
-					Expect(traefik.Env["TRAEFIK_ENTRYPOINTS_WEB_ADDRESS"]).To(Equal(":80"))
-				})
-
-				It("should handle services without env files", func() {
-					borken, err := services.Find("borken-1")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(borken.Name).To(Equal("borken-1"))
-					Expect(borken.Env).To(BeEmpty())
-				})
-			*/
 		})
 	})
 
@@ -555,6 +536,7 @@ var _ = Describe("Jed", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(retrieved).To(HaveKeyWithValue("TRAEFIK_API_DASHBOARD", "true"))
 				Expect(retrieved).To(HaveKeyWithValue("TRAEFIK_PROVIDERS_DOCKER", "true"))
+				Expect(retrieved).To(HaveKeyWithValue("TRAEFIK_ENTRYPOINTS_WEB_ADDRESS", ":80"))
 			})
 		})
 

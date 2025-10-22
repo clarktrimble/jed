@@ -18,7 +18,6 @@ type Env struct {
 type Service struct {
 	Name    string
 	Image   string
-	Env     map[string]string `json:"env"`
 	Ports   map[string]string `json:"ports"`
 	Labels  map[string]string `json:"labels"`
 	Volumes map[string]string `json:"volumes"`
