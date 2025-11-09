@@ -3,6 +3,9 @@
 This document explains the rationale behind key design decisions in Jed.
 
 Todo: this doc needs a good beating :)
+- rename rationale.md
+- overall: no compose api, want just enough
+- enumerate key design choices
 
 ## Slice-Based APIs
 
