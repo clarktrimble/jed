@@ -15,8 +15,8 @@ type Container struct {
 	Status  string            `json:"Status"`
 	Labels  map[string]string `json:"Labels"`
 	Created int64             `json:"Created"`
-	// Service is the service name parsed from the first container name.
-	Service string `json:"-"`
+	// ServiceName is parsed from first of Names to hopefully match Service.Name.
+	ServiceName string `json:"-"`
 }
 
 // DeployName returns the container's deployed name with leading slash removed.
@@ -36,7 +36,7 @@ type Containers []Container
 func (ctrs Containers) Find(serviceName string) (ctr Container, err error) {
 
 	for _, ctr = range ctrs {
-		if ctr.Service == serviceName {
+		if ctr.ServiceName == serviceName {
 			return
 		}
 	}
@@ -46,12 +46,10 @@ func (ctrs Containers) Find(serviceName string) (ctr Container, err error) {
 
 // unexported
 
-// Todo: Find vs deployed, wrong somewhere?
-// Todo: is more flexible to accept slice?
 func (ctrs Containers) deployed(name string) bool {
 
 	for _, ctr := range ctrs {
-		if ctr.Service == name {
+		if ctr.ServiceName == name {
 			return true
 		}
 	}
@@ -64,13 +62,13 @@ func managed(ctrs Containers) (mgd Containers, noMatch []string) {
 	for _, ctr := range ctrs {
 		for _, name := range ctr.Names {
 
-			match := suffixPattern.FindStringSubmatch(name)
+			match := deployNamePattern.FindStringSubmatch(name)
 			if match == nil {
 				noMatch = append(noMatch, name)
 				continue
 			}
 
-			ctr.Service = match[1]
+			ctr.ServiceName = match[1]
 			mgd = append(mgd, ctr)
 		}
 	}

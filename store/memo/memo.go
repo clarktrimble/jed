@@ -13,9 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Todo: add unit tests for memo store
-// Todo: consider shared interface testing for all Store implementations
-
 // Store implements jed.Store interface using in-memory storage.
 // Safe for concurrent use.
 type Store struct {
@@ -33,6 +30,7 @@ func New() *Store {
 }
 
 // GetService retrieves a service definition by name.
+// Note: shallow copy!!
 func (s *Store) GetService(ctx context.Context, name string) (jed.Service, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -63,6 +61,7 @@ func (s *Store) DelService(ctx context.Context, name string) error {
 }
 
 // Services retrieves all service definitions.
+// Note: shallow copy!!
 func (s *Store) Services(ctx context.Context) ([]jed.Service, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

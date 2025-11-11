@@ -36,8 +36,7 @@ import (
 //go:generate moq -out mock_test.go -pkg jed_test . Logger Client Store
 
 var (
-	// Todo: round these up and rename
-	suffixPattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
+	deployNamePattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
 )
 
 // Client is an HTTP client for communicating with the Docker API.
@@ -69,7 +68,7 @@ type Store interface {
 	DelService(ctx context.Context, name string) error
 
 	// Services returns all service definitions.
-	Services(ctx context.Context) ([]Service, error) // Todo: deep copy?
+	Services(ctx context.Context) ([]Service, error)
 
 	// GetEnv retrieves environment variables for a service.
 	// Returns an empty Env with initialized Vars map when the service has no
@@ -84,6 +83,12 @@ type Store interface {
 
 	// Envs returns all environment variable sets for all services.
 	Envs(ctx context.Context) ([]Env, error)
+}
+
+// Env holds environment variables for a service.
+type Env struct {
+	Name string
+	Vars map[string]string
 }
 
 // Config holds configuration for creating a Jed instance.
@@ -190,36 +195,6 @@ func (jed *Jed) Redeploy(ctx context.Context, service Service) (err error) {
 	}
 
 	_, err = jed.Deploy(ctx, service)
-	return
-}
-
-// SetEnv sets environment variables for a service.
-func (jed *Jed) SetEnv(ctx context.Context, serviceName string, env map[string]string) (err error) {
-
-	// Todo: do SetEnv and GetEnv really make sense here?  Doc ffs!
-
-	services, err := jed.Services(ctx)
-	if err != nil {
-		return
-	}
-
-	_, err = services.Find(serviceName)
-	if err != nil {
-		return
-	}
-
-	err = jed.store.SetEnv(ctx, Env{Name: serviceName, Vars: env})
-	return
-}
-
-// GetEnv retrieves environment variables for a service.
-func (jed *Jed) GetEnv(ctx context.Context, serviceName string) (env map[string]string, err error) {
-
-	e, err := jed.store.GetEnv(ctx, serviceName)
-	if err != nil {
-		return
-	}
-	env = e.Vars
 	return
 }
 

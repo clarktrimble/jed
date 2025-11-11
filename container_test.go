@@ -69,7 +69,7 @@ var _ = Describe("Container", func() {
 
 				services := make(map[string]bool)
 				for _, c := range containers {
-					services[c.Service] = true
+					services[c.ServiceName] = true
 				}
 				Expect(services).To(HaveKey("postgres"))
 				Expect(services).To(HaveKey("redis"))
@@ -167,7 +167,7 @@ var _ = Describe("Container", func() {
 			It("should return container without error", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ctr.Id).To(Equal("abc123"))
-				Expect(ctr.Service).To(Equal("postgres"))
+				Expect(ctr.ServiceName).To(Equal("postgres"))
 			})
 		})
 

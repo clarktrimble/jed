@@ -17,8 +17,9 @@ Manage Docker containers as services with persistent configuration and environme
     }
     j.CreateService(ctx, service)
 
-    j.SetEnv(ctx, "postgres", map[string]string{
-        "POSTGRES_PASSWORD": "secret",
+    store.SetEnv(ctx, jed.Env{
+        Name: "postgres",
+        Vars: map[string]string{"POSTGRES_PASSWORD": "secret"},
     })
 
     id, _ := j.Deploy(ctx, service)

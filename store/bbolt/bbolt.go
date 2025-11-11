@@ -17,17 +17,7 @@ var (
 	envsBucket     = []byte("envs")
 )
 
-// Store implements jed.Store interface.
-//
-//	GetService(name) → Service
-//	SetService(Service)
-//	DelService(name)
-//	Services() → []Service
-//
-//	GetEnv(name) → Env
-//	SetEnv(Env)
-//	DelEnv(name)
-//	Envs() → []Env
+// Store implements jed.Store interface on BoltDB.
 type Store struct {
 	db *bbolt.DB
 }

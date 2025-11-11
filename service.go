@@ -8,13 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Env holds environment variables for a service.
-// Todo: move me?
-type Env struct {
-	Name string
-	Vars map[string]string
-}
-
 // Service is a service's configuration.
 type Service struct {
 	// Name is the service name (e.g., "postgres").
@@ -79,25 +72,25 @@ func (jed *Jed) CreateService(ctx context.Context, service Service) (err error) 
 }
 
 // DeleteService removes a service definition and its env vars.
-func (jed *Jed) DeleteService(ctx context.Context, serviceName string) (err error) {
+func (jed *Jed) DeleteService(ctx context.Context, name string) (err error) {
 
 	services, err := jed.Services(ctx)
 	if err != nil {
 		return
 	}
 
-	_, err = services.Find(serviceName)
+	_, err = services.Find(name)
 	if err != nil {
 		return
 	}
 
-	// Todo: Partial failure leaves inconsistent state (service deleted, env orphaned).
-	err = jed.store.DelService(ctx, serviceName)
+	err = jed.store.DelService(ctx, name)
 	if err != nil {
+		err = errors.Wrapf(err, "not deleting %s env", name)
 		return
 	}
 
-	err = jed.store.DelEnv(ctx, serviceName)
+	err = jed.store.DelEnv(ctx, name)
 	return
 }
 

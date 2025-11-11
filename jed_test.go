@@ -121,6 +121,40 @@ var _ = Describe("Jed", func() {
 				Expect(startCall.Path).To(MatchRegexp(`^/containers/test-app-[a-zA-Z0-9]{7}/start$`))
 			})
 		})
+
+		When("deploying an already-deployed service", func() {
+			BeforeEach(func() {
+				// Mock Containers() to return a container matching the service name
+				cntrs := []jed.Container{
+					{
+						Id:     "existing123",
+						Names:  []string{"/test-app-x7y9z2n"},
+						Image:  "test:v1",
+						State:  "running",
+						Status: "Up 1 hour",
+						Labels: map[string]string{"managed_by": "jed"},
+					},
+				}
+				client.SendObjectFunc = mockContainers(cntrs)
+			})
+
+			It("should return already deployed error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("test-app already deployed"))
+			})
+
+			It("should not call create or start", func() {
+				calls := client.SendObjectCalls()
+				// 4 checkImage (from NewSvc) + Containers check only
+				Expect(calls).To(HaveLen(5))
+
+				createCall := findCall(calls, "POST", "/containers/create")
+				startCall := findCall(calls, "POST", "/start")
+
+				Expect(createCall).To(BeNil())
+				Expect(startCall).To(BeNil())
+			})
+		})
 	})
 
 	Describe("Services", func() {
@@ -472,81 +506,4 @@ var _ = Describe("Jed", func() {
 		})
 	})
 
-	Describe("SetEnv", func() {
-		var (
-			serviceName string
-			env         map[string]string
-		)
-
-		BeforeEach(func() {
-			svc, err = cfg.New(ctx, client, lgr, store)
-			Expect(err).NotTo(HaveOccurred())
-
-			serviceName = "borken-1"
-			env = map[string]string{
-				"FOO": "bar",
-				"BAZ": "qux",
-			}
-		})
-
-		JustBeforeEach(func() {
-			err = svc.SetEnv(ctx, serviceName, env)
-		})
-
-		When("setting env for existing service", func() {
-			It("should set without error", func() {
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("should persist env to store", func() {
-				storedEnv, err := store.GetEnvFunc(ctx, "borken-1")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(storedEnv.Vars).To(HaveKeyWithValue("FOO", "bar"))
-				Expect(storedEnv.Vars).To(HaveKeyWithValue("BAZ", "qux"))
-			})
-
-			It("should be retrievable via GetEnv", func() {
-				retrieved, err := svc.GetEnv(ctx, "borken-1")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(retrieved).To(Equal(env))
-			})
-		})
-
-		When("setting env for non-existent service", func() {
-			BeforeEach(func() {
-				serviceName = "nonexistent"
-			})
-
-			It("should return error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("not found"))
-			})
-		})
-	})
-
-	Describe("GetEnv", func() {
-
-		BeforeEach(func() {
-			svc, err = cfg.New(ctx, client, lgr, store)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		When("getting env for service with env", func() {
-			It("should get without error", func() {
-				retrieved, err := svc.GetEnv(ctx, "traefik")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(retrieved).To(HaveKeyWithValue("TRAEFIK_API_DASHBOARD", "true"))
-				Expect(retrieved).To(HaveKeyWithValue("TRAEFIK_PROVIDERS_DOCKER", "true"))
-				Expect(retrieved).To(HaveKeyWithValue("TRAEFIK_ENTRYPOINTS_WEB_ADDRESS", ":80"))
-			})
-		})
-
-		When("getting env for service without env", func() {
-			It("should return empty map", func() {
-				retrieved, err := svc.GetEnv(ctx, "borken-1")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(retrieved).To(BeEmpty())
-			})
-		})
-	})
 })
