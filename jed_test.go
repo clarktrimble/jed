@@ -108,8 +108,9 @@ var _ = Describe("Jed", func() {
 
 			It("should call create and start", func() {
 				calls := client.SendObjectCalls()
-				// 4 checkImage calls (from NewSvc) + create + start
-				Expect(calls).To(HaveLen(6))
+				// 4 checkImage calls (from NewSvc) + containers + create + start
+				// Todo: improve on len/find checking??
+				Expect(calls).To(HaveLen(7))
 
 				createCall := findCall(calls, "POST", "/containers/create")
 				startCall := findCall(calls, "POST", "/start")

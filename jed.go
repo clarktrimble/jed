@@ -125,13 +125,20 @@ func (cfg *Config) New(ctx context.Context, client Client, lgr Logger, store Sto
 func (jed *Jed) Deploy(ctx context.Context, service Service) (id string, err error) {
 
 	// Todo: just take name and lookup?
-	// Todo: handle already deployed
+
+	containers, err := jed.Containers(ctx)
+	if err != nil {
+		return
+	}
+	if containers.deployed(service.Name) {
+		err = errors.Errorf("service %s already deployed", service.Name)
+		return
+	}
 
 	env, err := jed.store.GetEnv(ctx, service.Name)
 	if err != nil {
 		return
 	}
-
 	cfg, err := service.config(env)
 	if err != nil {
 		return

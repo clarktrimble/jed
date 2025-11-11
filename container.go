@@ -46,7 +46,19 @@ func (ctrs Containers) Find(serviceName string) (ctr Container, err error) {
 
 // unexported
 
-func managed(ctrs []Container) (mgd Containers, noMatch []string) {
+// Todo: Find vs deployed, wrong somewhere?
+// Todo: is more flexible to accept slice?
+func (ctrs Containers) deployed(name string) bool {
+
+	for _, ctr := range ctrs {
+		if ctr.Service == name {
+			return true
+		}
+	}
+	return false
+}
+
+func managed(ctrs Containers) (mgd Containers, noMatch []string) {
 
 	mgd = Containers{}
 	for _, ctr := range ctrs {
