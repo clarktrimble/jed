@@ -12,6 +12,7 @@
     "/var/run/docker.sock": "/var/run/docker.sock"
     "/home/debian/proj/admin-int/certs": "/certs"
     # Todo: tfk labels here ?? (run.sh has em)
+    # Todo: cleanup unused fields
     #"/home/bn/admin-int/certs": "/certs"
     # Todo: fix path issue ^^
 - image: axis-camera:36e0971

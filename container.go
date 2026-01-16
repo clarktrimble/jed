@@ -1,6 +1,7 @@
 package jed
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -48,15 +49,12 @@ func (ctrs Containers) Find(serviceName string) (ctr Container, err error) {
 
 func (ctrs Containers) deployed(name string) bool {
 
-	for _, ctr := range ctrs {
-		if ctr.ServiceName == name {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(ctrs, func(c Container) bool {
+		return c.ServiceName == name
+	})
 }
 
-func managed(ctrs Containers) (mgd Containers, noMatch []string) {
+func (ctrs Containers) managed() (mgd Containers, noMatch []string) {
 
 	mgd = Containers{}
 	for _, ctr := range ctrs {

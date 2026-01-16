@@ -62,15 +62,6 @@ var _ = Describe("Jed", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(svc).NotTo(BeNil())
 			})
-
-			It("should add managed_by label to all services", func() {
-				services, err := svc.Services(ctx)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(services).NotTo(BeEmpty())
-				for _, service := range services {
-					Expect(service.Labels).To(HaveKeyWithValue("managed_by", "jed"))
-				}
-			})
 		})
 	})
 

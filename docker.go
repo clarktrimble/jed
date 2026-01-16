@@ -28,7 +28,7 @@ func (jed *Jed) create(ctx context.Context, name string, cfg containerConfig) (i
 	return
 }
 
-func (jed *Jed) containers(ctx context.Context) (containers []Container, err error) {
+func (jed *Jed) containers(ctx context.Context) (containers Containers, err error) {
 
 	path := `/containers/json?all=true&filters={"label":["managed_by=jed"]}`
 	err = jed.client.SendObject(ctx, "GET", path, nil, &containers)

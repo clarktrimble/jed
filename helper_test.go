@@ -36,14 +36,6 @@ func loadServices(cfs fs.FS) (services []jed.Service, err error) {
 		return
 	}
 
-	for i := range services {
-		// Todo: newServices without nil molehill
-		if services[i].Labels == nil {
-			services[i].Labels = make(map[string]string)
-		}
-		services[i].Labels["managed_by"] = "jed"
-	}
-
 	return
 }
 

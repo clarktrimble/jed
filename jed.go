@@ -206,7 +206,7 @@ func (jed *Jed) Containers(ctx context.Context) (mgd Containers, err error) {
 		return
 	}
 
-	mgd, noMatch := managed(ctrs)
+	mgd, noMatch := ctrs.managed()
 	if len(noMatch) != 0 {
 		jed.logger.Error(ctx, "ignoring managed_by=jed containers",
 			errors.Errorf("unexpected containers"), "names", noMatch)

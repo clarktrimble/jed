@@ -7,6 +7,7 @@ package memo
 import (
 	"context"
 	"maps"
+	"slices"
 	"sync"
 
 	"github.com/clarktrimble/jed"
@@ -66,11 +67,7 @@ func (s *Store) Services(ctx context.Context) ([]jed.Service, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	services := make([]jed.Service, 0, len(s.svcs))
-	for _, svc := range s.svcs {
-		services = append(services, svc)
-	}
-	return services, nil
+	return slices.Collect(maps.Values(s.svcs)), nil
 }
 
 // GetEnv retrieves environment variables for a service.

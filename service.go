@@ -3,6 +3,7 @@ package jed
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -136,7 +137,7 @@ func (service Service) config(env Env) (cfg containerConfig, err error) {
 	cfg = map[string]any{
 		"Image":        service.Image,
 		"Env":          envLines(env.Vars),
-		"Labels":       service.Labels,
+		"Labels":       managedBy(service.Labels),
 		"ExposedPorts": exposedPorts,
 		"HostConfig":   hostConfig,
 		"NetworkingConfig": map[string]any{
@@ -147,6 +148,15 @@ func (service Service) config(env Env) (cfg containerConfig, err error) {
 	}
 
 	return
+}
+
+func managedBy(labels map[string]string) map[string]string {
+
+	withLabel := map[string]string{}
+	maps.Copy(withLabel, labels)
+	withLabel["managed_by"] = "jed"
+
+	return withLabel
 }
 
 func buildPortConfig(ports map[string]string) (exposedPorts map[string]any, portBindings map[string][]map[string]string) {
