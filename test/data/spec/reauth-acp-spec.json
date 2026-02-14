@@ -1,0 +1,84 @@
+{
+  "Name": "reauth-acp",
+  "TaskTemplate": {
+    "ContainerSpec": {
+      "Image": "__IMAGE__",
+      "Env": [
+        "RTH_CLIENT_BASEURI=https://10.35.44.62",
+        "RTH_CLIENT_SKIPVERIFY=true",
+        "RTH_LOGGER_ENABLEDEBUG=true",
+        "RTH_OAUTH_CLIENTID=bn",
+        "RTH_OAUTH_CLIENTSECRET=/run/secrets/aruba_client_secret",
+        "RTH_OAUTH_URI=https://10.35.44.62",
+        "RTH_SERVER_PORT=3031",
+        "RTH_VISITRAC_BASEURI=http://saas1.visi-trac.net:5153",
+        "RTH_ZONECHANGE_DATAFILE=/data/zonechange-{{ .Service.Name }}-{{ .Task.Slot }}.db"
+      ],
+      "Mounts": [
+        {
+          "Type": "volume",
+          "Source": "svc-data",
+          "Target": "/data"
+        }
+      ],
+      "Secrets": [
+        {
+          "SecretID": "__ARUBA_CLIENT_SECRET_ID__",
+          "SecretName": "__ARUBA_CLIENT_SECRET_NAME__",
+          "File": {
+            "Name": "aruba_client_secret",
+            "UID": "1001",
+            "GID": "1001",
+            "Mode": 292
+          }
+        }
+      ],
+      "Hosts": ["10.35.44.122 container5a"],
+      "ReadOnly": true,
+      "User": "1001"
+    },
+    "LogDriver": {
+      "Name": "json-file",
+      "Options": {
+        "max-size": "10m",
+        "max-file": "3"
+      }
+    },
+    "Resources": {
+      "Limits": {
+        "NanoCPUs": 500000000,
+        "MemoryBytes": 134217728
+      },
+      "Reservations": {
+        "NanoCPUs": 100000000,
+        "MemoryBytes": 67108864
+      }
+    },
+    "RestartPolicy": {
+      "Condition": "on-failure",
+      "Delay": 5000000000,
+      "MaxAttempts": 3
+    },
+    "Networks": [
+      {"Target": "svc-net"}
+    ]
+  },
+  "Mode": {
+    "Replicated": {
+      "Replicas": 1
+    }
+  },
+  "UpdateConfig": {
+    "Order": "stop-first",
+    "FailureAction": "rollback"
+  },
+  "EndpointSpec": {
+    "Ports": [
+      {
+        "Protocol": "tcp",
+        "PublishedPort": 8012,
+        "TargetPort": 3031
+      }
+    ]
+  }
+}

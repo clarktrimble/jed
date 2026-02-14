@@ -10,4 +10,5 @@ cover.out
 junk/
 bin/
 
-.idea
+jed.db
+

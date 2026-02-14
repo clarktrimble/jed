@@ -1,0 +1,10 @@
+name: reauth-acp
+image: local/reauth-acp:a1b2c3d
+ports:
+  3031/tcp: "8012"
+volumes:
+  svc-data: /data
+network: svc-net
+restart: on-failure
+secrets:
+  - aruba_client_secret

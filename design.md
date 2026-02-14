@@ -161,3 +161,57 @@ The Store interface doesn't enforce referential integrity:
 - You can set env for a non-existent service
 - Deleting a service requires manually deleting env
 - This is by design for flexibility, but requires careful management
+
+## Swarm Integration
+
+### One Service, Two Deploy Targets
+
+`jed.Service` defines what to deploy. The same Service definition can be deployed
+as a standalone container (via `jed.Deploy`) or as a swarm service (via `swarm.Deploy`).
+The deploy target is a runtime choice, not a type-system fork.
+
+The `Secrets` field on Service is the only swarm-specific addition. It lists secret
+base names (e.g., `"s3_secret_key"`) that get resolved to versioned swarm secrets
+at deploy time.
+
+### Swarm Spec Built Programmatically
+
+The `swarm` package builds the full Docker API spec from `Service` + `Env` +
+resolved secrets. This replaces the earlier approach of maintaining JSON spec
+files with placeholder text replacement (`__IMAGE__`, `__SECRET_ID__`, etc.).
+
+**Why typed over templates?**
+- Spec correctness checked at compile time, not deploy time
+- No placeholder convention to remember or get wrong
+- Testable - `buildSpec` is a pure function
+
+### Swarm Defaults
+
+Most of the swarm service spec is boilerplate that doesn't vary per service:
+LogDriver, Resources, RestartPolicy, User, ReadOnly, Replicas, UpdateConfig.
+These are hardcoded in the spec builder with sensible defaults.
+
+**What varies per service:**
+- Name, Image, Env, Secrets, Ports, Volumes, Network
+
+**What's hardcoded (for now):**
+- Resources: 0.5 CPU / 128MB limit, 0.1 CPU / 64MB reservation
+- LogDriver: json-file, 10m max, 3 files
+- RestartPolicy: on-failure, 5s delay, 3 max attempts
+- Mode: 1 replica
+- UpdateConfig: stop-first, rollback on failure
+- User: 1001, ReadOnly: true
+
+These can become Service fields if the need arises.
+
+### Versioned Secrets
+
+Swarm secrets are immutable. To "update" a secret, you create a new version
+(`s3_secret_key_v1`, `s3_secret_key_v2`, etc.) and redeploy. `SecretLatest`
+finds the highest version automatically.
+
+### Create or Update
+
+`swarm.Deploy` checks whether the service already exists (via version check)
+and creates or updates accordingly. This differs from container deploy which
+only creates and errors if already deployed.

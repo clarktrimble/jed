@@ -1,0 +1,215 @@
+// Package main implements transship, a CLI for deploying to Docker Swarm
+// using service and env definitions from the jed store.
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/alexflint/go-arg"
+	"github.com/clarktrimble/giant"
+	"github.com/clarktrimble/sabot"
+	"github.com/pkg/errors"
+	"golang.org/x/term"
+
+	"github.com/clarktrimble/jed/store/bbolt"
+	"github.com/clarktrimble/jed/swarm"
+)
+
+type DeployCmd struct {
+	Name string `arg:"positional,required" help:"service name"`
+}
+
+type LsServicesCmd struct{}
+
+type TasksCmd struct {
+	Service string `arg:"positional,required" help:"service name"`
+}
+
+type LsSecretsCmd struct{}
+
+type CreateSecretCmd struct {
+	Name string `arg:"positional,required" help:"secret name (value from stdin)"`
+}
+
+type LsConfigsCmd struct{}
+
+type CreateConfigCmd struct {
+	Name string `arg:"positional,required" help:"config name"`
+	File string `arg:"positional,required" help:"file containing config value"`
+}
+
+type CreateNetworkCmd struct {
+	Name       string `arg:"positional,required" help:"network name"`
+	Attachable bool   `arg:"-a,--attachable" default:"true" help:"allow manual container attachment"`
+	Encrypted  bool   `arg:"-e,--encrypted" help:"encrypt overlay traffic"`
+}
+
+type args struct {
+	Deploy        *DeployCmd        `arg:"subcommand:deploy" help:"deploy/update a swarm service"`
+	LsServices    *LsServicesCmd    `arg:"subcommand:ls-services" help:"list swarm services"`
+	Tasks         *TasksCmd         `arg:"subcommand:tasks" help:"show service tasks"`
+	LsSecrets     *LsSecretsCmd     `arg:"subcommand:ls-secrets" help:"list secrets"`
+	CreateSecret  *CreateSecretCmd  `arg:"subcommand:create-secret" help:"create a secret"`
+	LsConfigs     *LsConfigsCmd     `arg:"subcommand:ls-configs" help:"list configs"`
+	CreateConfig  *CreateConfigCmd  `arg:"subcommand:create-config" help:"create a config"`
+	CreateNetwork *CreateNetworkCmd `arg:"subcommand:create-network" help:"create overlay network"`
+
+	Socket string `arg:"-s,--socket" default:"/var/run/docker.sock" help:"docker socket path"`
+	DB     string `arg:"-d,--db" default:"jed.db" help:"path to jed store"`
+}
+
+func main() {
+	var args args
+	p := arg.MustParse(&args)
+
+	if p.Subcommand() == nil {
+		p.WriteHelp(os.Stdout)
+		os.Exit(0)
+	}
+
+	ctx := context.Background()
+	deployer := newDeployer(args.Socket)
+
+	switch {
+	case args.Deploy != nil:
+		store, err := bbolt.New(args.DB)
+		fatal(err)
+		defer store.Close()
+		deploy(ctx, deployer, store, args.Deploy.Name)
+	case args.LsServices != nil:
+		lsServices(ctx, deployer)
+	case args.Tasks != nil:
+		tasks(ctx, deployer, args.Tasks.Service)
+	case args.LsSecrets != nil:
+		lsSecrets(ctx, deployer)
+	case args.CreateSecret != nil:
+		createSecret(ctx, deployer, args.CreateSecret.Name)
+	case args.LsConfigs != nil:
+		lsConfigs(ctx, deployer)
+	case args.CreateConfig != nil:
+		createConfig(ctx, deployer, args.CreateConfig.Name, args.CreateConfig.File)
+	case args.CreateNetwork != nil:
+		createNetwork(ctx, deployer, args.CreateNetwork)
+	}
+}
+
+func newDeployer(socket string) *swarm.Deployer {
+	lgrCfg := sabot.Config{MaxLen: 999}
+	lgr := lgrCfg.New(os.Stderr)
+
+	clientCfg := &giant.Config{
+		BaseUri:    "http://localhost",
+		UnixSocket: socket,
+	}
+	client := clientCfg.NewWithTrippers(lgr)
+
+	return swarm.New(client)
+}
+
+func deploy(ctx context.Context, deployer *swarm.Deployer, store *bbolt.Store, name string) {
+	svc, err := store.GetService(ctx, name)
+	fatal(errors.Wrapf(err, "failed to get service %q from store", name))
+
+	env, err := store.GetEnv(ctx, name)
+	fatal(errors.Wrapf(err, "failed to get env %q from store", name))
+
+	fmt.Printf("deploying %s (%s)\n", svc.Name, svc.Image)
+	if len(svc.Secrets) > 0 {
+		fmt.Printf("  secrets: %v\n", svc.Secrets)
+	}
+	fmt.Printf("  env: %d vars\n", len(env.Vars))
+
+	id, err := deployer.Deploy(ctx, svc, env)
+	fatal(err)
+
+	if id != "" {
+		fmt.Printf("created %s (%s)\n", name, id[:12])
+	} else {
+		fmt.Printf("updated %s\n", name)
+	}
+}
+
+func lsServices(ctx context.Context, deployer *swarm.Deployer) {
+	svcs, err := deployer.ListServices(ctx)
+	fatal(err)
+
+	for _, s := range svcs {
+		fmt.Printf("%s\t%s\n", s.ID[:12], s.Name)
+	}
+}
+
+func tasks(ctx context.Context, deployer *swarm.Deployer, service string) {
+	tasks, err := deployer.ServiceTasks(ctx, service)
+	fatal(err)
+
+	for _, t := range tasks {
+		fmt.Printf("%s\t%s\t%s\n", t.State, t.Image, t.Error)
+	}
+}
+
+func lsSecrets(ctx context.Context, deployer *swarm.Deployer) {
+	secrets, err := deployer.ListSecrets(ctx)
+	fatal(err)
+
+	for _, s := range secrets {
+		fmt.Printf("%s\t%s\n", s.ID[:12], s.Name)
+	}
+}
+
+func createSecret(ctx context.Context, deployer *swarm.Deployer, name string) {
+	var data []byte
+	var err error
+
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Print("Enter secret value: ")
+		reader := bufio.NewReader(os.Stdin)
+		data, err = reader.ReadBytes('\n')
+		data = bytes.TrimRight(data, "\n")
+	} else {
+		data, err = io.ReadAll(os.Stdin)
+	}
+	fatal(err)
+
+	id, err := deployer.CreateSecret(ctx, name, data)
+	fatal(err)
+
+	fmt.Printf("created secret %s: %s\n", name, id)
+}
+
+func lsConfigs(ctx context.Context, deployer *swarm.Deployer) {
+	configs, err := deployer.ListConfigs(ctx)
+	fatal(err)
+
+	for _, c := range configs {
+		fmt.Printf("%s\t%s\n", c.ID[:12], c.Name)
+	}
+}
+
+func createConfig(ctx context.Context, deployer *swarm.Deployer, name, file string) {
+	data, err := os.ReadFile(file)
+	fatal(err)
+
+	id, err := deployer.CreateConfig(ctx, name, data)
+	fatal(err)
+
+	fmt.Printf("created config %s: %s\n", name, id)
+}
+
+func createNetwork(ctx context.Context, deployer *swarm.Deployer, cmd *CreateNetworkCmd) {
+	id, err := deployer.CreateNetwork(ctx, cmd.Name, cmd.Attachable, cmd.Encrypted)
+	fatal(err)
+
+	fmt.Printf("created network %s: %s\n", cmd.Name, id)
+}
+
+func fatal(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}

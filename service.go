@@ -25,6 +25,8 @@ type Service struct {
 	Network string `json:"network"`
 	// Restart is the restart policy (e.g., "unless-stopped", "always").
 	Restart string `json:"restart"`
+	// Secrets lists swarm secret base names to mount (e.g., "s3_secret_key").
+	Secrets []string `json:"secrets,omitempty"`
 }
 
 // Services is a slice of services.

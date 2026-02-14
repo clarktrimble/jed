@@ -1,0 +1,95 @@
+{
+  "Name": "tag",
+  "TaskTemplate": {
+    "ContainerSpec": {
+      "Image": "__IMAGE__",
+      "Env": [
+        "TAG_BFC_APIKEY=/run/secrets/bfc_api_key",
+        "TAG_BFC_BASEURI=https://api.vadc-test.bastille.cloud",
+        "TAG_BFC_SKIPVERIFY=true",
+        "TAG_LOGGER_ENABLEDEBUG=true",
+        "TAG_LOGGER_ENABLETRACE=false",
+        "TAG_SERVER_PORT=3031",
+        "TAG_SVC_DRYRUN=true",
+        "TAG_SVC_PREFIX=emp",
+        "TAG_WEBHOOK_INTERVAL=9s",
+        "TAG_WEBHOOK_BUFFERSIZE=9999",
+        "TAG_S3_REGION=testoregion",
+        "TAG_S3_SCHEME=http",
+        "TAG_S3_HOST=container4:3900",
+        "TAG_S3_BUCKET=testbucket",
+        "TAG_S3_OBJECT=sample.json",
+        "TAG_S3_ACCESSKEY=GKdf62cf3b0b0edb99e0eb138c",
+        "TAG_S3_SECRETKEY=/run/secrets/s3_secret_key"
+      ],
+      "Secrets": [
+        {
+          "SecretID": "__S3_SECRET_KEY_ID__",
+          "SecretName": "__S3_SECRET_KEY_NAME__",
+          "File": {
+            "Name": "s3_secret_key",
+            "UID": "1001",
+            "GID": "1001",
+            "Mode": 292
+          }
+        },
+        {
+          "SecretID": "__BFC_API_KEY_ID__",
+          "SecretName": "__BFC_API_KEY_NAME__",
+          "File": {
+            "Name": "bfc_api_key",
+            "UID": "1001",
+            "GID": "1001",
+            "Mode": 292
+          }
+        }
+      ],
+      "Hosts": ["10.35.44.41 container4"],
+      "ReadOnly": true,
+      "User": "1001"
+    },
+    "LogDriver": {
+      "Name": "json-file",
+      "Options": {
+        "max-size": "10m",
+        "max-file": "3"
+      }
+    },
+    "Resources": {
+      "Limits": {
+        "NanoCPUs": 500000000,
+        "MemoryBytes": 134217728
+      },
+      "Reservations": {
+        "NanoCPUs": 100000000,
+        "MemoryBytes": 67108864
+      }
+    },
+    "RestartPolicy": {
+      "Condition": "on-failure",
+      "Delay": 5000000000,
+      "MaxAttempts": 3
+    },
+    "Networks": [
+      {"Target": "svc-net"}
+    ]
+  },
+  "Mode": {
+    "Replicated": {
+      "Replicas": 1
+    }
+  },
+  "UpdateConfig": {
+    "Order": "start-first",
+    "FailureAction": "rollback"
+  },
+  "EndpointSpec": {
+    "Ports": [
+      {
+        "Protocol": "tcp",
+        "PublishedPort": 8010,
+        "TargetPort": 3031
+      }
+    ]
+  }
+}
