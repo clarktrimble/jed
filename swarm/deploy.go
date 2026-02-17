@@ -29,6 +29,7 @@ func (d *Deployer) Deploy(ctx context.Context, service jed.Service, env jed.Env)
 	// Check if service exists
 	version, verErr := d.ServiceVersion(ctx, service.Name)
 	if verErr != nil {
+		// Todo: more explicit / less fragile detection
 		if !strings.Contains(verErr.Error(), "404") {
 			err = verErr
 			return
@@ -79,6 +80,10 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		"Env":      envLines(env.Vars),
 		"ReadOnly": true,
 		"User":     "1001",
+	}
+
+	if len(service.Command) > 0 {
+		containerSpec["Command"] = service.Command
 	}
 
 	if len(secrets) > 0 {

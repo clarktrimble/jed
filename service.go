@@ -15,6 +15,8 @@ type Service struct {
 	Name string
 	// Image is the Docker image (e.g., "postgres:16").
 	Image string
+	// Command overrides the image's default command (e.g., ["sleep", "3600"]).
+	Command []string `json:"command,omitempty"`
 	// Ports maps container ports to host ports (e.g., "5432/tcp": "5432").
 	Ports map[string]string `json:"ports"`
 	// Labels are Docker container labels.

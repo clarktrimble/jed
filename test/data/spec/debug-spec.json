@@ -1,0 +1,18 @@
+{
+  "Name": "debug",
+  "TaskTemplate": {
+    "ContainerSpec": {
+      "Image": "alpine:latest",
+      "Command": ["sleep", "3600"],
+      "Hosts": ["10.35.44.41 container4"]
+    },
+    "Networks": [
+      {"Target": "svc-net"}
+    ]
+  },
+  "Mode": {
+    "Replicated": {
+      "Replicas": 1
+    }
+  }
+}

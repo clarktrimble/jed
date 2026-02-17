@@ -20,6 +20,19 @@ import (
 	"github.com/clarktrimble/jed/swarm"
 )
 
+// Todo: regularize commands "ls-" etc
+// Todo: list networks
+// Todo: dry run for deploy and ??
+
+// Bootstrap notes
+/*
+➜  jed git:(swarm) ✗ go run cmd/transship/main.go create-network svc-net
+error: failed to create network "svc-net": http POST request to http://localhost /v1.52/networks/create failed: Post "http://localhost/v1.52/networks/create": unexpected status code 409 with body: {"message":"network with name svc-net already exists"}
+
+exit status 1
+
+*/
+
 type DeployCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
