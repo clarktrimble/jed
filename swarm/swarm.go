@@ -4,18 +4,24 @@ package swarm
 //go:generate moq -out mock_test.go -pkg swarm_test . Client
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/clarktrimble/jed"
 	"github.com/pkg/errors"
 )
 
 // Client sends objects to the Docker socket API.
 type Client interface {
 	SendObject(ctx context.Context, method, path string, snd, rcv any) error
+	SendJson(ctx context.Context, method, path string, body io.Reader) ([]byte, error)
 }
 
 // Deployer interacts with Docker Swarm.
@@ -28,16 +34,16 @@ func New(client Client) *Deployer {
 	return &Deployer{client: client}
 }
 
-// ServiceVersion returns the current version index for a service.
-func (d *Deployer) ServiceVersion(ctx context.Context, name string) (int, error) {
+// GetService returns full service info from Docker.
+func (d *Deployer) GetService(ctx context.Context, name string) (*ServiceInfo, error) {
 
-	var svc serviceResponse
+	var svc ServiceInfo
 	err := d.client.SendObject(ctx, "GET", "/v1.52/services/"+name, nil, &svc)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to get service %q", name)
+		return nil, errors.Wrapf(err, "failed to get service %q", name)
 	}
 
-	return svc.Version.Index, nil
+	return &svc, nil
 }
 
 // UpdateService updates a service with the given spec.
@@ -93,52 +99,19 @@ func (d *Deployer) SecretLatest(ctx context.Context, name string) (id, versioned
 		return "", "", err
 	}
 
-	var bestID, bestName string
-	var bestVersion int
-
-	prefix := name + "_v"
-	for _, s := range secrets {
-		if strings.HasPrefix(s.Name, prefix) {
-			vStr := strings.TrimPrefix(s.Name, prefix)
-			v, err := strconv.Atoi(vStr)
-			if err == nil && v > bestVersion {
-				bestVersion = v
-				bestID = s.ID
-				bestName = s.Name
-			}
-		}
-	}
-
-	if bestID == "" {
-		return "", "", errors.Errorf("secret %q not found (no %s_v* versions)", name, name)
-	}
-
-	return bestID, bestName, nil
+	return findLatest(secretsToItems(secrets), name, "secret")
 }
 
 // CreateSecret creates a versioned secret and returns its ID.
 // Creates {name}_v{N} where N is the next version number.
 func (d *Deployer) CreateSecret(ctx context.Context, name string, value []byte) (string, error) {
 
-	// Find next version
 	secrets, err := d.ListSecrets(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	nextVersion := 1
-	prefix := name + "_v"
-	for _, s := range secrets {
-		if strings.HasPrefix(s.Name, prefix) {
-			vStr := strings.TrimPrefix(s.Name, prefix)
-			v, err := strconv.Atoi(vStr)
-			if err == nil && v >= nextVersion {
-				nextVersion = v + 1
-			}
-		}
-	}
-
-	versionedName := fmt.Sprintf("%s_v%d", name, nextVersion)
+	versionedName := fmt.Sprintf("%s_v%d", name, findNextVersion(secretsToItems(secrets), name))
 	req := dataCreate{
 		Name: versionedName,
 		Data: base64.StdEncoding.EncodeToString(value),
@@ -182,52 +155,19 @@ func (d *Deployer) ConfigLatest(ctx context.Context, name string) (id, versioned
 		return "", "", err
 	}
 
-	var bestID, bestName string
-	var bestVersion int
-
-	prefix := name + "_v"
-	for _, c := range configs {
-		if strings.HasPrefix(c.Name, prefix) {
-			vStr := strings.TrimPrefix(c.Name, prefix)
-			v, err := strconv.Atoi(vStr)
-			if err == nil && v > bestVersion {
-				bestVersion = v
-				bestID = c.ID
-				bestName = c.Name
-			}
-		}
-	}
-
-	if bestID == "" {
-		return "", "", errors.Errorf("config %q not found (no %s_v* versions)", name, name)
-	}
-
-	return bestID, bestName, nil
+	return findLatest(configsToItems(configs), name, "config")
 }
 
 // CreateConfig creates a versioned config and returns its ID.
 // Creates {name}_v{N} where N is the next version number.
 func (d *Deployer) CreateConfig(ctx context.Context, name string, value []byte) (string, error) {
 
-	// Find next version
 	configs, err := d.ListConfigs(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	nextVersion := 1
-	prefix := name + "_v"
-	for _, c := range configs {
-		if strings.HasPrefix(c.Name, prefix) {
-			vStr := strings.TrimPrefix(c.Name, prefix)
-			v, err := strconv.Atoi(vStr)
-			if err == nil && v >= nextVersion {
-				nextVersion = v + 1
-			}
-		}
-	}
-
-	versionedName := fmt.Sprintf("%s_v%d", name, nextVersion)
+	versionedName := fmt.Sprintf("%s_v%d", name, findNextVersion(configsToItems(configs), name))
 	req := dataCreate{
 		Name: versionedName,
 		Data: base64.StdEncoding.EncodeToString(value),
@@ -330,6 +270,25 @@ func (d *Deployer) ServiceTasks(ctx context.Context, serviceName string) ([]Task
 	return result, nil
 }
 
+// TaskLogs retrieves logs from a swarm task.
+func (d *Deployer) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, error) {
+
+	path := fmt.Sprintf("/v1.52/tasks/%s/logs?stdout=true&stderr=true&tail=%s", taskID, tail)
+
+	rawLogs, err := d.client.SendJson(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get logs for task %q", taskID)
+	}
+
+	reader := jed.DecodeLogs(bytes.NewReader(rawLogs))
+	logs, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to decode logs for task %q", taskID)
+	}
+
+	return logs, nil
+}
+
 // Service represents a swarm service.
 type Service struct {
 	ID   string
@@ -357,13 +316,48 @@ type Config struct {
 	Name string
 }
 
-// unexported
-
-type serviceResponse struct {
+// ServiceInfo holds the full response from the Docker service endpoint.
+type ServiceInfo struct {
 	Version struct {
 		Index int `json:"Index"`
 	} `json:"Version"`
+	Spec         json.RawMessage `json:"Spec"`
+	PreviousSpec json.RawMessage `json:"PreviousSpec,omitempty"`
+	Endpoint     ServiceEndpoint `json:"Endpoint"`
+	UpdateStatus UpdateStatus    `json:"UpdateStatus"`
+	CreatedAt    time.Time       `json:"CreatedAt"`
+	UpdatedAt    time.Time       `json:"UpdatedAt"`
 }
+
+// ServiceEndpoint represents a service's network endpoint.
+type ServiceEndpoint struct {
+	Ports      []PortConfig `json:"Ports"`
+	VirtualIPs []VirtualIP  `json:"VirtualIPs"`
+}
+
+// PortConfig represents a published port.
+type PortConfig struct {
+	Protocol      string `json:"Protocol"`
+	TargetPort    int    `json:"TargetPort"`
+	PublishedPort int    `json:"PublishedPort"`
+	PublishMode   string `json:"PublishMode"`
+}
+
+// VirtualIP represents a service's virtual IP on a network.
+type VirtualIP struct {
+	NetworkID string `json:"NetworkID"`
+	Addr      string `json:"Addr"`
+}
+
+// UpdateStatus represents the status of a service update.
+type UpdateStatus struct {
+	State       string    `json:"State"`
+	Message     string    `json:"Message"`
+	StartedAt   time.Time `json:"StartedAt"`
+	CompletedAt time.Time `json:"CompletedAt"`
+}
+
+// unexported
 
 type serviceListItem struct {
 	ID   string `json:"ID"`
@@ -407,4 +401,67 @@ type networkCreate struct {
 	Driver     string            `json:"Driver"`
 	Attachable bool              `json:"Attachable"`
 	Options    map[string]string `json:"Options,omitempty"`
+}
+
+// namedItem is used by version helpers.
+type namedItem struct {
+	ID   string
+	Name string
+}
+
+func secretsToItems(secrets []Secret) []namedItem {
+	items := make([]namedItem, len(secrets))
+	for i, s := range secrets {
+		items[i] = namedItem(s)
+	}
+	return items
+}
+
+func configsToItems(configs []Config) []namedItem {
+	items := make([]namedItem, len(configs))
+	for i, c := range configs {
+		items[i] = namedItem(c)
+	}
+	return items
+}
+
+func findLatest(items []namedItem, baseName, resourceType string) (id, name string, err error) {
+	var bestID, bestName string
+	var bestVersion int
+
+	prefix := baseName + "_v"
+	for _, item := range items {
+		if strings.HasPrefix(item.Name, prefix) {
+			vStr := strings.TrimPrefix(item.Name, prefix)
+			v, err := strconv.Atoi(vStr)
+			if err == nil && v > bestVersion {
+				bestVersion = v
+				bestID = item.ID
+				bestName = item.Name
+			}
+		}
+	}
+
+	if bestID == "" {
+		return "", "", errors.Errorf("%s %q not found (no %s_v* versions)", resourceType, baseName, baseName)
+	}
+
+	return bestID, bestName, nil
+}
+
+func findNextVersion(items []namedItem, baseName string) int {
+	nextVersion := 1
+	prefix := baseName + "_v"
+
+	for _, item := range items {
+		if strings.HasPrefix(item.Name, prefix) {
+			vStr := strings.TrimPrefix(item.Name, prefix)
+			v, err := strconv.Atoi(vStr)
+			if err == nil && v >= nextVersion {
+				nextVersion = v + 1
+			}
+		}
+	}
+
+	return nextVersion
 }

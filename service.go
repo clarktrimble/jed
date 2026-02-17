@@ -29,6 +29,8 @@ type Service struct {
 	Restart string `json:"restart"`
 	// Secrets lists swarm secret base names to mount (e.g., "s3_secret_key").
 	Secrets []string `json:"secrets,omitempty"`
+	// Hosts adds /etc/hosts entries (e.g., "10.35.44.41 container4").
+	Hosts []string `json:"hosts,omitempty"`
 }
 
 // Services is a slice of services.

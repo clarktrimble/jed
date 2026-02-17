@@ -11,7 +11,8 @@ const (
 	maxFrameSize uint32 = 65536
 )
 
-func decodeLogs(src io.Reader) io.Reader {
+// DecodeLogs wraps a Docker log stream, stripping multiplexed frame headers.
+func DecodeLogs(src io.Reader) io.Reader {
 	return &logDecoder{
 		src:    src,
 		header: make([]byte, 8),

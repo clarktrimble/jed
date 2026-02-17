@@ -229,7 +229,7 @@ func (jed *Jed) Logs(ctx context.Context, id, tail string) (logs []byte, err err
 	// deocdeLogs is written to support streaming
 	// to expose that from here we'd need an io.ReadCloser from Client
 	// and to return one as well.  Could be a cool feature :)
-	reader := decodeLogs(bytes.NewReader(rawLogs))
+	reader := DecodeLogs(bytes.NewReader(rawLogs))
 	logs, err = io.ReadAll(reader)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to parse docker logs for container")

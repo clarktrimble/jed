@@ -1,0 +1,123 @@
+[
+  {
+    "Type": "service",
+    "Action": "create",
+    "Actor": {
+      "ID": "p72kslk7wqiiwszpqtgcglrjn",
+      "Attributes": {
+        "name": "test"
+      }
+    },
+    "scope": "swarm",
+    "time": 1771356780,
+    "timeNano": 1771356780255352804
+  },
+  {
+    "Type": "service",
+    "Action": "update",
+    "Actor": {
+      "ID": "p72kslk7wqiiwszpqtgcglrjn",
+      "Attributes": {
+        "name": "test"
+      }
+    },
+    "scope": "swarm",
+    "time": 1771356780,
+    "timeNano": 1771356780256309445
+  },
+  {
+    "Type": "node",
+    "Action": "update",
+    "Actor": {
+      "ID": "ludb8um9kkarh19ja6g7kvwfq",
+      "Attributes": {
+        "name": "vilnius"
+      }
+    },
+    "scope": "swarm",
+    "time": 1771356780,
+    "timeNano": 1771356780308703314
+  },
+  {
+    "Type": "network",
+    "Action": "create",
+    "Actor": {
+      "ID": "qn7ll8sv0sikijooyzprx7lpp",
+      "Attributes": {
+        "name": "svc-net",
+        "type": "overlay"
+      }
+    },
+    "scope": "local",
+    "time": 1771356780,
+    "timeNano": 1771356780494853491
+  },
+  {
+    "Type": "image",
+    "Action": "pull",
+    "Actor": {
+      "ID": "alpine:latest",
+      "Attributes": {
+        "name": "alpine"
+      }
+    },
+    "scope": "local",
+    "time": 1771356781,
+    "timeNano": 1771356781164757305
+  },
+  {
+    "Type": "container",
+    "Action": "create",
+    "Actor": {
+      "ID": "9411ef2c2660e81fa639081974d6e49dec3a227c1e9183dcf12416b1f8bd175c",
+      "Attributes": {
+        "com.docker.swarm.node.id": "ludb8um9kkarh19ja6g7kvwfq",
+        "com.docker.swarm.service.id": "p72kslk7wqiiwszpqtgcglrjn",
+        "com.docker.swarm.service.name": "test",
+        "com.docker.swarm.task": "",
+        "com.docker.swarm.task.id": "4b56lc3a6di0gomomxnov2063",
+        "com.docker.swarm.task.name": "test.1.4b56lc3a6di0gomomxnov2063",
+        "image": "alpine:latest",
+        "name": "test.1.4b56lc3a6di0gomomxnov2063"
+      }
+    },
+    "scope": "local",
+    "time": 1771356781,
+    "timeNano": 1771356781178815990
+  },
+  {
+    "Type": "network",
+    "Action": "connect",
+    "Actor": {
+      "ID": "qn7ll8sv0sikijooyzprx7lpp",
+      "Attributes": {
+        "container": "9411ef2c2660e81fa639081974d6e49dec3a227c1e9183dcf12416b1f8bd175c",
+        "name": "svc-net",
+        "type": "overlay"
+      }
+    },
+    "scope": "local",
+    "time": 1771356781,
+    "timeNano": 1771356781289284150
+  },
+  {
+    "Type": "container",
+    "Action": "start",
+    "Actor": {
+      "ID": "9411ef2c2660e81fa639081974d6e49dec3a227c1e9183dcf12416b1f8bd175c",
+      "Attributes": {
+        "com.docker.swarm.node.id": "ludb8um9kkarh19ja6g7kvwfq",
+        "com.docker.swarm.service.id": "p72kslk7wqiiwszpqtgcglrjn",
+        "com.docker.swarm.service.name": "test",
+        "com.docker.swarm.task": "",
+        "com.docker.swarm.task.id": "4b56lc3a6di0gomomxnov2063",
+        "com.docker.swarm.task.name": "test.1.4b56lc3a6di0gomomxnov2063",
+        "image": "alpine:latest",
+        "name": "test.1.4b56lc3a6di0gomomxnov2063"
+      }
+    },
+    "scope": "local",
+    "time": 1771356781,
+    "timeNano": 1771356781296401903
+  }
+]

@@ -27,7 +27,7 @@ func (d *Deployer) Deploy(ctx context.Context, service jed.Service, env jed.Env)
 	}
 
 	// Check if service exists
-	version, verErr := d.ServiceVersion(ctx, service.Name)
+	svcInfo, verErr := d.GetService(ctx, service.Name)
 	if verErr != nil {
 		// Todo: more explicit / less fragile detection
 		if !strings.Contains(verErr.Error(), "404") {
@@ -41,7 +41,7 @@ func (d *Deployer) Deploy(ctx context.Context, service jed.Service, env jed.Env)
 	}
 
 	// Service exists, update it
-	err = d.UpdateService(ctx, service.Name, version, spec)
+	err = d.UpdateService(ctx, service.Name, svcInfo.Version.Index, spec)
 	return
 }
 
@@ -94,8 +94,13 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		containerSpec["Mounts"] = swarmMounts(service.Volumes)
 	}
 
+	if len(service.Hosts) > 0 {
+		containerSpec["Hosts"] = service.Hosts
+	}
+
 	spec := map[string]any{
-		"Name": service.Name,
+		"Name":   service.Name,
+		"Labels": service.Labels,
 		"TaskTemplate": map[string]any{
 			"ContainerSpec": containerSpec,
 			"LogDriver": map[string]any{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -224,6 +225,53 @@ var _ = Describe("Deploy", func() {
 			Expect(containerSpec).NotTo(HaveKey("Secrets"))
 		})
 	})
+
+	Describe("with hosts", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Hosts = []string{"192.168.88.75 vilnius", "10.0.0.1 gateway"}
+
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
+						return fmt404Error()
+
+					case method == "POST" && strings.Contains(path, "/services/create"):
+						mockResponse(map[string]string{"ID": "svc-hosts-123"}, rcv)
+						return nil
+
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client)
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should deploy without error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should include Hosts in container spec", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+
+			hosts := containerSpec["Hosts"].([]string)
+			Expect(hosts).To(HaveLen(2))
+			Expect(hosts).To(ContainElement("192.168.88.75 vilnius"))
+			Expect(hosts).To(ContainElement("10.0.0.1 gateway"))
+		})
+	})
 })
 
 // helpers
@@ -268,3 +316,64 @@ func findCall(calls []struct {
 func fmt404Error() error {
 	return fmt.Errorf("request failed: 404")
 }
+
+var _ = Describe("GetService", func() {
+	var (
+		client   *ClientMock
+		deployer *swarm.Deployer
+		ctx      context.Context
+		svcInfo  *swarm.ServiceInfo
+		err      error
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+
+		testData, err := os.ReadFile("../test/data/svcinfo/tag.json")
+		Expect(err).NotTo(HaveOccurred())
+
+		client = &ClientMock{
+			SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+				err := json.Unmarshal(testData, rcv)
+				Expect(err).NotTo(HaveOccurred())
+				return nil
+			},
+		}
+		deployer = swarm.New(client)
+	})
+
+	JustBeforeEach(func() {
+		svcInfo, err = deployer.GetService(ctx, "tag")
+	})
+
+	It("should return without error", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should parse Version", func() {
+		Expect(svcInfo.Version.Index).To(BeNumerically(">", 0))
+	})
+
+	It("should parse Spec as raw JSON", func() {
+		Expect(svcInfo.Spec).NotTo(BeEmpty())
+		Expect(string(svcInfo.Spec)).To(ContainSubstring("tag"))
+	})
+
+	It("should parse Endpoint", func() {
+		Expect(svcInfo.Endpoint.Ports).To(HaveLen(1))
+		Expect(svcInfo.Endpoint.Ports[0].TargetPort).To(Equal(3031))
+		Expect(svcInfo.Endpoint.Ports[0].PublishedPort).To(Equal(8010))
+		Expect(svcInfo.Endpoint.VirtualIPs).To(HaveLen(2))
+	})
+
+	It("should parse UpdateStatus", func() {
+		Expect(svcInfo.UpdateStatus.State).To(Equal("completed"))
+		Expect(svcInfo.UpdateStatus.CompletedAt).NotTo(BeZero())
+	})
+
+	It("should parse timestamps", func() {
+		Expect(svcInfo.CreatedAt).NotTo(BeZero())
+		Expect(svcInfo.UpdatedAt).NotTo(BeZero())
+		Expect(svcInfo.UpdatedAt.After(svcInfo.CreatedAt)).To(BeTrue())
+	})
+})

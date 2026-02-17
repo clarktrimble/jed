@@ -6,9 +6,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/alexflint/go-arg"
 	"github.com/clarktrimble/giant"
@@ -23,6 +25,7 @@ import (
 // Todo: regularize commands "ls-" etc
 // Todo: list networks
 // Todo: dry run for deploy and ??
+// Todo: hairpin Host route thing??
 
 // Bootstrap notes
 /*
@@ -39,8 +42,21 @@ type DeployCmd struct {
 
 type LsServicesCmd struct{}
 
+type DeleteServiceCmd struct {
+	Name string `arg:"positional,required" help:"service name"`
+}
+
+type InspectCmd struct {
+	Name string `arg:"positional,required" help:"service name"`
+}
+
 type TasksCmd struct {
 	Service string `arg:"positional,required" help:"service name"`
+}
+
+type LogsCmd struct {
+	Task string `arg:"positional,required" help:"task ID"`
+	Tail string `arg:"-n,--tail" default:"100" help:"number of lines to show"`
 }
 
 type LsSecretsCmd struct{}
@@ -65,7 +81,10 @@ type CreateNetworkCmd struct {
 type args struct {
 	Deploy        *DeployCmd        `arg:"subcommand:deploy" help:"deploy/update a swarm service"`
 	LsServices    *LsServicesCmd    `arg:"subcommand:ls-services" help:"list swarm services"`
+	DeleteService *DeleteServiceCmd `arg:"subcommand:delete-service" help:"delete a swarm service"`
+	Inspect       *InspectCmd       `arg:"subcommand:inspect" help:"show service spec"`
 	Tasks         *TasksCmd         `arg:"subcommand:tasks" help:"show service tasks"`
+	Logs          *LogsCmd          `arg:"subcommand:logs" help:"show service logs"`
 	LsSecrets     *LsSecretsCmd     `arg:"subcommand:ls-secrets" help:"list secrets"`
 	CreateSecret  *CreateSecretCmd  `arg:"subcommand:create-secret" help:"create a secret"`
 	LsConfigs     *LsConfigsCmd     `arg:"subcommand:ls-configs" help:"list configs"`
@@ -96,8 +115,14 @@ func main() {
 		deploy(ctx, deployer, store, args.Deploy.Name)
 	case args.LsServices != nil:
 		lsServices(ctx, deployer)
+	case args.DeleteService != nil:
+		deleteService(ctx, deployer, args.DeleteService.Name)
+	case args.Inspect != nil:
+		inspect(ctx, deployer, args.Inspect.Name)
 	case args.Tasks != nil:
 		tasks(ctx, deployer, args.Tasks.Service)
+	case args.Logs != nil:
+		logs(ctx, deployer, args.Logs.Task, args.Logs.Tail)
 	case args.LsSecrets != nil:
 		lsSecrets(ctx, deployer)
 	case args.CreateSecret != nil:
@@ -156,13 +181,47 @@ func lsServices(ctx context.Context, deployer *swarm.Deployer) {
 	}
 }
 
+func deleteService(ctx context.Context, deployer *swarm.Deployer, name string) {
+	err := deployer.DeleteService(ctx, name)
+	fatal(err)
+
+	fmt.Printf("deleted service %s\n", name)
+}
+
+func inspect(ctx context.Context, deployer *swarm.Deployer, name string) {
+	svc, err := deployer.GetService(ctx, name)
+	fatal(err)
+
+	var buf bytes.Buffer
+	err = json.Indent(&buf, svc.Spec, "", "  ")
+	fatal(err)
+
+	fmt.Println(buf.String())
+}
+
 func tasks(ctx context.Context, deployer *swarm.Deployer, service string) {
 	tasks, err := deployer.ServiceTasks(ctx, service)
 	fatal(err)
 
+	// Sort by timestamp, newest first (ISO format sorts correctly as strings)
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].Timestamp > tasks[j].Timestamp
+	})
+
 	for _, t := range tasks {
-		fmt.Printf("%s\t%s\t%s\n", t.State, t.Image, t.Error)
+		ts := t.Timestamp
+		if len(ts) > 19 {
+			ts = ts[:19] // trim nanoseconds
+		}
+		fmt.Printf("%s\t%s\t%s\t%s\t%s\n", ts, t.ID[:12], t.State, t.Image, t.Error)
 	}
+}
+
+func logs(ctx context.Context, deployer *swarm.Deployer, task, tail string) {
+	data, err := deployer.TaskLogs(ctx, task, tail)
+	fatal(err)
+
+	fmt.Print(string(data))
 }
 
 func lsSecrets(ctx context.Context, deployer *swarm.Deployer) {
