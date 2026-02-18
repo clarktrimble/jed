@@ -199,8 +199,12 @@ func swarmMounts(volumes map[string]string) []map[string]string {
 
 	mounts := make([]map[string]string, 0, len(volumes))
 	for source, target := range volumes {
+		mountType := "volume"
+		if strings.HasPrefix(source, "/") {
+			mountType = "bind"
+		}
 		mounts = append(mounts, map[string]string{
-			"Type":   "bind",
+			"Type":   mountType,
 			"Source": source,
 			"Target": target,
 		})

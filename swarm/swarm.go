@@ -3,6 +3,8 @@ package swarm
 
 //go:generate moq -out mock_test.go -pkg swarm_test . Client
 
+// Todo: think about streaming events from swarm to buffer for later retrieval
+
 import (
 	"bytes"
 	"context"

@@ -26,6 +26,10 @@ import (
 // Todo: list networks
 // Todo: dry run for deploy and ??
 // Todo: hairpin Host route thing??
+// Todo: resolve "name" arg for set-svc but not set-env, this is awkward and error prone
+// Todo: also awkward to specify commit hash in yaml rather than on transship cli??
+// Todo: remove version/blah info in help
+// Todo: revisit bind (host path) vs named vol issue; need to support both??
 
 // Bootstrap notes
 /*
