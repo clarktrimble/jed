@@ -9,6 +9,41 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Resource defaults
+const (
+	DefaultCPULimit   = "0.5"
+	DefaultMemLimit   = "128M"
+	DefaultCPUReserve = "0.1"
+	DefaultMemReserve = "64M"
+)
+
+// Resources specifies CPU and memory limits and reservations.
+// CPU values are decimal strings (e.g., "0.5" for half a CPU).
+// Memory values require M suffix (e.g., "128M" for 128 megabytes).
+type Resources struct {
+	CPULimit   string `json:"cpu_limit,omitempty"`
+	MemLimit   string `json:"mem_limit,omitempty"`
+	CPUReserve string `json:"cpu_reserve,omitempty"`
+	MemReserve string `json:"mem_reserve,omitempty"`
+}
+
+// WithDefaults returns Resources with defaults applied for empty values.
+func (r Resources) WithDefaults() Resources {
+	if r.CPULimit == "" {
+		r.CPULimit = DefaultCPULimit
+	}
+	if r.MemLimit == "" {
+		r.MemLimit = DefaultMemLimit
+	}
+	if r.CPUReserve == "" {
+		r.CPUReserve = DefaultCPUReserve
+	}
+	if r.MemReserve == "" {
+		r.MemReserve = DefaultMemReserve
+	}
+	return r
+}
+
 // Service is a service's configuration.
 type Service struct {
 	// Name is the service name (e.g., "postgres").
@@ -31,6 +66,8 @@ type Service struct {
 	Secrets []string `json:"secrets,omitempty"`
 	// Hosts adds /etc/hosts entries (e.g., "10.35.44.41 container4").
 	Hosts []string `json:"hosts,omitempty"`
+	// Resources specifies CPU and memory limits/reservations.
+	Resources Resources `json:"resources,omitempty"`
 }
 
 // Services is a slice of services.

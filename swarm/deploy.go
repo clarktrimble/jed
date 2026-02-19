@@ -75,6 +75,11 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		return nil, err
 	}
 
+	resources, err := resourceSpec(service.Resources.WithDefaults())
+	if err != nil {
+		return nil, err
+	}
+
 	containerSpec := map[string]any{
 		"Image":    service.Image,
 		"Env":      envLines(env.Vars),
@@ -110,16 +115,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 					"max-file": "3",
 				},
 			},
-			"Resources": map[string]any{
-				"Limits": map[string]any{
-					"NanoCPUs":    500000000,
-					"MemoryBytes": 134217728,
-				},
-				"Reservations": map[string]any{
-					"NanoCPUs":    100000000,
-					"MemoryBytes": 67108864,
-				},
-			},
+			"Resources": resources,
 			"RestartPolicy": map[string]any{
 				"Condition":   "on-failure",
 				"Delay":       5000000000,
@@ -219,4 +215,53 @@ func envLines(vars map[string]string) []string {
 		lines = append(lines, fmt.Sprintf("%s=%s", key, value))
 	}
 	return lines
+}
+
+func resourceSpec(r jed.Resources) (map[string]any, error) {
+	cpuLimit, err := parseCPU(r.CPULimit)
+	if err != nil {
+		return nil, errors.Wrap(err, "cpu_limit")
+	}
+	cpuReserve, err := parseCPU(r.CPUReserve)
+	if err != nil {
+		return nil, errors.Wrap(err, "cpu_reserve")
+	}
+	memLimit, err := parseMem(r.MemLimit)
+	if err != nil {
+		return nil, errors.Wrap(err, "mem_limit")
+	}
+	memReserve, err := parseMem(r.MemReserve)
+	if err != nil {
+		return nil, errors.Wrap(err, "mem_reserve")
+	}
+
+	return map[string]any{
+		"Limits": map[string]any{
+			"NanoCPUs":    cpuLimit,
+			"MemoryBytes": memLimit,
+		},
+		"Reservations": map[string]any{
+			"NanoCPUs":    cpuReserve,
+			"MemoryBytes": memReserve,
+		},
+	}, nil
+}
+
+func parseCPU(s string) (int64, error) {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, errors.Errorf("invalid cpu value %q", s)
+	}
+	return int64(f * 1_000_000_000), nil
+}
+
+func parseMem(s string) (int64, error) {
+	if !strings.HasSuffix(s, "M") {
+		return 0, errors.Errorf("memory value %q must have M suffix", s)
+	}
+	n, err := strconv.ParseInt(strings.TrimSuffix(s, "M"), 10, 64)
+	if err != nil {
+		return 0, errors.Errorf("invalid memory value %q", s)
+	}
+	return n * 1024 * 1024, nil
 }
