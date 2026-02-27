@@ -1,0 +1,11 @@
+name: whoami
+image: containous/whoami
+network: svc-net
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.whoami.rule: "PathPrefix(`/whoami`)"
+  traefik.http.routers.whoami.entrypoints: "websecure"
+  traefik.http.routers.whoami.tls: "true"
+  traefik.http.routers.whoami.middlewares: "whoami-strip"
+  traefik.http.middlewares.whoami-strip.stripprefix.prefixes: "/whoami"
+  traefik.http.services.whoami.loadbalancer.server.port: "80"

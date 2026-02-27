@@ -272,6 +272,132 @@ var _ = Describe("Deploy", func() {
 			Expect(hosts).To(ContainElement("10.0.0.1 gateway"))
 		})
 	})
+
+	Describe("with publish_mode host", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.PublishMode = "host"
+
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
+						return fmt404Error()
+
+					case method == "POST" && strings.Contains(path, "/services/create"):
+						mockResponse(map[string]string{"ID": "svc-host-mode"}, rcv)
+						return nil
+
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client)
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should deploy without error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should include PublishMode in port spec", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			endpointSpec := spec["EndpointSpec"].(map[string]any)
+			ports := endpointSpec["Ports"].([]map[string]any)
+			Expect(ports).To(HaveLen(1))
+			Expect(ports[0]["PublishMode"]).To(Equal("host"))
+		})
+	})
+
+	Describe("with custom user", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.User = "1000:967"
+
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
+						return fmt404Error()
+
+					case method == "POST" && strings.Contains(path, "/services/create"):
+						mockResponse(map[string]string{"ID": "svc-custom-user"}, rcv)
+						return nil
+
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client)
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should deploy without error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should use custom user in container spec", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			Expect(containerSpec["User"]).To(Equal("1000:967"))
+		})
+	})
+
+	Describe("with default user", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			// User not set, should default to 1001
+
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
+						return fmt404Error()
+
+					case method == "POST" && strings.Contains(path, "/services/create"):
+						mockResponse(map[string]string{"ID": "svc-default-user"}, rcv)
+						return nil
+
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client)
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should use default user 1001", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			Expect(containerSpec["User"]).To(Equal("1001"))
+		})
+	})
 })
 
 // helpers

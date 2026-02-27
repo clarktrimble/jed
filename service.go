@@ -68,6 +68,11 @@ type Service struct {
 	Hosts []string `json:"hosts,omitempty"`
 	// Resources specifies CPU and memory limits/reservations.
 	Resources Resources `json:"resources,omitempty"`
+	// PublishMode controls swarm port publishing: "host" for direct node binding,
+	// empty or "ingress" for load-balanced routing mesh (default).
+	PublishMode string `json:"publish_mode,omitempty"`
+	// User sets the container user (e.g., "1001", "1000:967"). Default is "1001".
+	User string `json:"user,omitempty"`
 }
 
 // Services is a slice of services.

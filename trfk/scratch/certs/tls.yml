@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /certs/intmon.bn.dev+3.pem
+      keyFile: /certs/intmon.bn.dev+3-key.pem

@@ -13,6 +13,8 @@ import (
 // Deploy creates or updates a swarm service from a jed.Service and jed.Env.
 func (d *Deployer) Deploy(ctx context.Context, service jed.Service, env jed.Env) (id string, err error) {
 
+	// Todo: validate service rather than crashing around
+
 	// Resolve secrets to latest versions
 	resolved, err := d.resolveSecrets(ctx, service.Secrets)
 	if err != nil {
@@ -70,7 +72,7 @@ func (d *Deployer) resolveSecrets(ctx context.Context, secrets []string) ([]reso
 
 func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[string]any, error) {
 
-	ports, err := swarmPorts(service.Ports)
+	ports, err := swarmPorts(service.Ports, service.PublishMode)
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +82,16 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		return nil, err
 	}
 
+	user := service.User
+	if user == "" {
+		user = "1001"
+	}
+
 	containerSpec := map[string]any{
 		"Image":    service.Image,
 		"Env":      envLines(env.Vars),
 		"ReadOnly": true,
-		"User":     "1001",
+		"User":     user,
 	}
 
 	if len(service.Command) > 0 {
@@ -163,7 +170,9 @@ func secretRefs(secrets []resolvedSecret) []map[string]any {
 	return refs
 }
 
-func swarmPorts(ports map[string]string) ([]map[string]any, error) {
+func swarmPorts(ports map[string]string, publishMode string) ([]map[string]any, error) {
+
+	// Todo: consider fully specified format: src, dst, proto, mode
 
 	result := make([]map[string]any, 0, len(ports))
 	for containerPort, hostPort := range ports {
@@ -182,11 +191,16 @@ func swarmPorts(ports map[string]string) ([]map[string]any, error) {
 			return nil, fmt.Errorf("invalid published port %q: %w", hostPort, err)
 		}
 
-		result = append(result, map[string]any{
+		portSpec := map[string]any{
 			"Protocol":      parts[1],
 			"TargetPort":    target,
 			"PublishedPort": published,
-		})
+		}
+		if publishMode == "host" {
+			portSpec["PublishMode"] = "host"
+		}
+
+		result = append(result, portSpec)
 	}
 	return result, nil
 }

@@ -28,6 +28,7 @@ resources:
   cpu_reserve: "0.1"
   mem_reserve: "64M"
 ```
+Todo: looks like we have "string" in the above where float/int would be better?
 
 ## Fields
 
@@ -44,6 +45,8 @@ resources:
 | command | no | Override container command |
 | labels | no | Container labels |
 | resources | no | CPU and memory limits/reservations |
+| publish_mode | no | Port publish mode: "host" for direct binding, default is ingress |
+| user | no | Container user (e.g., "1001", "1000:967"). Default is "1001" |
 
 ## Resources
 
