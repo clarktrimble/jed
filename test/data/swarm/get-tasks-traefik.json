@@ -1,0 +1,520 @@
+[
+  {
+    "ID": "chw715vucthx2m2cci32nnl7o",
+    "Version": {
+      "Index": 992
+    },
+    "CreatedAt": "2026-02-27T22:29:30.69848289Z",
+    "UpdatedAt": "2026-02-27T22:52:41.622946474Z",
+    "Labels": {},
+    "Spec": {
+      "ContainerSpec": {
+        "Image": "traefik:v3.6.9",
+        "Env": [
+          "TRAEFIK_API_INSECURE=true",
+          "TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80",
+          "TRAEFIK_PROVIDERS_SWARM=true",
+          "TRAEFIK_PROVIDERS_SWARM_EXPOSEDBYDEFAULT=false",
+          "TRAEFIK_PROVIDERS_SWARM_NETWORK=svc-net",
+          "TRAEFIK_ACCESSLOG=true",
+          "TRAEFIK_API_DASHBOARD=true"
+        ],
+        "User": "1000:967",
+        "ReadOnly": true,
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/var/run/docker.sock",
+            "Target": "/var/run/docker.sock"
+          }
+        ],
+        "Isolation": "default"
+      },
+      "Resources": {
+        "Limits": {
+          "NanoCPUs": 500000000,
+          "MemoryBytes": 134217728
+        },
+        "Reservations": {
+          "NanoCPUs": 100000000,
+          "MemoryBytes": 67108864
+        }
+      },
+      "RestartPolicy": {
+        "Condition": "on-failure",
+        "Delay": 5000000000,
+        "MaxAttempts": 3
+      },
+      "Networks": [
+        {
+          "Target": "qn7ll8sv0sikijooyzprx7lpp"
+        }
+      ],
+      "LogDriver": {
+        "Name": "json-file",
+        "Options": {
+          "max-file": "3",
+          "max-size": "10m"
+        }
+      },
+      "ForceUpdate": 0
+    },
+    "ServiceID": "wp5ojx06w6ekll0cufolohto2",
+    "Slot": 1,
+    "NodeID": "ludb8um9kkarh19ja6g7kvwfq",
+    "Status": {
+      "Timestamp": "2026-02-27T22:52:41.571791925Z",
+      "State": "shutdown",
+      "Message": "shutdown",
+      "ContainerStatus": {
+        "ContainerID": "ba0bdc853accc7687f99d777e8c2e8b0c16d88e233489776623bceea7eeca0f1",
+        "PID": 0,
+        "ExitCode": 0
+      },
+      "PortStatus": {}
+    },
+    "DesiredState": "shutdown",
+    "NetworksAttachments": [
+      {
+        "Network": {
+          "ID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Version": {
+            "Index": 217
+          },
+          "CreatedAt": "2026-01-06T23:31:49.65198378Z",
+          "UpdatedAt": "2026-02-15T17:13:54.140710704Z",
+          "Spec": {
+            "Name": "svc-net",
+            "Labels": {},
+            "DriverConfiguration": {
+              "Name": "overlay"
+            },
+            "Attachable": true,
+            "Scope": "swarm"
+          },
+          "DriverState": {
+            "Name": "overlay",
+            "Options": {
+              "com.docker.network.driver.overlay.vxlanid_list": "4097"
+            }
+          },
+          "IPAMOptions": {
+            "Driver": {
+              "Name": "default"
+            },
+            "Configs": [
+              {
+                "Subnet": "10.0.1.0/24",
+                "Gateway": "10.0.1.1"
+              }
+            ]
+          }
+        },
+        "Addresses": [
+          "10.0.1.93/24"
+        ]
+      }
+    ],
+    "Volumes": null
+  },
+  {
+    "ID": "iwu63doym56qkdwr6c006njxa",
+    "Version": {
+      "Index": 956
+    },
+    "CreatedAt": "2026-02-27T21:57:26.123803677Z",
+    "UpdatedAt": "2026-02-27T22:07:31.537662389Z",
+    "Labels": {},
+    "Spec": {
+      "ContainerSpec": {
+        "Image": "traefik:v3.6.9",
+        "Env": [
+          "TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80",
+          "TRAEFIK_PROVIDERS_DOCKER=true",
+          "TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false",
+          "TRAEFIK_PROVIDERS_DOCKER_NETWORK=svc-net",
+          "TRAEFIK_ACCESSLOG=true",
+          "TRAEFIK_API_DASHBOARD=true",
+          "TRAEFIK_API_INSECURE=true"
+        ],
+        "User": "1001",
+        "ReadOnly": true,
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/var/run/docker.sock",
+            "Target": "/var/run/docker.sock"
+          }
+        ],
+        "Isolation": "default"
+      },
+      "Resources": {
+        "Limits": {
+          "NanoCPUs": 500000000,
+          "MemoryBytes": 134217728
+        },
+        "Reservations": {
+          "NanoCPUs": 100000000,
+          "MemoryBytes": 67108864
+        }
+      },
+      "RestartPolicy": {
+        "Condition": "on-failure",
+        "Delay": 5000000000,
+        "MaxAttempts": 3
+      },
+      "Networks": [
+        {
+          "Target": "qn7ll8sv0sikijooyzprx7lpp"
+        }
+      ],
+      "LogDriver": {
+        "Name": "json-file",
+        "Options": {
+          "max-file": "3",
+          "max-size": "10m"
+        }
+      },
+      "ForceUpdate": 0
+    },
+    "ServiceID": "wp5ojx06w6ekll0cufolohto2",
+    "Slot": 1,
+    "NodeID": "ludb8um9kkarh19ja6g7kvwfq",
+    "Status": {
+      "Timestamp": "2026-02-27T22:07:31.451496077Z",
+      "State": "shutdown",
+      "Message": "shutdown",
+      "ContainerStatus": {
+        "ContainerID": "d9b5336f85ca279a8a9a983ce9cf3d34c8d3c86182e998392bf56f89010656a7",
+        "PID": 0,
+        "ExitCode": 0
+      },
+      "PortStatus": {}
+    },
+    "DesiredState": "shutdown",
+    "NetworksAttachments": [
+      {
+        "Network": {
+          "ID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Version": {
+            "Index": 217
+          },
+          "CreatedAt": "2026-01-06T23:31:49.65198378Z",
+          "UpdatedAt": "2026-02-15T17:13:54.140710704Z",
+          "Spec": {
+            "Name": "svc-net",
+            "Labels": {},
+            "DriverConfiguration": {
+              "Name": "overlay"
+            },
+            "Attachable": true,
+            "Scope": "swarm"
+          },
+          "DriverState": {
+            "Name": "overlay",
+            "Options": {
+              "com.docker.network.driver.overlay.vxlanid_list": "4097"
+            }
+          },
+          "IPAMOptions": {
+            "Driver": {
+              "Name": "default"
+            },
+            "Configs": [
+              {
+                "Subnet": "10.0.1.0/24",
+                "Gateway": "10.0.1.1"
+              }
+            ]
+          }
+        },
+        "Addresses": [
+          "10.0.1.89/24"
+        ]
+      }
+    ],
+    "Volumes": null
+  },
+  {
+    "ID": "rlbtk3kxtzt5h7wwewj3bffll",
+    "Version": {
+      "Index": 997
+    },
+    "CreatedAt": "2026-02-27T22:52:38.346890663Z",
+    "UpdatedAt": "2026-02-27T22:52:42.632271931Z",
+    "Labels": {},
+    "Spec": {
+      "ContainerSpec": {
+        "Image": "traefik:v3.6.9",
+        "Env": [
+          "TRAEFIK_ACCESSLOG=true",
+          "TRAEFIK_API_DASHBOARD=true",
+          "TRAEFIK_API_INSECURE=true",
+          "TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80",
+          "TRAEFIK_PROVIDERS_FILE_FILENAME=/certs/tls.yml",
+          "TRAEFIK_PROVIDERS_SWARM=true",
+          "TRAEFIK_PROVIDERS_SWARM_EXPOSEDBYDEFAULT=false",
+          "TRAEFIK_PROVIDERS_SWARM_NETWORK=svc-net",
+          "TRAEFIK_ENTRYPOINTS_WEBSECURE_ADDRESS=:443"
+        ],
+        "User": "1000:967",
+        "ReadOnly": true,
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/home/trimble/ctlib/jed/scratch/certs",
+            "Target": "/certs"
+          },
+          {
+            "Type": "bind",
+            "Source": "/var/run/docker.sock",
+            "Target": "/var/run/docker.sock"
+          }
+        ],
+        "Isolation": "default"
+      },
+      "Resources": {
+        "Limits": {
+          "NanoCPUs": 500000000,
+          "MemoryBytes": 134217728
+        },
+        "Reservations": {
+          "NanoCPUs": 100000000,
+          "MemoryBytes": 67108864
+        }
+      },
+      "RestartPolicy": {
+        "Condition": "on-failure",
+        "Delay": 5000000000,
+        "MaxAttempts": 3
+      },
+      "Networks": [
+        {
+          "Target": "qn7ll8sv0sikijooyzprx7lpp"
+        }
+      ],
+      "LogDriver": {
+        "Name": "json-file",
+        "Options": {
+          "max-file": "3",
+          "max-size": "10m"
+        }
+      },
+      "ForceUpdate": 0
+    },
+    "ServiceID": "wp5ojx06w6ekll0cufolohto2",
+    "Slot": 1,
+    "NodeID": "ludb8um9kkarh19ja6g7kvwfq",
+    "Status": {
+      "Timestamp": "2026-02-27T22:52:42.619683096Z",
+      "State": "running",
+      "Message": "started",
+      "ContainerStatus": {
+        "ContainerID": "eb1031db275f6e700c45ed160eb3311511742dc5cf24405f161f109871ebb8ae",
+        "PID": 934863,
+        "ExitCode": 0
+      },
+      "PortStatus": {
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 8080,
+            "PublishedPort": 8080,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 8080,
+            "PublishedPort": 8080,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 443,
+            "PublishedPort": 443,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 443,
+            "PublishedPort": 443,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 80,
+            "PublishedPort": 80,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 80,
+            "PublishedPort": 80,
+            "PublishMode": "host"
+          }
+        ]
+      }
+    },
+    "DesiredState": "running",
+    "NetworksAttachments": [
+      {
+        "Network": {
+          "ID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Version": {
+            "Index": 217
+          },
+          "CreatedAt": "2026-01-06T23:31:49.65198378Z",
+          "UpdatedAt": "2026-02-15T17:13:54.140710704Z",
+          "Spec": {
+            "Name": "svc-net",
+            "Labels": {},
+            "DriverConfiguration": {
+              "Name": "overlay"
+            },
+            "Attachable": true,
+            "Scope": "swarm"
+          },
+          "DriverState": {
+            "Name": "overlay",
+            "Options": {
+              "com.docker.network.driver.overlay.vxlanid_list": "4097"
+            }
+          },
+          "IPAMOptions": {
+            "Driver": {
+              "Name": "default"
+            },
+            "Configs": [
+              {
+                "Subnet": "10.0.1.0/24",
+                "Gateway": "10.0.1.1"
+              }
+            ]
+          }
+        },
+        "Addresses": [
+          "10.0.1.94/24"
+        ]
+      }
+    ],
+    "Volumes": null
+  },
+  {
+    "ID": "zejz2u4m7wbtzf7thdgtyow4k",
+    "Version": {
+      "Index": 977
+    },
+    "CreatedAt": "2026-02-27T22:07:28.227784855Z",
+    "UpdatedAt": "2026-02-27T22:29:34.024569619Z",
+    "Labels": {},
+    "Spec": {
+      "ContainerSpec": {
+        "Image": "traefik:v3.6.9",
+        "Env": [
+          "TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80",
+          "TRAEFIK_PROVIDERS_DOCKER=true",
+          "TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false",
+          "TRAEFIK_PROVIDERS_DOCKER_NETWORK=svc-net",
+          "TRAEFIK_ACCESSLOG=true",
+          "TRAEFIK_API_DASHBOARD=true",
+          "TRAEFIK_API_INSECURE=true"
+        ],
+        "User": "1000:967",
+        "ReadOnly": true,
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/var/run/docker.sock",
+            "Target": "/var/run/docker.sock"
+          }
+        ],
+        "Isolation": "default"
+      },
+      "Resources": {
+        "Limits": {
+          "NanoCPUs": 500000000,
+          "MemoryBytes": 134217728
+        },
+        "Reservations": {
+          "NanoCPUs": 100000000,
+          "MemoryBytes": 67108864
+        }
+      },
+      "RestartPolicy": {
+        "Condition": "on-failure",
+        "Delay": 5000000000,
+        "MaxAttempts": 3
+      },
+      "Networks": [
+        {
+          "Target": "qn7ll8sv0sikijooyzprx7lpp"
+        }
+      ],
+      "LogDriver": {
+        "Name": "json-file",
+        "Options": {
+          "max-file": "3",
+          "max-size": "10m"
+        }
+      },
+      "ForceUpdate": 0
+    },
+    "ServiceID": "wp5ojx06w6ekll0cufolohto2",
+    "Slot": 1,
+    "NodeID": "ludb8um9kkarh19ja6g7kvwfq",
+    "Status": {
+      "Timestamp": "2026-02-27T22:29:33.926280504Z",
+      "State": "shutdown",
+      "Message": "shutdown",
+      "ContainerStatus": {
+        "ContainerID": "8663d2bddb0a48e556060c9e321db3d12c34691c8eca16d0956d2ec3b3895d26",
+        "PID": 0,
+        "ExitCode": 0
+      },
+      "PortStatus": {}
+    },
+    "DesiredState": "shutdown",
+    "NetworksAttachments": [
+      {
+        "Network": {
+          "ID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Version": {
+            "Index": 217
+          },
+          "CreatedAt": "2026-01-06T23:31:49.65198378Z",
+          "UpdatedAt": "2026-02-15T17:13:54.140710704Z",
+          "Spec": {
+            "Name": "svc-net",
+            "Labels": {},
+            "DriverConfiguration": {
+              "Name": "overlay"
+            },
+            "Attachable": true,
+            "Scope": "swarm"
+          },
+          "DriverState": {
+            "Name": "overlay",
+            "Options": {
+              "com.docker.network.driver.overlay.vxlanid_list": "4097"
+            }
+          },
+          "IPAMOptions": {
+            "Driver": {
+              "Name": "default"
+            },
+            "Configs": [
+              {
+                "Subnet": "10.0.1.0/24",
+                "Gateway": "10.0.1.1"
+              }
+            ]
+          }
+        },
+        "Addresses": [
+          "10.0.1.90/24"
+        ]
+      }
+    ],
+    "Volumes": null
+  }
+]

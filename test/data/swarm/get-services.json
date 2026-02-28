@@ -1,0 +1,770 @@
+[
+  {
+    "ID": "dhgtqt27zv3zf6n13g2zgp3b0",
+    "Version": {
+      "Index": 999
+    },
+    "CreatedAt": "2026-02-27T22:24:47.145492343Z",
+    "UpdatedAt": "2026-02-27T22:56:14.752606535Z",
+    "Spec": {
+      "Name": "whoami",
+      "Labels": {
+        "traefik.enable": "true",
+        "traefik.http.middlewares.whoami-strip.stripprefix.prefixes": "/whoami",
+        "traefik.http.routers.whoami.entrypoints": "websecure",
+        "traefik.http.routers.whoami.middlewares": "whoami-strip",
+        "traefik.http.routers.whoami.rule": "PathPrefix(`/whoami`)",
+        "traefik.http.routers.whoami.tls": "true",
+        "traefik.http.services.whoami.loadbalancer.server.port": "80"
+      },
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "containous/whoami",
+          "User": "1001",
+          "ReadOnly": true,
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      }
+    },
+    "PreviousSpec": {
+      "Name": "whoami",
+      "Labels": {
+        "traefik.enable": "true",
+        "traefik.http.middlewares.whoami-strip.stripprefix.prefixes": "/whoami",
+        "traefik.http.routers.whoami.middlewares": "whoami-strip",
+        "traefik.http.routers.whoami.rule": "PathPrefix(`/whoami`)",
+        "traefik.http.services.whoami.loadbalancer.server.port": "80"
+      },
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "containous/whoami",
+          "User": "1001",
+          "ReadOnly": true,
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      }
+    },
+    "Endpoint": {
+      "Spec": {},
+      "VirtualIPs": [
+        {
+          "NetworkID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Addr": "10.0.1.91/24"
+        }
+      ]
+    }
+  },
+  {
+    "ID": "oyjrmow65scj5ixnhb4fjg161",
+    "Version": {
+      "Index": 795
+    },
+    "CreatedAt": "2026-02-16T16:33:31.294200326Z",
+    "UpdatedAt": "2026-02-17T19:17:06.332130869Z",
+    "Spec": {
+      "Name": "debug",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "alpine:latest",
+          "Command": [
+            "sleep",
+            "3600"
+          ],
+          "User": "1001",
+          "ReadOnly": true,
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      }
+    },
+    "PreviousSpec": {
+      "Name": "debug",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "alpine:latest",
+          "Command": [
+            "sleep",
+            "3600"
+          ],
+          "User": "1001",
+          "ReadOnly": true,
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      }
+    },
+    "Endpoint": {
+      "Spec": {},
+      "VirtualIPs": [
+        {
+          "NetworkID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Addr": "10.0.1.3/24"
+        }
+      ]
+    }
+  },
+  {
+    "ID": "wp5ojx06w6ekll0cufolohto2",
+    "Version": {
+      "Index": 998
+    },
+    "CreatedAt": "2026-02-27T21:57:26.122470167Z",
+    "UpdatedAt": "2026-02-27T22:52:47.633042279Z",
+    "Spec": {
+      "Name": "traefik",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "traefik:v3.6.9",
+          "Env": [
+            "TRAEFIK_ACCESSLOG=true",
+            "TRAEFIK_API_DASHBOARD=true",
+            "TRAEFIK_API_INSECURE=true",
+            "TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80",
+            "TRAEFIK_PROVIDERS_FILE_FILENAME=/certs/tls.yml",
+            "TRAEFIK_PROVIDERS_SWARM=true",
+            "TRAEFIK_PROVIDERS_SWARM_EXPOSEDBYDEFAULT=false",
+            "TRAEFIK_PROVIDERS_SWARM_NETWORK=svc-net",
+            "TRAEFIK_ENTRYPOINTS_WEBSECURE_ADDRESS=:443"
+          ],
+          "User": "1000:967",
+          "ReadOnly": true,
+          "Mounts": [
+            {
+              "Type": "bind",
+              "Source": "/home/trimble/ctlib/jed/scratch/certs",
+              "Target": "/certs"
+            },
+            {
+              "Type": "bind",
+              "Source": "/var/run/docker.sock",
+              "Target": "/var/run/docker.sock"
+            }
+          ],
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      },
+      "EndpointSpec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 443,
+            "PublishedPort": 443,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 80,
+            "PublishedPort": 80,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 8080,
+            "PublishedPort": 8080,
+            "PublishMode": "host"
+          }
+        ]
+      }
+    },
+    "PreviousSpec": {
+      "Name": "traefik",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "traefik:v3.6.9",
+          "Env": [
+            "TRAEFIK_API_INSECURE=true",
+            "TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80",
+            "TRAEFIK_PROVIDERS_SWARM=true",
+            "TRAEFIK_PROVIDERS_SWARM_EXPOSEDBYDEFAULT=false",
+            "TRAEFIK_PROVIDERS_SWARM_NETWORK=svc-net",
+            "TRAEFIK_ACCESSLOG=true",
+            "TRAEFIK_API_DASHBOARD=true"
+          ],
+          "User": "1000:967",
+          "ReadOnly": true,
+          "Mounts": [
+            {
+              "Type": "bind",
+              "Source": "/var/run/docker.sock",
+              "Target": "/var/run/docker.sock"
+            }
+          ],
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      },
+      "EndpointSpec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 80,
+            "PublishedPort": 80,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 8080,
+            "PublishedPort": 8080,
+            "PublishMode": "host"
+          }
+        ]
+      }
+    },
+    "Endpoint": {
+      "Spec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 443,
+            "PublishedPort": 443,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 80,
+            "PublishedPort": 80,
+            "PublishMode": "host"
+          },
+          {
+            "Protocol": "tcp",
+            "TargetPort": 8080,
+            "PublishedPort": 8080,
+            "PublishMode": "host"
+          }
+        ]
+      },
+      "Ports": [
+        {
+          "Protocol": "tcp",
+          "TargetPort": 443,
+          "PublishedPort": 443,
+          "PublishMode": "host"
+        },
+        {
+          "Protocol": "tcp",
+          "TargetPort": 80,
+          "PublishedPort": 80,
+          "PublishMode": "host"
+        },
+        {
+          "Protocol": "tcp",
+          "TargetPort": 8080,
+          "PublishedPort": 8080,
+          "PublishMode": "host"
+        }
+      ],
+      "VirtualIPs": [
+        {
+          "NetworkID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Addr": "10.0.1.88/24"
+        }
+      ]
+    },
+    "UpdateStatus": {
+      "State": "completed",
+      "StartedAt": "2026-02-27T22:52:38.346414252Z",
+      "CompletedAt": "2026-02-27T22:52:47.633032209Z",
+      "Message": "update completed"
+    }
+  },
+  {
+    "ID": "ypd2azr6t0d2qhhcrgr2jahqm",
+    "Version": {
+      "Index": 921
+    },
+    "CreatedAt": "2026-01-06T23:45:54.580526586Z",
+    "UpdatedAt": "2026-02-17T22:26:06.534435203Z",
+    "Spec": {
+      "Name": "tag",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "local/tag:c197117",
+          "Env": [
+            "TAG_BFC_BASEURI=https://api.vadc-test.bastille.cloud",
+            "TAG_S3_BUCKET=testbucket",
+            "TAG_S3_OBJECT=sample.json",
+            "TAG_BFC_SKIPVERIFY=true",
+            "TAG_S3_SCHEME=http",
+            "TAG_SERVER_PORT=3031",
+            "TAG_SVC_DRYRUN=true",
+            "TAG_LOGGER_ENABLEDEBUG=true",
+            "TAG_S3_ACCESSKEY=GKdf62cf3b0b0edb99e0eb138c",
+            "TAG_SVC_PREFIX=emp",
+            "TAG_WEBHOOK_BUFFERSIZE=9999",
+            "TAG_WEBHOOK_INTERVAL=3s",
+            "TAG_BFC_APIKEY=/run/secrets/bfc_api_key",
+            "TAG_LOGGER_ENABLETRACE=false",
+            "TAG_S3_HOST=10.35.44.41:3900",
+            "TAG_S3_REGION=testoregion",
+            "TAG_S3_SECRETKEY=/run/secrets/s3_secret_key"
+          ],
+          "User": "1001",
+          "ReadOnly": true,
+          "Secrets": [
+            {
+              "File": {
+                "Name": "s3_secret_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "53o7ekx6p3c5q22lzqgf3wv09",
+              "SecretName": "s3_secret_key_v1"
+            },
+            {
+              "File": {
+                "Name": "bfc_api_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "tdb7jg738n8qcva7t4cx2q6n5",
+              "SecretName": "bfc_api_key_v3"
+            }
+          ],
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      },
+      "EndpointSpec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 3031,
+            "PublishedPort": 8010,
+            "PublishMode": "ingress"
+          }
+        ]
+      }
+    },
+    "PreviousSpec": {
+      "Name": "tag",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "local/tag:c197117",
+          "Env": [
+            "TAG_LOGGER_ENABLETRACE=false",
+            "TAG_S3_OBJECT=sample.json",
+            "TAG_S3_SCHEME=http",
+            "TAG_SVC_PREFIX=emp",
+            "TAG_BFC_BASEURI=https://api.vadc-test.bastille.cloud",
+            "TAG_S3_ACCESSKEY=GKdf62cf3b0b0edb99e0eb138c",
+            "TAG_S3_SECRETKEY=/run/secrets/s3_secret_key",
+            "TAG_SERVER_PORT=3031",
+            "TAG_WEBHOOK_BUFFERSIZE=9999",
+            "TAG_WEBHOOK_INTERVAL=3s",
+            "TAG_S3_REGION=testoregion",
+            "TAG_SVC_DRYRUN=true",
+            "TAG_BFC_SKIPVERIFY=true",
+            "TAG_S3_BUCKET=testbucket",
+            "TAG_S3_HOST=10.35.44.41:3900",
+            "TAG_BFC_APIKEY=/run/secrets/bfc_api_key",
+            "TAG_LOGGER_ENABLEDEBUG=true"
+          ],
+          "User": "1001",
+          "ReadOnly": true,
+          "Hosts": [
+            "192.168.88.75 vilnius"
+          ],
+          "Secrets": [
+            {
+              "File": {
+                "Name": "s3_secret_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "53o7ekx6p3c5q22lzqgf3wv09",
+              "SecretName": "s3_secret_key_v1"
+            },
+            {
+              "File": {
+                "Name": "bfc_api_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "tdb7jg738n8qcva7t4cx2q6n5",
+              "SecretName": "bfc_api_key_v3"
+            }
+          ],
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      },
+      "EndpointSpec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 3031,
+            "PublishedPort": 8010,
+            "PublishMode": "ingress"
+          }
+        ]
+      }
+    },
+    "Endpoint": {
+      "Spec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 3031,
+            "PublishedPort": 8010,
+            "PublishMode": "ingress"
+          }
+        ]
+      },
+      "Ports": [
+        {
+          "Protocol": "tcp",
+          "TargetPort": 3031,
+          "PublishedPort": 8010,
+          "PublishMode": "ingress"
+        }
+      ],
+      "VirtualIPs": [
+        {
+          "NetworkID": "iwhhnur8i6e81cvctavfccr3q",
+          "Addr": "10.0.0.3/24"
+        },
+        {
+          "NetworkID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Addr": "10.0.1.2/24"
+        }
+      ]
+    },
+    "UpdateStatus": {
+      "State": "completed",
+      "StartedAt": "2026-02-17T22:25:57.021396764Z",
+      "CompletedAt": "2026-02-17T22:26:06.534424163Z",
+      "Message": "update completed"
+    }
+  }
+]

@@ -23,7 +23,7 @@ func TestSwarm(t *testing.T) {
 var _ = Describe("Deploy", func() {
 	var (
 		client   *ClientMock
-		deployer *swarm.Deployer
+		deployer *swarm.Swarm
 		ctx      context.Context
 		svc      jed.Service
 		env      jed.Env
@@ -446,7 +446,7 @@ func fmt404Error() error {
 var _ = Describe("GetService", func() {
 	var (
 		client   *ClientMock
-		deployer *swarm.Deployer
+		deployer *swarm.Swarm
 		ctx      context.Context
 		svcInfo  *swarm.ServiceInfo
 		err      error

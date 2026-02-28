@@ -140,7 +140,7 @@ func main() {
 	}
 }
 
-func newDeployer(socket string) *swarm.Deployer {
+func newDeployer(socket string) *swarm.Swarm {
 	lgrCfg := sabot.Config{MaxLen: 999}
 	lgr := lgrCfg.New(os.Stderr)
 
@@ -153,7 +153,7 @@ func newDeployer(socket string) *swarm.Deployer {
 	return swarm.New(client)
 }
 
-func deploy(ctx context.Context, deployer *swarm.Deployer, store *bbolt.Store, name string) {
+func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
 	svc, err := store.GetService(ctx, name)
 	fatal(errors.Wrapf(err, "failed to get service %q from store", name))
 
@@ -176,7 +176,7 @@ func deploy(ctx context.Context, deployer *swarm.Deployer, store *bbolt.Store, n
 	}
 }
 
-func lsServices(ctx context.Context, deployer *swarm.Deployer) {
+func lsServices(ctx context.Context, deployer *swarm.Swarm) {
 	svcs, err := deployer.ListServices(ctx)
 	fatal(err)
 
@@ -185,14 +185,14 @@ func lsServices(ctx context.Context, deployer *swarm.Deployer) {
 	}
 }
 
-func deleteService(ctx context.Context, deployer *swarm.Deployer, name string) {
+func deleteService(ctx context.Context, deployer *swarm.Swarm, name string) {
 	err := deployer.DeleteService(ctx, name)
 	fatal(err)
 
 	fmt.Printf("deleted service %s\n", name)
 }
 
-func inspect(ctx context.Context, deployer *swarm.Deployer, name string) {
+func inspect(ctx context.Context, deployer *swarm.Swarm, name string) {
 	svc, err := deployer.GetService(ctx, name)
 	fatal(err)
 
@@ -203,7 +203,7 @@ func inspect(ctx context.Context, deployer *swarm.Deployer, name string) {
 	fmt.Println(buf.String())
 }
 
-func tasks(ctx context.Context, deployer *swarm.Deployer, service string) {
+func tasks(ctx context.Context, deployer *swarm.Swarm, service string) {
 	tasks, err := deployer.ServiceTasks(ctx, service)
 	fatal(err)
 
@@ -221,14 +221,14 @@ func tasks(ctx context.Context, deployer *swarm.Deployer, service string) {
 	}
 }
 
-func logs(ctx context.Context, deployer *swarm.Deployer, task, tail string) {
+func logs(ctx context.Context, deployer *swarm.Swarm, task, tail string) {
 	data, err := deployer.TaskLogs(ctx, task, tail)
 	fatal(err)
 
 	fmt.Print(string(data))
 }
 
-func lsSecrets(ctx context.Context, deployer *swarm.Deployer) {
+func lsSecrets(ctx context.Context, deployer *swarm.Swarm) {
 	secrets, err := deployer.ListSecrets(ctx)
 	fatal(err)
 
@@ -237,7 +237,7 @@ func lsSecrets(ctx context.Context, deployer *swarm.Deployer) {
 	}
 }
 
-func createSecret(ctx context.Context, deployer *swarm.Deployer, name string) {
+func createSecret(ctx context.Context, deployer *swarm.Swarm, name string) {
 	var data []byte
 	var err error
 
@@ -257,7 +257,7 @@ func createSecret(ctx context.Context, deployer *swarm.Deployer, name string) {
 	fmt.Printf("created secret %s: %s\n", name, id)
 }
 
-func lsConfigs(ctx context.Context, deployer *swarm.Deployer) {
+func lsConfigs(ctx context.Context, deployer *swarm.Swarm) {
 	configs, err := deployer.ListConfigs(ctx)
 	fatal(err)
 
@@ -266,7 +266,7 @@ func lsConfigs(ctx context.Context, deployer *swarm.Deployer) {
 	}
 }
 
-func createConfig(ctx context.Context, deployer *swarm.Deployer, name, file string) {
+func createConfig(ctx context.Context, deployer *swarm.Swarm, name, file string) {
 	data, err := os.ReadFile(file)
 	fatal(err)
 
@@ -276,7 +276,7 @@ func createConfig(ctx context.Context, deployer *swarm.Deployer, name, file stri
 	fmt.Printf("created config %s: %s\n", name, id)
 }
 
-func createNetwork(ctx context.Context, deployer *swarm.Deployer, cmd *CreateNetworkCmd) {
+func createNetwork(ctx context.Context, deployer *swarm.Swarm, cmd *CreateNetworkCmd) {
 	id, err := deployer.CreateNetwork(ctx, cmd.Name, cmd.Attachable, cmd.Encrypted)
 	fatal(err)
 

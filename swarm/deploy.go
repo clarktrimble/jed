@@ -11,7 +11,7 @@ import (
 )
 
 // Deploy creates or updates a swarm service from a jed.Service and jed.Env.
-func (d *Deployer) Deploy(ctx context.Context, service jed.Service, env jed.Env) (id string, err error) {
+func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (id string, err error) {
 
 	// Todo: validate service rather than crashing around
 
@@ -53,7 +53,7 @@ type resolvedSecret struct {
 	file string // base name / mount filename (e.g., "s3_secret_key")
 }
 
-func (d *Deployer) resolveSecrets(ctx context.Context, secrets []string) ([]resolvedSecret, error) {
+func (d *Swarm) resolveSecrets(ctx context.Context, secrets []string) ([]resolvedSecret, error) {
 
 	resolved := make([]resolvedSecret, 0, len(secrets))
 	for _, name := range secrets {
