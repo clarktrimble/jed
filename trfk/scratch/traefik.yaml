@@ -9,4 +9,4 @@ ports:
   "8080/tcp": "8080"
 volumes:
   /var/run/docker.sock: /var/run/docker.sock
-  /home/trimble/ctlib/jed/scratch/certs: /certs
+  /home/trimble/ctlib/jed/trfk/scratch/certs: /certs

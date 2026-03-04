@@ -47,6 +47,7 @@ Todo: looks like we have "string" in the above where float/int would be better?
 | resources | no | CPU and memory limits/reservations |
 | publish_mode | no | Port publish mode: "host" for direct binding, default is ingress |
 | user | no | Container user (e.g., "1001", "1000:967"). Default is "1001" |
+| traefik | no | Traefik routing config (generates labels automatically) |
 
 ## Resources
 
@@ -90,3 +91,27 @@ secrets:
   - aruba_client_secret
   - db_password
 ```
+
+## Traefik
+
+When `traefik` is present, routing labels are generated automatically for PathPrefix routing at `/{service name}` with TLS on the websecure entrypoint, plus stripprefix middleware.
+
+```yaml
+traefik:
+  port: "8080"
+```
+
+Generates these labels:
+
+```yaml
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.{name}.rule: "PathPrefix(`/{name}`)"
+  traefik.http.routers.{name}.entrypoints: "websecure"
+  traefik.http.routers.{name}.tls: "true"
+  traefik.http.routers.{name}.middlewares: "{name}-strip"
+  traefik.http.middlewares.{name}-strip.stripprefix.prefixes: "/{name}"
+  traefik.http.services.{name}.loadbalancer.server.port: "{port}"
+```
+
+Explicit labels in `labels:` take precedence over generated traefik labels.

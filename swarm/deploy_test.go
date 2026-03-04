@@ -187,22 +187,7 @@ var _ = Describe("Deploy", func() {
 	Describe("with no secrets", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
-
-			client = &ClientMock{
-				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
-					switch {
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						return fmt404Error()
-
-					case method == "POST" && strings.Contains(path, "/services/create"):
-						mockResponse(map[string]string{"ID": "svc-new-789"}, rcv)
-						return nil
-
-					default:
-						return nil
-					}
-				},
-			}
+			client = newCreateMock("svc-new-789")
 			deployer = swarm.New(client)
 		})
 
@@ -230,22 +215,7 @@ var _ = Describe("Deploy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
 			svc.Hosts = []string{"192.168.88.75 vilnius", "10.0.0.1 gateway"}
-
-			client = &ClientMock{
-				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
-					switch {
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						return fmt404Error()
-
-					case method == "POST" && strings.Contains(path, "/services/create"):
-						mockResponse(map[string]string{"ID": "svc-hosts-123"}, rcv)
-						return nil
-
-					default:
-						return nil
-					}
-				},
-			}
+			client = newCreateMock("svc-hosts-123")
 			deployer = swarm.New(client)
 		})
 
@@ -277,22 +247,7 @@ var _ = Describe("Deploy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
 			svc.PublishMode = "host"
-
-			client = &ClientMock{
-				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
-					switch {
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						return fmt404Error()
-
-					case method == "POST" && strings.Contains(path, "/services/create"):
-						mockResponse(map[string]string{"ID": "svc-host-mode"}, rcv)
-						return nil
-
-					default:
-						return nil
-					}
-				},
-			}
+			client = newCreateMock("svc-host-mode")
 			deployer = swarm.New(client)
 		})
 
@@ -321,22 +276,7 @@ var _ = Describe("Deploy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
 			svc.User = "1000:967"
-
-			client = &ClientMock{
-				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
-					switch {
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						return fmt404Error()
-
-					case method == "POST" && strings.Contains(path, "/services/create"):
-						mockResponse(map[string]string{"ID": "svc-custom-user"}, rcv)
-						return nil
-
-					default:
-						return nil
-					}
-				},
-			}
+			client = newCreateMock("svc-custom-user")
 			deployer = swarm.New(client)
 		})
 
@@ -363,23 +303,7 @@ var _ = Describe("Deploy", func() {
 	Describe("with default user", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
-			// User not set, should default to 1001
-
-			client = &ClientMock{
-				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
-					switch {
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						return fmt404Error()
-
-					case method == "POST" && strings.Contains(path, "/services/create"):
-						mockResponse(map[string]string{"ID": "svc-default-user"}, rcv)
-						return nil
-
-					default:
-						return nil
-					}
-				},
-			}
+			client = newCreateMock("svc-default-user")
 			deployer = swarm.New(client)
 		})
 
@@ -396,6 +320,73 @@ var _ = Describe("Deploy", func() {
 			taskTemplate := spec["TaskTemplate"].(map[string]any)
 			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
 			Expect(containerSpec["User"]).To(Equal("1001"))
+		})
+	})
+
+	Describe("with traefik config", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Traefik = &jed.Traefik{Port: "8080"}
+			client = newCreateMock("svc-traefik")
+			deployer = swarm.New(client)
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should deploy without error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should generate traefik labels", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			labels := spec["Labels"].(map[string]string)
+
+			Expect(labels["traefik.enable"]).To(Equal("true"))
+			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
+			Expect(labels["traefik.http.routers.reauth-acp.entrypoints"]).To(Equal("websecure"))
+			Expect(labels["traefik.http.routers.reauth-acp.tls"]).To(Equal("true"))
+			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal("reauth-acp-strip"))
+			Expect(labels["traefik.http.middlewares.reauth-acp-strip.stripprefix.prefixes"]).To(Equal("/reauth-acp"))
+			Expect(labels["traefik.http.services.reauth-acp.loadbalancer.server.port"]).To(Equal("8080"))
+		})
+	})
+
+	Describe("with traefik config and explicit labels", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Traefik = &jed.Traefik{Port: "8080"}
+			svc.Labels = map[string]string{
+				"custom.label":   "custom-value",
+				"traefik.enable": "false", // explicit override
+			}
+			client = newCreateMock("svc-traefik-explicit")
+			deployer = swarm.New(client)
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should merge labels with explicit winning", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			labels := spec["Labels"].(map[string]string)
+
+			// Custom label preserved
+			Expect(labels["custom.label"]).To(Equal("custom-value"))
+			// Explicit override wins
+			Expect(labels["traefik.enable"]).To(Equal("false"))
+			// Generated labels still present
+			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
 		})
 	})
 })
@@ -441,6 +432,22 @@ func findCall(calls []struct {
 
 func fmt404Error() error {
 	return fmt.Errorf("request failed: 404")
+}
+
+func newCreateMock(id string) *ClientMock {
+	return &ClientMock{
+		SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+			switch {
+			case method == "GET" && strings.Contains(path, "/services/"):
+				return fmt404Error()
+			case method == "POST" && strings.Contains(path, "/services/create"):
+				mockResponse(map[string]string{"ID": id}, rcv)
+				return nil
+			default:
+				return nil
+			}
+		},
+	}
 }
 
 var _ = Describe("GetService", func() {

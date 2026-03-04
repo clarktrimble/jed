@@ -17,6 +17,11 @@ const (
 	DefaultMemReserve = "64M"
 )
 
+// Traefik specifies traefik routing configuration.
+type Traefik struct {
+	Port string `json:"port"`
+}
+
 // Resources specifies CPU and memory limits and reservations.
 // CPU values are decimal strings (e.g., "0.5" for half a CPU).
 // Memory values require M suffix (e.g., "128M" for 128 megabytes).
@@ -73,6 +78,8 @@ type Service struct {
 	PublishMode string `json:"publish_mode,omitempty"`
 	// User sets the container user (e.g., "1001", "1000:967"). Default is "1001".
 	User string `json:"user,omitempty"`
+	// Traefik enables traefik routing label generation.
+	Traefik *Traefik `json:"traefik,omitempty"`
 }
 
 // Services is a slice of services.

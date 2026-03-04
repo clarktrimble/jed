@@ -3,6 +3,7 @@ package swarm
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (id string, err error) {
 
 	// Todo: validate service rather than crashing around
+	// Todo: honor restart from service yaml, we're ignoring it
 
 	// Resolve secrets to latest versions
 	resolved, err := d.resolveSecrets(ctx, service.Secrets)
@@ -110,9 +112,15 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		containerSpec["Hosts"] = service.Hosts
 	}
 
+	labels := service.Labels
+	if service.Traefik != nil {
+		labels = traefikLabels(service.Name, service.Traefik)
+		maps.Copy(labels, service.Labels) // explicit labels win
+	}
+
 	spec := map[string]any{
 		"Name":   service.Name,
-		"Labels": service.Labels,
+		"Labels": labels,
 		"TaskTemplate": map[string]any{
 			"ContainerSpec": containerSpec,
 			"LogDriver": map[string]any{
@@ -278,4 +286,18 @@ func parseMem(s string) (int64, error) {
 		return 0, errors.Errorf("invalid memory value %q", s)
 	}
 	return n * 1024 * 1024, nil
+}
+
+// traefikLabels generates traefik routing labels for a service.
+// Stripped PathPrefix routing at /{name} with TLS on websecure entrypoint,
+func traefikLabels(name string, t *jed.Traefik) map[string]string {
+	return map[string]string{
+		"traefik.enable": "true",
+		fmt.Sprintf("traefik.http.routers.%s.rule", name):                           fmt.Sprintf("PathPrefix(`/%s`)", name),
+		fmt.Sprintf("traefik.http.routers.%s.entrypoints", name):                    "websecure",
+		fmt.Sprintf("traefik.http.routers.%s.tls", name):                            "true",
+		fmt.Sprintf("traefik.http.routers.%s.middlewares", name):                    fmt.Sprintf("%s-strip", name),
+		fmt.Sprintf("traefik.http.middlewares.%s-strip.stripprefix.prefixes", name): fmt.Sprintf("/%s", name),
+		fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", name):      t.Port,
+	}
 }

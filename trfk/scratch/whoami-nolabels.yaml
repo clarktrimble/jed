@@ -1,0 +1,5 @@
+name: whoami
+image: containous/whoami
+network: svc-net
+traefik:
+  port: "80"

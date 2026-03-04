@@ -1,4 +1,8 @@
 
+## NOTE
+Got fucked by firefox hard redirecting *.dev to https
+Using bargel for now, switch back when traefik dashboard works on ssl
+
 ```
 ➜  jed git:(swarm) ✗ mkcert intmon.bn.dev "*.intmon.bn.dev" localhost 127.0.0.1
 
