@@ -20,6 +20,9 @@
 // # Stateless
 //
 // Jed relies on the Docker API and Service/Env Store for all state, maintaining no internal cache.
+//
+// Todo: demote container functionality (Deploy, etc) to container pkg for symmetry with swarm
+// Todo: container methods accept Service and Env as needed rather than internal lookups
 package jed
 
 import (

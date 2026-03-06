@@ -1,6 +1,7 @@
 # Jed
 
 Manage Docker containers as services with persistent configuration and environment.
+Note: this is a little stale.  See swarm/README.md.
 
 ## Quick Start
 

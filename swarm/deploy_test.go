@@ -15,6 +15,15 @@ import (
 	"github.com/clarktrimble/jed/swarm"
 )
 
+/*
+  Inconsistencies with client_test.go:
+
+  1. deployer vs sw naming
+  2. mockResponse is defined here but used in both files
+  3. GetService test should probably be in client_test.go or pulled into the main Describe
+  4. loadTestData pattern not used - inline os.ReadFile instead
+*/
+
 func TestSwarm(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Swarm Suite")

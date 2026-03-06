@@ -23,8 +23,7 @@ func (d *Swarm) GetService(ctx context.Context, name string) (*ServiceInfo, erro
 	return &svc, nil
 }
 
-// UpdateService updates a service with the given spec.
-func (d *Swarm) UpdateService(ctx context.Context, name string, version int, spec any) error {
+func (d *Swarm) updateService(ctx context.Context, name string, version int, spec any) error {
 
 	path := fmt.Sprintf("/v1.52/services/%s/update?version=%d", name, version)
 	err := d.client.SendObject(ctx, "POST", path, spec, nil)
@@ -35,8 +34,7 @@ func (d *Swarm) UpdateService(ctx context.Context, name string, version int, spe
 	return nil
 }
 
-// CreateService creates a new service.
-func (d *Swarm) CreateService(ctx context.Context, spec any) (string, error) {
+func (d *Swarm) createService(ctx context.Context, spec any) (string, error) {
 
 	var resp idResponse
 	err := d.client.SendObject(ctx, "POST", "/v1.52/services/create", spec, &resp)

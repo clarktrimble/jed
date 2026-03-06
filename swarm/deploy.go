@@ -16,6 +16,12 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (i
 
 	// Todo: validate service rather than crashing around
 	// Todo: honor restart from service yaml, we're ignoring it
+	// Todo: finding the right task for log file is flakey
+	//       2026-03-05T16:22:08     trt14okg7c2s    running traefik:v3.6.9
+	//       2026-03-05T16:22:08     ustlwf51japh    pending traefik:v3.6.9  no suitable node (host-mode port already in use on 1 node)
+	//       (I think sort failed to discriminate and we looked at running instead of pending)
+	// Todo: fix error: open whoami.env: no such file or directory (this is deploy.sh so maybe?)
+	// Todo: is there a gid issue where transship needs docker gid?
 
 	// Resolve secrets to latest versions
 	resolved, err := d.resolveSecrets(ctx, service.Secrets)
@@ -40,12 +46,12 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (i
 		}
 
 		// Service doesn't exist, create it
-		id, err = d.CreateService(ctx, spec)
+		id, err = d.createService(ctx, spec)
 		return
 	}
 
 	// Service exists, update it
-	err = d.UpdateService(ctx, service.Name, svcInfo.Version.Index, spec)
+	err = d.updateService(ctx, service.Name, svcInfo.Version.Index, spec)
 	return
 }
 
