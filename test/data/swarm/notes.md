@@ -2,6 +2,15 @@
 
 Responses captured from Docker Swarm API via unix socket for use by `swarm` package tests.
 
+## Docker API Documentation
+
+API docs by version: https://docs.docker.com/reference/api/engine/version/v1.52/
+
+Use web search to find specific endpoints/fields:
+```
+site:docs.docker.com engine API v1.52 ServiceInspect ServiceStatus
+```
+
 ## Capturing data
 
 ```bash
@@ -18,6 +27,7 @@ curl -s --unix-socket /var/run/docker.sock 'http://localhost/v1.52/tasks?filters
 
 - `get-services.json` - list of all services
 - `get-service-tag.json` - single service detail
+- `get-services-filtered.json` - filtered services list with ServiceStatus (used by GetService)
 - `get-secrets.json` - list of secrets
 - `get-configs.json` - list of configs (empty `[]` when none exist)
 - `get-tasks-traefik.json` - tasks for a service

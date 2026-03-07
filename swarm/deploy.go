@@ -40,7 +40,7 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (i
 	svcInfo, verErr := d.GetService(ctx, service.Name)
 	if verErr != nil {
 		// Todo: more explicit / less fragile detection
-		if !strings.Contains(verErr.Error(), "404") {
+		if !strings.Contains(verErr.Error(), "not found") {
 			err = verErr
 			return
 		}
@@ -148,7 +148,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		},
 		"Mode": map[string]any{
 			"Replicated": map[string]any{
-				"Replicas": 1,
+				"Replicas": service.Replicas,
 			},
 		},
 		"UpdateConfig": map[string]any{
@@ -293,6 +293,7 @@ func parseMem(s string) (int64, error) {
 	}
 	return n * 1024 * 1024, nil
 }
+
 
 // traefikLabels generates traefik routing labels for a service.
 // Stripped PathPrefix routing at /{name} with TLS on websecure entrypoint,

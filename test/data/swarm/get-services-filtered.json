@@ -1,0 +1,263 @@
+[
+  {
+    "ID": "ypd2azr6t0d2qhhcrgr2jahqm",
+    "Version": {
+      "Index": 1189
+    },
+    "CreatedAt": "2026-01-06T23:45:54.580526586Z",
+    "UpdatedAt": "2026-03-05T13:59:50.205487048Z",
+    "Spec": {
+      "Name": "tag",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "local/tag:c197117",
+          "Env": [
+            "TAG_BFC_BASEURI=https://api.vadc-test.bastille.cloud",
+            "TAG_S3_BUCKET=testbucket",
+            "TAG_S3_OBJECT=sample.json",
+            "TAG_BFC_SKIPVERIFY=true",
+            "TAG_S3_SCHEME=http",
+            "TAG_SERVER_PORT=3031",
+            "TAG_SVC_DRYRUN=true",
+            "TAG_LOGGER_ENABLEDEBUG=true",
+            "TAG_S3_ACCESSKEY=GKdf62cf3b0b0edb99e0eb138c",
+            "TAG_SVC_PREFIX=emp",
+            "TAG_WEBHOOK_BUFFERSIZE=9999",
+            "TAG_WEBHOOK_INTERVAL=3s",
+            "TAG_BFC_APIKEY=/run/secrets/bfc_api_key",
+            "TAG_LOGGER_ENABLETRACE=false",
+            "TAG_S3_HOST=10.35.44.41:3900",
+            "TAG_S3_REGION=testoregion",
+            "TAG_S3_SECRETKEY=/run/secrets/s3_secret_key"
+          ],
+          "User": "1001",
+          "ReadOnly": true,
+          "Secrets": [
+            {
+              "File": {
+                "Name": "s3_secret_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "53o7ekx6p3c5q22lzqgf3wv09",
+              "SecretName": "s3_secret_key_v1"
+            },
+            {
+              "File": {
+                "Name": "bfc_api_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "tdb7jg738n8qcva7t4cx2q6n5",
+              "SecretName": "bfc_api_key_v3"
+            }
+          ],
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      },
+      "EndpointSpec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 3031,
+            "PublishedPort": 8010,
+            "PublishMode": "ingress"
+          }
+        ]
+      }
+    },
+    "PreviousSpec": {
+      "Name": "tag",
+      "Labels": {},
+      "TaskTemplate": {
+        "ContainerSpec": {
+          "Image": "local/tag:c197117",
+          "Env": [
+            "TAG_LOGGER_ENABLETRACE=false",
+            "TAG_S3_OBJECT=sample.json",
+            "TAG_S3_SCHEME=http",
+            "TAG_SVC_PREFIX=emp",
+            "TAG_BFC_BASEURI=https://api.vadc-test.bastille.cloud",
+            "TAG_S3_ACCESSKEY=GKdf62cf3b0b0edb99e0eb138c",
+            "TAG_S3_SECRETKEY=/run/secrets/s3_secret_key",
+            "TAG_SERVER_PORT=3031",
+            "TAG_WEBHOOK_BUFFERSIZE=9999",
+            "TAG_WEBHOOK_INTERVAL=3s",
+            "TAG_S3_REGION=testoregion",
+            "TAG_SVC_DRYRUN=true",
+            "TAG_BFC_SKIPVERIFY=true",
+            "TAG_S3_BUCKET=testbucket",
+            "TAG_S3_HOST=10.35.44.41:3900",
+            "TAG_BFC_APIKEY=/run/secrets/bfc_api_key",
+            "TAG_LOGGER_ENABLEDEBUG=true"
+          ],
+          "User": "1001",
+          "ReadOnly": true,
+          "Hosts": [
+            "192.168.88.75 vilnius"
+          ],
+          "Secrets": [
+            {
+              "File": {
+                "Name": "s3_secret_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "53o7ekx6p3c5q22lzqgf3wv09",
+              "SecretName": "s3_secret_key_v1"
+            },
+            {
+              "File": {
+                "Name": "bfc_api_key",
+                "UID": "1001",
+                "GID": "1001",
+                "Mode": 292
+              },
+              "SecretID": "tdb7jg738n8qcva7t4cx2q6n5",
+              "SecretName": "bfc_api_key_v3"
+            }
+          ],
+          "Isolation": "default"
+        },
+        "Resources": {
+          "Limits": {
+            "NanoCPUs": 500000000,
+            "MemoryBytes": 134217728
+          },
+          "Reservations": {
+            "NanoCPUs": 100000000,
+            "MemoryBytes": 67108864
+          }
+        },
+        "RestartPolicy": {
+          "Condition": "on-failure",
+          "Delay": 5000000000,
+          "MaxAttempts": 3
+        },
+        "Networks": [
+          {
+            "Target": "qn7ll8sv0sikijooyzprx7lpp"
+          }
+        ],
+        "LogDriver": {
+          "Name": "json-file",
+          "Options": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "ForceUpdate": 0,
+        "Runtime": "container"
+      },
+      "Mode": {
+        "Replicated": {
+          "Replicas": 1
+        }
+      },
+      "UpdateConfig": {
+        "Parallelism": 0,
+        "FailureAction": "rollback",
+        "MaxFailureRatio": 0,
+        "Order": "stop-first"
+      },
+      "EndpointSpec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 3031,
+            "PublishedPort": 8010,
+            "PublishMode": "ingress"
+          }
+        ]
+      }
+    },
+    "Endpoint": {
+      "Spec": {
+        "Mode": "vip",
+        "Ports": [
+          {
+            "Protocol": "tcp",
+            "TargetPort": 3031,
+            "PublishedPort": 8010,
+            "PublishMode": "ingress"
+          }
+        ]
+      },
+      "Ports": [
+        {
+          "Protocol": "tcp",
+          "TargetPort": 3031,
+          "PublishedPort": 8010,
+          "PublishMode": "ingress"
+        }
+      ],
+      "VirtualIPs": [
+        {
+          "NetworkID": "iwhhnur8i6e81cvctavfccr3q",
+          "Addr": "10.0.0.3/24"
+        },
+        {
+          "NetworkID": "qn7ll8sv0sikijooyzprx7lpp",
+          "Addr": "10.0.1.2/24"
+        }
+      ]
+    },
+    "UpdateStatus": {
+      "State": "completed",
+      "StartedAt": "2026-02-17T22:25:57.021396764Z",
+      "CompletedAt": "2026-02-17T22:26:06.534424163Z",
+      "Message": "update completed"
+    },
+    "ServiceStatus": {
+      "RunningTasks": 0,
+      "DesiredTasks": 1,
+      "CompletedTasks": 0
+    }
+  }
+]

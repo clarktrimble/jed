@@ -111,12 +111,21 @@ type ServiceInfo struct {
 	Version struct {
 		Index int `json:"Index"`
 	} `json:"Version"`
-	Spec         json.RawMessage `json:"Spec"`
-	PreviousSpec json.RawMessage `json:"PreviousSpec,omitempty"`
-	Endpoint     ServiceEndpoint `json:"Endpoint"`
-	UpdateStatus UpdateStatus    `json:"UpdateStatus"`
-	CreatedAt    time.Time       `json:"CreatedAt"`
-	UpdatedAt    time.Time       `json:"UpdatedAt"`
+	Spec          json.RawMessage `json:"Spec"`
+	PreviousSpec  json.RawMessage `json:"PreviousSpec,omitempty"`
+	Endpoint      ServiceEndpoint `json:"Endpoint"`
+	UpdateStatus  UpdateStatus    `json:"UpdateStatus"`
+	ServiceStatus ServiceStatus   `json:"ServiceStatus"`
+	CreatedAt     time.Time       `json:"CreatedAt"`
+	UpdatedAt     time.Time       `json:"UpdatedAt"`
+}
+
+// ServiceStatus holds task counts for a service.
+// Populated when GetService is called (requires ?status=true).
+type ServiceStatus struct {
+	RunningTasks   int `json:"RunningTasks"`
+	DesiredTasks   int `json:"DesiredTasks"`
+	CompletedTasks int `json:"CompletedTasks"`
 }
 
 // ServiceEndpoint represents a service's network endpoint.
@@ -146,6 +155,7 @@ type UpdateStatus struct {
 	StartedAt   time.Time `json:"StartedAt"`
 	CompletedAt time.Time `json:"CompletedAt"`
 }
+
 
 // unexported
 

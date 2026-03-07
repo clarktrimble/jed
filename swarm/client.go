@@ -14,13 +14,19 @@ import (
 // GetService returns full service info from Docker.
 func (d *Swarm) GetService(ctx context.Context, name string) (*ServiceInfo, error) {
 
-	var svc ServiceInfo
-	err := d.client.SendObject(ctx, "GET", "/v1.52/services/"+name, nil, &svc)
+	path := fmt.Sprintf("/v1.52/services?status=true&filters={\"name\":[\"%s\"]}", name)
+
+	var svcs []ServiceInfo
+	err := d.client.SendObject(ctx, "GET", path, nil, &svcs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get service %q", name)
 	}
 
-	return &svc, nil
+	if len(svcs) == 0 {
+		return nil, errors.Errorf("service %q not found", name)
+	}
+
+	return &svcs[0], nil
 }
 
 func (d *Swarm) updateService(ctx context.Context, name string, version int, spec any) error {
@@ -282,4 +288,38 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 	}
 
 	return logs, nil
+}
+
+// Status returns the current status of a deployed service.
+//
+// Returns one of three states:
+//   - "stopped": DesiredTasks == 0
+//   - "running": RunningTasks == DesiredTasks
+//   - "error": anything else (desired > 0 but not all running)
+//
+// todo: Further work needed to distinguish error causes:
+//   - UpdateStatus.State values: "updating", "paused", "completed",
+//     "rollback_started", "rollback_paused", "rollback_completed"
+//   - UpdateStatus.Message may contain error details
+//   - Our UpdateConfig uses FailureAction: "rollback", so failed deploys trigger rollback
+//   - Need to capture actual rollback scenarios to understand what Docker returns
+//   - Consider whether "pending" state is needed for startup vs actual errors
+//   - Tasks endpoint has detailed error info but selecting the right task is tricky
+func (d *Swarm) Status(ctx context.Context, name string) (string, error) {
+
+	svc, err := d.GetService(ctx, name)
+	if err != nil {
+		return "", err
+	}
+
+	ss := svc.ServiceStatus
+
+	switch {
+	case ss.DesiredTasks == 0:
+		return "stopped", nil
+	case ss.RunningTasks == ss.DesiredTasks:
+		return "running", nil
+	default:
+		return "error", nil
+	}
 }

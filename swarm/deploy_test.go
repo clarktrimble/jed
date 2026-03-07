@@ -3,7 +3,6 @@ package swarm_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -67,9 +66,10 @@ var _ = Describe("Deploy", func() {
 			client = &ClientMock{
 				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
 					switch {
-					// ServiceVersion: return 404
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						return fmt404Error()
+					// GetService: return empty list (not found)
+					case method == "GET" && strings.Contains(path, "/services?"):
+						mockResponse([]map[string]any{}, rcv)
+						return nil
 
 					// ListSecrets: return versioned secrets
 					case method == "GET" && strings.Contains(path, "/secrets"):
@@ -150,10 +150,10 @@ var _ = Describe("Deploy", func() {
 			client = &ClientMock{
 				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
 					switch {
-					// ServiceVersion: return version 42
-					case method == "GET" && strings.Contains(path, "/services/reauth-acp"):
-						mockResponse(map[string]any{
-							"Version": map[string]any{"Index": 42},
+					// GetService: return list with one service
+					case method == "GET" && strings.Contains(path, "/services?"):
+						mockResponse([]map[string]any{
+							{"Version": map[string]any{"Index": 42}},
 						}, rcv)
 						return nil
 
@@ -439,16 +439,17 @@ func findCall(calls []struct {
 	return nil
 }
 
-func fmt404Error() error {
-	return fmt.Errorf("request failed: 404")
-}
+//func fmt404Error() error {
+//return fmt.Errorf("request failed: 404")
+//}
 
 func newCreateMock(id string) *ClientMock {
 	return &ClientMock{
 		SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
 			switch {
-			case method == "GET" && strings.Contains(path, "/services/"):
-				return fmt404Error()
+			case method == "GET" && strings.Contains(path, "/services?"):
+				mockResponse([]map[string]any{}, rcv) // empty list = not found
+				return nil
 			case method == "POST" && strings.Contains(path, "/services/create"):
 				mockResponse(map[string]string{"ID": id}, rcv)
 				return nil
@@ -471,7 +472,7 @@ var _ = Describe("GetService", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		testData, err := os.ReadFile("../test/data/svcinfo/tag.json")
+		testData, err := os.ReadFile("../test/data/swarm/get-services-filtered.json")
 		Expect(err).NotTo(HaveOccurred())
 
 		client = &ClientMock{

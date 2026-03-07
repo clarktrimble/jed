@@ -21,6 +21,7 @@ id, err := sw.Deploy(ctx, svc, env)
 services, err := sw.ListServices(ctx)
 tasks, err := sw.ServiceTasks(ctx, "myapp")
 logs, err := sw.TaskLogs(ctx, tasks[0].ID, "100")
+state, err := sw.Status(ctx, "myapp") // "stopped", "running", or "error"
 
 // Teardown
 sw.DeleteService(ctx, "myapp")
@@ -47,7 +48,7 @@ In `jed.Service`, list base names in `Secrets`. Deploy resolves to the latest ve
 |------------------|------------------------------------------------|-----------|
 | Resources        | 0.5 CPU / 128MB limit, 0.1 CPU / 64MB reserve  | default   |
 | User             | 1001                                           | default   |
-| Replicas         | 1                                              | hardcoded |
+| Replicas         | 0 (stopped)                                    | default   |
 | Root filesystem  | Read-only                                      | hardcoded |
 | Restart          | on-failure, 5s delay, max 3 attempts           | hardcoded |
 | Update order     | stop-first, rollback on failure                | hardcoded |

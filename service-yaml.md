@@ -9,6 +9,7 @@ name: reauth-acp
 image: local/reauth-acp:3c070f2
 network: svc-net
 restart: on-failure
+replicas: 1
 
 ports:
   3031/tcp: "8012"
@@ -48,6 +49,7 @@ Todo: looks like we have "string" in the above where float/int would be better?
 | publish_mode | no | Port publish mode: "host" for direct binding, default is ingress |
 | user | no | Container user (e.g., "1001", "1000:967"). Default is "1001" |
 | traefik | no | Traefik routing config (generates labels automatically) |
+| replicas | no | Number of service instances. Default is 0 (stopped) |
 
 ## Resources
 

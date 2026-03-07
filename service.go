@@ -80,6 +80,8 @@ type Service struct {
 	User string `json:"user,omitempty"`
 	// Traefik enables traefik routing label generation.
 	Traefik *Traefik `json:"traefik,omitempty"`
+	// Replicas is the number of service instances to run.
+	Replicas int `json:"replicas,omitempty"`
 }
 
 // Services is a slice of services.
@@ -166,6 +168,9 @@ func (service Service) validate() error {
 	}
 	if service.Restart == "" {
 		issues = append(issues, "restart policy is required")
+	}
+	if service.Replicas < 0 {
+		issues = append(issues, "replicas cannot be negative")
 	}
 
 	if len(issues) > 0 {
