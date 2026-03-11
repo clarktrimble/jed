@@ -292,12 +292,7 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 
 // Status returns the current status of a deployed service.
 //
-// Returns one of three states:
-//   - "stopped": DesiredTasks == 0
-//   - "running": RunningTasks == DesiredTasks
-//   - "error": anything else (desired > 0 but not all running)
-//
-// todo: Further work needed to distinguish error causes:
+// Todo: Further work needed to distinguish error causes:
 //   - UpdateStatus.State values: "updating", "paused", "completed",
 //     "rollback_started", "rollback_paused", "rollback_completed"
 //   - UpdateStatus.Message may contain error details
@@ -305,6 +300,13 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 //   - Need to capture actual rollback scenarios to understand what Docker returns
 //   - Consider whether "pending" state is needed for startup vs actual errors
 //   - Tasks endpoint has detailed error info but selecting the right task is tricky
+//   - dont forget about events from docker and state in jed.db which could be helpful
+//   - in any case, rollback is the one we want to nail here? (FailureAction: pause for now)
+//
+// Note: Job mode services (replicated-job, global-job) would need different logic:
+//   - CompletedTasks is only populated for job modes (always 0 for replicated/global)
+//   - Job success: CompletedTasks == DesiredTasks
+//   - Current logic wrongly reports "error" for completed jobs
 func (d *Swarm) Status(ctx context.Context, name string) (string, error) {
 
 	svc, err := d.GetService(ctx, name)

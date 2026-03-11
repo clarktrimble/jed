@@ -153,7 +153,8 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		},
 		"UpdateConfig": map[string]any{
 			"Order":         "stop-first",
-			"FailureAction": "rollback",
+			"FailureAction": "pause",
+			//"FailureAction": "rollback",
 		},
 	}
 
@@ -293,7 +294,6 @@ func parseMem(s string) (int64, error) {
 	}
 	return n * 1024 * 1024, nil
 }
-
 
 // traefikLabels generates traefik routing labels for a service.
 // Stripped PathPrefix routing at /{name} with TLS on websecure entrypoint,
