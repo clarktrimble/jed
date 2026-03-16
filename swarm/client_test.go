@@ -16,8 +16,8 @@ import (
 // nopLogger is a no-op logger for tests.
 type nopLogger struct{}
 
-func (nopLogger) Info(ctx context.Context, msg string, kv ...any)            {}
-func (nopLogger) Debug(ctx context.Context, msg string, kv ...any)           {}
+func (nopLogger) Info(ctx context.Context, msg string, kv ...any)             {}
+func (nopLogger) Debug(ctx context.Context, msg string, kv ...any)            {}
 func (nopLogger) Error(ctx context.Context, msg string, err error, kv ...any) {}
 
 func loadTestData(name string) []byte {
@@ -342,6 +342,158 @@ var _ = Describe("Swarm Client", func() {
 
 		It("should decode the logs", func() {
 			Expect(string(logs)).To(Equal("hello world\n"))
+		})
+	})
+
+	Describe("Status", func() {
+		var (
+			status  swarm.Status
+			message string
+		)
+
+		// Todo: think about test data from swarm
+		// Helper to build service response with given states
+		serviceWith := func(desired, running int, updateState, updateMessage string) []map[string]any {
+			return []map[string]any{{
+				"ServiceStatus": map[string]any{
+					"DesiredTasks": desired,
+					"RunningTasks": running,
+				},
+				"UpdateStatus": map[string]any{
+					"State":   updateState,
+					"Message": updateMessage,
+				},
+			}}
+		}
+
+		Context("running service", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(1, 1, "completed", ""), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return running", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusRunning))
+				Expect(message).To(BeEmpty())
+			})
+		})
+
+		Context("stopped service", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(0, 0, "completed", ""), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return stopped", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusStopped))
+			})
+		})
+
+		Context("stopping service", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(0, 1, "completed", ""), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return pending", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusPending))
+			})
+		})
+
+		Context("deploying service", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(1, 0, "updating", "update in progress"), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return pending with message", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusPending))
+				Expect(message).To(Equal("update in progress"))
+			})
+		})
+
+		Context("fresh service starting", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(1, 0, "", ""), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return pending", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusPending))
+			})
+		})
+
+		Context("deploy failed (paused)", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(1, 0, "paused", "update paused due to failure"), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return error with message", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusError))
+				Expect(message).To(Equal("update paused due to failure"))
+			})
+		})
+
+		Context("task mismatch after completed update", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					mockResponse(serviceWith(2, 1, "completed", "update completed"), rcv)
+					return nil
+				}
+			})
+
+			JustBeforeEach(func() {
+				status, message, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return error with message", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusError))
+				Expect(message).To(Equal("update completed"))
+			})
 		})
 	})
 })

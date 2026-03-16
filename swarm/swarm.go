@@ -94,6 +94,16 @@ type Service struct {
 	Name string
 }
 
+// Status represents the operational state of a service.
+type Status string
+
+const (
+	StatusRunning Status = "running"
+	StatusStopped Status = "stopped"
+	StatusPending Status = "pending"
+	StatusError   Status = "error"
+)
+
 // Task represents a service task.
 type Task struct {
 	ID        string

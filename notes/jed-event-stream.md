@@ -192,3 +192,10 @@ Filter container events client-side by matching `com.docker.swarm.service.name`.
   - No duplication - Service/Time in Event only, not in payloads
 
   Ready for montage to consume with ring buffer and SSE.
+
+## and Status(es) makeover
+  - Status type with constants (StatusRunning, StatusStopped, StatusPending, StatusError)
+  - Status() returns (Status, string, error) - now includes message
+  - Statuses() - batch status for all services in one API call
+  - computeStatus() - shared logic
+  - "pending" state covers: deploying, stopping, fresh service starting

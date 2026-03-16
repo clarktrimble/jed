@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/clarktrimble/jed"
 	"github.com/pkg/errors"
@@ -82,6 +80,25 @@ type serviceListItem struct {
 	Spec struct {
 		Name string `json:"Name"`
 	} `json:"Spec"`
+	ServiceStatus ServiceStatus `json:"ServiceStatus"`
+	UpdateStatus  UpdateStatus  `json:"UpdateStatus"`
+}
+
+// Statuses returns the status of all services.
+func (d *Swarm) Statuses(ctx context.Context) (map[string]Status, error) {
+
+	var svcs []serviceListItem
+	err := d.client.SendObject(ctx, "GET", "/v1.52/services?status=true", nil, &svcs)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list services")
+	}
+
+	result := make(map[string]Status, len(svcs))
+	for _, s := range svcs {
+		result[s.Spec.Name] = computeStatus(s.ServiceStatus, s.UpdateStatus)
+	}
+
+	return result, nil
 }
 
 // DeleteService deletes a service by name.
@@ -294,154 +311,50 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 
 // Status returns the current status of a deployed service.
 //
-// Todo: Further work needed to distinguish error causes:
-//   - UpdateStatus.State values: "updating", "paused", "completed",
-//     "rollback_started", "rollback_paused", "rollback_completed"
-//   - UpdateStatus.Message may contain error details
-//   - Our UpdateConfig uses FailureAction: "rollback", so failed deploys trigger rollback
-//   - Need to capture actual rollback scenarios to understand what Docker returns
-//   - Consider whether "pending" state is needed for startup vs actual errors
-//   - Tasks endpoint has detailed error info but selecting the right task is tricky
-//   - dont forget about events from docker and state in jed.db which could be helpful
-//   - in any case, rollback is the one we want to nail here? (FailureAction: pause for now)
+// Returns status:
+//   - StatusStopped - DesiredTasks == 0 and no tasks running
+//   - StatusPending - transitioning: starting up, deploying, or stopping
+//   - StatusError   - deploy failed (paused) or task count mismatch
+//   - StatusRunning - healthy, all desired tasks running
 //
-// Note: Job mode services (replicated-job, global-job) would need different logic:
-//   - CompletedTasks is only populated for job modes (always 0 for replicated/global)
-//   - Job success: CompletedTasks == DesiredTasks
-//   - Current logic wrongly reports "error" for completed jobs
-func (d *Swarm) Status(ctx context.Context, name string) (string, error) {
+// Returns message from UpdateStatus.Message when relevant (e.g., error details).
+//
+// Note: Job mode services (replicated-job, global-job) would need different logic.
+// Todo: consider rollback, how hard will this be to support from a ux sanity perspective?
+func (d *Swarm) Status(ctx context.Context, name string) (Status, string, error) {
 
 	svc, err := d.GetService(ctx, name)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	ss := svc.ServiceStatus
+	status := computeStatus(svc.ServiceStatus, svc.UpdateStatus)
 
+	// Include message for pending/error states
+	var message string
+	if status == StatusPending || status == StatusError {
+		message = svc.UpdateStatus.Message
+	}
+
+	return status, message, nil
+}
+
+// computeStatus determines the status from ServiceStatus and UpdateStatus.
+func computeStatus(ss ServiceStatus, us UpdateStatus) Status {
 	switch {
-	case ss.DesiredTasks == 0:
-		return "stopped", nil
+	case ss.DesiredTasks == 0 && ss.RunningTasks == 0:
+		return StatusStopped
+	case ss.DesiredTasks == 0 && ss.RunningTasks > 0:
+		return StatusPending // stopping
+	case us.State == "updating":
+		return StatusPending // deploying
+	case us.State == "paused":
+		return StatusError // deploy failed
 	case ss.RunningTasks == ss.DesiredTasks:
-		return "running", nil
+		return StatusRunning
+	case us.State == "" && ss.RunningTasks < ss.DesiredTasks:
+		return StatusPending // fresh service starting
 	default:
-		return "error", nil
+		return StatusError
 	}
-}
-
-// Event wraps typed events from Docker's /events stream.
-type Event struct {
-	Type    string          `json:"type"`    // "service", "container"
-	Service string          `json:"service"` // service name for filtering
-	Time    time.Time       `json:"time"`    // event timestamp
-	Payload json.RawMessage `json:"payload"` // ServiceEvent or ContainerEvent
-}
-
-// ServiceEvent represents a swarm service state change.
-type ServiceEvent struct {
-	Action      string `json:"action"`
-	UpdateState string `json:"update_state,omitempty"`
-}
-
-// ContainerEvent represents a container lifecycle event.
-type ContainerEvent struct {
-	Action   string `json:"action"`
-	TaskID   string `json:"task_id"`
-	TaskName string `json:"task_name"`
-	Image    string `json:"image"`
-	ExitCode string `json:"exit_code,omitempty"`
-	ExecDur  string `json:"exec_dur,omitempty"`
-}
-
-// swarmEvent is the Docker API event structure.
-type swarmEvent struct {
-	Type   string `json:"Type"`
-	Action string `json:"Action"`
-	Actor  struct {
-		ID         string            `json:"ID"`
-		Attributes map[string]string `json:"Attributes"`
-	} `json:"Actor"`
-	Time int64 `json:"time"`
-}
-
-// ToEvent converts a Docker event to our Event type.
-func (se *swarmEvent) ToEvent() (event Event, err error) {
-
-	attrs := se.Actor.Attributes
-	event.Time = time.Unix(se.Time, 0)
-
-	switch se.Type {
-	case "service":
-		event.Type = "service"
-		event.Service = attrs["name"]
-		event.Payload, err = json.Marshal(ServiceEvent{
-			Action:      se.Action,
-			UpdateState: attrs["updatestate.new"],
-		})
-		if err != nil {
-			err = errors.Wrap(err, "marshal service event")
-		}
-
-	case "container":
-		event.Type = "container"
-		event.Service = attrs["com.docker.swarm.service.name"]
-		event.Payload, err = json.Marshal(ContainerEvent{
-			Action:   se.Action,
-			TaskID:   attrs["com.docker.swarm.task.id"],
-			TaskName: attrs["com.docker.swarm.task.name"],
-			Image:    attrs["image"],
-			ExitCode: attrs["exitCode"],
-			ExecDur:  attrs["execDuration"],
-		})
-		if err != nil {
-			err = errors.Wrap(err, "marshal container event")
-		}
-
-	default:
-		err = errors.Errorf("unsupported event type: %s", se.Type)
-	}
-
-	return
-}
-
-// Events streams Docker service and container events.
-func (d *Swarm) Events(ctx context.Context) (<-chan Event, error) {
-
-	lines, err := d.client.StreamLines(ctx, "/v1.52/events")
-	if err != nil {
-		return nil, err
-	}
-
-	events := make(chan Event)
-	go func() {
-		defer close(events)
-
-		for data := range lines {
-
-			var se swarmEvent
-			err := json.Unmarshal(data, &se)
-			if err != nil {
-				err = errors.Wrap(err, "unmarshal swarm event")
-				d.logger.Error(ctx, "failed to unmarshal event", err)
-				continue
-			}
-
-			if se.Type != "service" && se.Type != "container" {
-				continue
-			}
-
-			event, err := se.ToEvent()
-			if err != nil {
-				d.logger.Error(ctx, "failed to convert event", err)
-				continue
-			}
-
-			select {
-			case events <- event:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return events, nil
 }
