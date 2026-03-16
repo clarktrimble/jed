@@ -89,7 +89,7 @@ var _ = Describe("Deploy", func() {
 					}
 				},
 			}
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -173,7 +173,7 @@ var _ = Describe("Deploy", func() {
 					}
 				},
 			}
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -197,7 +197,7 @@ var _ = Describe("Deploy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
 			client = newCreateMock("svc-new-789")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -225,7 +225,7 @@ var _ = Describe("Deploy", func() {
 			svc.Secrets = nil
 			svc.Hosts = []string{"192.168.88.75 vilnius", "10.0.0.1 gateway"}
 			client = newCreateMock("svc-hosts-123")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -257,7 +257,7 @@ var _ = Describe("Deploy", func() {
 			svc.Secrets = nil
 			svc.PublishMode = "host"
 			client = newCreateMock("svc-host-mode")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -286,7 +286,7 @@ var _ = Describe("Deploy", func() {
 			svc.Secrets = nil
 			svc.User = "1000:967"
 			client = newCreateMock("svc-custom-user")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -313,7 +313,7 @@ var _ = Describe("Deploy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
 			client = newCreateMock("svc-default-user")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -337,7 +337,7 @@ var _ = Describe("Deploy", func() {
 			svc.Secrets = nil
 			svc.Traefik = &jed.Traefik{Port: "8080"}
 			client = newCreateMock("svc-traefik")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -375,7 +375,7 @@ var _ = Describe("Deploy", func() {
 				"traefik.enable": "false", // explicit override
 			}
 			client = newCreateMock("svc-traefik-explicit")
-			deployer = swarm.New(client)
+			deployer = swarm.New(client, nopLogger{})
 		})
 
 		JustBeforeEach(func() {
@@ -482,7 +482,7 @@ var _ = Describe("GetService", func() {
 				return nil
 			},
 		}
-		deployer = swarm.New(client)
+		deployer = swarm.New(client, nopLogger{})
 	})
 
 	JustBeforeEach(func() {

@@ -42,16 +42,25 @@ import (
 type Client interface {
 	SendObject(ctx context.Context, method, path string, snd, rcv any) error
 	SendJson(ctx context.Context, method, path string, body io.Reader) ([]byte, error)
+	StreamLines(ctx context.Context, path string) (<-chan []byte, error)
+}
+
+// Logger specifies a contextual, structured logger.
+type Logger interface {
+	Info(ctx context.Context, msg string, kv ...any)
+	Debug(ctx context.Context, msg string, kv ...any)
+	Error(ctx context.Context, msg string, err error, kv ...any)
 }
 
 // Swarm interacts with Docker Swarm.
 type Swarm struct {
 	client Client
+	logger Logger
 }
 
 // New creates a Swarm.
-func New(client Client) *Swarm {
-	return &Swarm{client: client}
+func New(client Client, logger Logger) *Swarm {
+	return &Swarm{client: client, logger: logger}
 }
 
 // SecretLatest returns the ID and versioned name of the latest secret by base name.

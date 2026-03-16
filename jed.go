@@ -23,6 +23,8 @@
 //
 // Todo: demote container functionality (Deploy, etc) to container pkg for symmetry with swarm
 // Todo: container methods accept Service and Env as needed rather than internal lookups
+// Todo: straighten out logger stuffs, sigh
+// Todo: work over unit, not too shapely in there
 package jed
 
 import (

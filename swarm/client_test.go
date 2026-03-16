@@ -13,6 +13,13 @@ import (
 	"github.com/clarktrimble/jed/swarm"
 )
 
+// nopLogger is a no-op logger for tests.
+type nopLogger struct{}
+
+func (nopLogger) Info(ctx context.Context, msg string, kv ...any)            {}
+func (nopLogger) Debug(ctx context.Context, msg string, kv ...any)           {}
+func (nopLogger) Error(ctx context.Context, msg string, err error, kv ...any) {}
+
 func loadTestData(name string) []byte {
 	data, err := os.ReadFile("../test/data/swarm/" + name)
 	Expect(err).NotTo(HaveOccurred())
@@ -30,7 +37,7 @@ var _ = Describe("Swarm Client", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		client = &ClientMock{}
-		sw = swarm.New(client)
+		sw = swarm.New(client, nopLogger{})
 	})
 
 	Describe("ListServices", func() {

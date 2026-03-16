@@ -1,0 +1,24 @@
+
+This is how a failed deploy looks upstream from swarm.Events
+Container exits with error each time it is started and swarm gives up after 3 tries cos "pause"
+
+➜  jed git:(swarm) ✗ bin/transship_linux-amd64 events
+13:20:07 tag service: {"action":"update"}
+13:20:07 tag service: {"action":"update","update_state":"updating"}
+13:20:08 tag container: {"action":"create","task_id":"k0ki0vhq1mvl99scw2wt4arib","task_name":"tag.1.k0ki0vhq1mvl99scw2wt4arib","image":"local/tag:c197117"}
+13:20:08 tag container: {"action":"start","task_id":"k0ki0vhq1mvl99scw2wt4arib","task_name":"tag.1.k0ki0vhq1mvl99scw2wt4arib","image":"local/tag:c197117"}
+13:20:10 tag container: {"action":"destroy","task_id":"jy4de6ysd0v3edrknjqmfmah2","task_name":"tag.1.jy4de6ysd0v3edrknjqmfmah2","image":"local/tag:c197117"}
+13:20:13 tag service: {"action":"update","update_state":"completed"}
+13:20:39 tag container: {"action":"die","task_id":"k0ki0vhq1mvl99scw2wt4arib","task_name":"tag.1.k0ki0vhq1mvl99scw2wt4arib","image":"local/tag:c197117","exit_code":"1","exec_dur":"30"}
+13:20:39 tag container: {"action":"create","task_id":"0lnukwsw3z29v7i50rb44hb93","task_name":"tag.1.0lnukwsw3z29v7i50rb44hb93","image":"local/tag:c197117"}
+13:20:41 tag container: {"action":"destroy","task_id":"b192ksng88l5plojor2fk3ymz","task_name":"tag.1.b192ksng88l5plojor2fk3ymz","image":"local/tag:c197117"}
+13:20:44 tag container: {"action":"start","task_id":"0lnukwsw3z29v7i50rb44hb93","task_name":"tag.1.0lnukwsw3z29v7i50rb44hb93","image":"local/tag:c197117"}
+13:21:14 tag container: {"action":"die","task_id":"0lnukwsw3z29v7i50rb44hb93","task_name":"tag.1.0lnukwsw3z29v7i50rb44hb93","image":"local/tag:c197117","exit_code":"1","exec_dur":"30"}
+13:21:15 tag container: {"action":"create","task_id":"36r7ivlzm2vl77oz8k2zp0kkx","task_name":"tag.1.36r7ivlzm2vl77oz8k2zp0kkx","image":"local/tag:c197117"}
+13:21:16 tag container: {"action":"destroy","task_id":"w9tl7h87hwh5vz7c01i6pbznm","task_name":"tag.1.w9tl7h87hwh5vz7c01i6pbznm","image":"local/tag:c197117"}
+13:21:19 tag container: {"action":"start","task_id":"36r7ivlzm2vl77oz8k2zp0kkx","task_name":"tag.1.36r7ivlzm2vl77oz8k2zp0kkx","image":"local/tag:c197117"}
+13:21:49 tag container: {"action":"die","task_id":"36r7ivlzm2vl77oz8k2zp0kkx","task_name":"tag.1.36r7ivlzm2vl77oz8k2zp0kkx","image":"local/tag:c197117","exit_code":"1","exec_dur":"30"}
+13:21:50 tag container: {"action":"create","task_id":"oxcv2fmd8jduwpjs4o0t08s6e","task_name":"tag.1.oxcv2fmd8jduwpjs4o0t08s6e","image":"local/tag:c197117"}
+13:21:52 tag container: {"action":"destroy","task_id":"eqqm6ueun84w4j6za0becw5jn","task_name":"tag.1.eqqm6ueun84w4j6za0becw5jn","image":"local/tag:c197117"}
+13:21:55 tag container: {"action":"start","task_id":"oxcv2fmd8jduwpjs4o0t08s6e","task_name":"tag.1.oxcv2fmd8jduwpjs4o0t08s6e","image":"local/tag:c197117"}
+13:22:25 tag container: {"action":"die","task_id":"oxcv2fmd8jduwpjs4o0t08s6e","task_name":"tag.1.oxcv2fmd8jduwpjs4o0t08s6e","image":"local/tag:c197117","exit_code":"1","exec_dur":"30"}

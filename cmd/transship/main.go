@@ -82,6 +82,8 @@ type CreateNetworkCmd struct {
 	Encrypted  bool   `arg:"-e,--encrypted" help:"encrypt overlay traffic"`
 }
 
+type EventsCmd struct{}
+
 type args struct {
 	Deploy        *DeployCmd        `arg:"subcommand:deploy" help:"deploy/update a swarm service"`
 	LsServices    *LsServicesCmd    `arg:"subcommand:ls-services" help:"list swarm services"`
@@ -89,6 +91,7 @@ type args struct {
 	Inspect       *InspectCmd       `arg:"subcommand:inspect" help:"show service spec"`
 	Tasks         *TasksCmd         `arg:"subcommand:tasks" help:"show service tasks"`
 	Logs          *LogsCmd          `arg:"subcommand:logs" help:"show service logs"`
+	Events        *EventsCmd        `arg:"subcommand:events" help:"stream docker events"`
 	LsSecrets     *LsSecretsCmd     `arg:"subcommand:ls-secrets" help:"list secrets"`
 	CreateSecret  *CreateSecretCmd  `arg:"subcommand:create-secret" help:"create a secret"`
 	LsConfigs     *LsConfigsCmd     `arg:"subcommand:ls-configs" help:"list configs"`
@@ -127,6 +130,8 @@ func main() {
 		tasks(ctx, deployer, args.Tasks.Service)
 	case args.Logs != nil:
 		logs(ctx, deployer, args.Logs.Task, args.Logs.Tail)
+	case args.Events != nil:
+		events(ctx, deployer)
 	case args.LsSecrets != nil:
 		lsSecrets(ctx, deployer)
 	case args.CreateSecret != nil:
@@ -150,7 +155,7 @@ func newDeployer(socket string) *swarm.Swarm {
 	}
 	client := clientCfg.NewWithTrippers(lgr)
 
-	return swarm.New(client)
+	return swarm.New(client, lgr)
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
@@ -226,6 +231,15 @@ func logs(ctx context.Context, deployer *swarm.Swarm, task, tail string) {
 	fatal(err)
 
 	fmt.Print(string(data))
+}
+
+func events(ctx context.Context, deployer *swarm.Swarm) {
+	evts, err := deployer.Events(ctx)
+	fatal(err)
+
+	for event := range evts {
+		fmt.Printf("%s %s %s: %s\n", event.Time.Format("15:04:05"), event.Service, event.Type, string(event.Payload))
+	}
 }
 
 func lsSecrets(ctx context.Context, deployer *swarm.Swarm) {
