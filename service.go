@@ -82,9 +82,10 @@ type Service struct {
 	Traefik *Traefik `json:"traefik,omitempty"`
 	// Replicas is the number of service instances to run.
 	Replicas int `json:"replicas,omitempty"`
-	// StartAttempts is how many times swarm will try to start a task (default 1).
-	// Use 0 for unlimited attempts.
-	StartAttempts *int `json:"start_attempts,omitempty"`
+	// RestartService enables swarm restart on failure (default false: no restart).
+	RestartService bool `json:"restart_service,omitempty"`
+	// RestartAttempts is max restart attempts before giving up (default 1, 0 for unlimited).
+	RestartAttempts *int `json:"restart_attempts,omitempty"`
 }
 
 // Services is a slice of services.
