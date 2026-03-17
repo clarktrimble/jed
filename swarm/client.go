@@ -313,30 +313,20 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 //
 // Returns status:
 //   - StatusStopped - DesiredTasks == 0 and no tasks running
-//   - StatusPending - transitioning: starting up, deploying, or stopping
+//   - StatusPending - transitioning: deploying or stopping
 //   - StatusError   - deploy failed (paused) or task count mismatch
 //   - StatusRunning - healthy, all desired tasks running
 //
-// Returns message from UpdateStatus.Message when relevant (e.g., error details).
-//
 // Note: Job mode services (replicated-job, global-job) would need different logic.
 // Todo: consider rollback, how hard will this be to support from a ux sanity perspective?
-func (d *Swarm) Status(ctx context.Context, name string) (Status, string, error) {
+func (d *Swarm) Status(ctx context.Context, name string) (Status, error) {
 
 	svc, err := d.GetService(ctx, name)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	status := computeStatus(svc.ServiceStatus, svc.UpdateStatus)
-
-	// Include message for pending/error states
-	var message string
-	if status == StatusPending || status == StatusError {
-		message = svc.UpdateStatus.Message
-	}
-
-	return status, message, nil
+	return computeStatus(svc.ServiceStatus, svc.UpdateStatus), nil
 }
 
 // computeStatus determines the status from ServiceStatus and UpdateStatus.
@@ -352,8 +342,6 @@ func computeStatus(ss ServiceStatus, us UpdateStatus) Status {
 		return StatusError // deploy failed
 	case ss.RunningTasks == ss.DesiredTasks:
 		return StatusRunning
-	case us.State == "" && ss.RunningTasks < ss.DesiredTasks:
-		return StatusPending // fresh service starting
 	default:
 		return StatusError
 	}

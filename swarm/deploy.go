@@ -140,7 +140,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 			"RestartPolicy": map[string]any{
 				"Condition":   "on-failure",
 				"Delay":       5000000000,
-				"MaxAttempts": 3,
+				"MaxAttempts": startAttempts(service.StartAttempts),
 			},
 			"Networks": []map[string]string{
 				{"Target": service.Network},
@@ -293,6 +293,13 @@ func parseMem(s string) (int64, error) {
 		return 0, errors.Errorf("invalid memory value %q", s)
 	}
 	return n * 1024 * 1024, nil
+}
+
+func startAttempts(n *int) int {
+	if n == nil {
+		return 1
+	}
+	return *n
 }
 
 // traefikLabels generates traefik routing labels for a service.

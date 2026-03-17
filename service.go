@@ -72,7 +72,7 @@ type Service struct {
 	// Hosts adds /etc/hosts entries (e.g., "10.35.44.41 container4").
 	Hosts []string `json:"hosts,omitempty"`
 	// Resources specifies CPU and memory limits/reservations.
-	Resources Resources `json:"resources,omitempty"`
+	Resources Resources `json:"resources"`
 	// PublishMode controls swarm port publishing: "host" for direct node binding,
 	// empty or "ingress" for load-balanced routing mesh (default).
 	PublishMode string `json:"publish_mode,omitempty"`
@@ -82,6 +82,9 @@ type Service struct {
 	Traefik *Traefik `json:"traefik,omitempty"`
 	// Replicas is the number of service instances to run.
 	Replicas int `json:"replicas,omitempty"`
+	// StartAttempts is how many times swarm will try to start a task (default 1).
+	// Use 0 for unlimited attempts.
+	StartAttempts *int `json:"start_attempts,omitempty"`
 }
 
 // Services is a slice of services.

@@ -347,8 +347,7 @@ var _ = Describe("Swarm Client", func() {
 
 	Describe("Status", func() {
 		var (
-			status  swarm.Status
-			message string
+			status swarm.Status
 		)
 
 		// Todo: think about test data from swarm
@@ -375,13 +374,12 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
 			It("should return running", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status).To(Equal(swarm.StatusRunning))
-				Expect(message).To(BeEmpty())
 			})
 		})
 
@@ -394,7 +392,7 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
 			It("should return stopped", func() {
@@ -412,7 +410,7 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
 			It("should return pending", func() {
@@ -430,17 +428,16 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
-			It("should return pending with message", func() {
+			It("should return pending", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status).To(Equal(swarm.StatusPending))
-				Expect(message).To(Equal("update in progress"))
 			})
 		})
 
-		Context("fresh service starting", func() {
+		Context("running < desired with no update state", func() {
 			BeforeEach(func() {
 				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 					mockResponse(serviceWith(1, 0, "", ""), rcv)
@@ -449,12 +446,12 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
-			It("should return pending", func() {
+			It("should return error", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(status).To(Equal(swarm.StatusPending))
+				Expect(status).To(Equal(swarm.StatusError))
 			})
 		})
 
@@ -467,13 +464,12 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
-			It("should return error with message", func() {
+			It("should return error", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status).To(Equal(swarm.StatusError))
-				Expect(message).To(Equal("update paused due to failure"))
 			})
 		})
 
@@ -486,13 +482,12 @@ var _ = Describe("Swarm Client", func() {
 			})
 
 			JustBeforeEach(func() {
-				status, message, err = sw.Status(ctx, "myservice")
+				status, err = sw.Status(ctx, "myservice")
 			})
 
-			It("should return error with message", func() {
+			It("should return error", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status).To(Equal(swarm.StatusError))
-				Expect(message).To(Equal("update completed"))
 			})
 		})
 	})
