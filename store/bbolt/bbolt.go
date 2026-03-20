@@ -17,6 +17,8 @@ var (
 	envsBucket     = []byte("envs")
 )
 
+// Todo: can store just handle name, bytes; unmarshalling into passed pointer?
+
 // Store implements jed.Store interface on BoltDB.
 type Store struct {
 	db *bbolt.DB

@@ -162,6 +162,9 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	svc, err := store.GetService(ctx, name)
 	fatal(errors.Wrapf(err, "failed to get service %q from store", name))
 
+	err = svc.Validate()
+	fatal(errors.Wrapf(err, "failed to validate service %q", name))
+
 	env, err := store.GetEnv(ctx, name)
 	fatal(errors.Wrapf(err, "failed to get env %q from store", name))
 

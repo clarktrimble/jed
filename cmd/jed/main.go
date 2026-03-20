@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -91,10 +90,10 @@ func getSvc(ctx context.Context, store *bbolt.Store, name string) {
 	svc, err := store.GetService(ctx, name)
 	fatal(err)
 
-	data, err := json.MarshalIndent(svc, "", "  ")
+	data, err := yaml.Marshal(svc)
 	fatal(err)
 
-	fmt.Println(string(data))
+	fmt.Printf("---\n%s", data)
 }
 
 func setSvc(ctx context.Context, store *bbolt.Store, file string) {
@@ -105,9 +104,8 @@ func setSvc(ctx context.Context, store *bbolt.Store, file string) {
 	err = yaml.Unmarshal(data, &svc)
 	fatal(errors.Wrapf(err, "failed to parse %s", file))
 
-	if svc.Name == "" {
-		fatal(errors.Errorf("service name is required in %s", file))
-	}
+	err = svc.Validate()
+	fatal(errors.Wrapf(err, "failed to validate service from %s", file))
 
 	err = store.SetService(ctx, svc)
 	fatal(err)
