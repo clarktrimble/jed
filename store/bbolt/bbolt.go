@@ -90,6 +90,7 @@ func (str *Store) SetService(ctx context.Context, service jed.Service) (err erro
 	return
 }
 
+// Todo: check key existence before delete, bbolt is silent on missing keys
 func (str *Store) DelService(ctx context.Context, name string) (err error) {
 
 	err = str.db.Update(func(tx *bbolt.Tx) error {
@@ -152,6 +153,7 @@ func (str *Store) SetEnv(ctx context.Context, env jed.Env) (err error) {
 	return
 }
 
+// Todo: check key existence before delete, bbolt is silent on missing keys
 func (str *Store) DelEnv(ctx context.Context, name string) (err error) {
 
 	err = str.db.Update(func(tx *bbolt.Tx) error {

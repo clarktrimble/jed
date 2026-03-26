@@ -25,6 +25,10 @@ type SetSvcCmd struct {
 	File string `arg:"positional,required" help:"YAML file with service definition"`
 }
 
+type DelSvcCmd struct {
+	Name string `arg:"positional,required" help:"service name"`
+}
+
 type LsEnvCmd struct{}
 
 type GetEnvCmd struct {
@@ -36,13 +40,19 @@ type SetEnvCmd struct {
 	File string `arg:"positional,required" help:".env file"`
 }
 
+type DelEnvCmd struct {
+	Name string `arg:"positional,required" help:"service name"`
+}
+
 type args struct {
 	LsSvc  *LsSvcCmd  `arg:"subcommand:ls-svc" help:"list services"`
 	GetSvc *GetSvcCmd `arg:"subcommand:get-svc" help:"get a service"`
 	SetSvc *SetSvcCmd `arg:"subcommand:set-svc" help:"set a service from YAML"`
+	DelSvc *DelSvcCmd `arg:"subcommand:del-svc" help:"delete a service"`
 	LsEnv  *LsEnvCmd  `arg:"subcommand:ls-env" help:"list envs"`
 	GetEnv *GetEnvCmd `arg:"subcommand:get-env" help:"get env for a service"`
 	SetEnv *SetEnvCmd `arg:"subcommand:set-env" help:"set env from .env file"`
+	DelEnv *DelEnvCmd `arg:"subcommand:del-env" help:"delete env for a service"`
 
 	DB string `arg:"-d,--db" default:"jed.db" help:"path to bbolt database"`
 }
@@ -68,12 +78,16 @@ func main() {
 		getSvc(ctx, store, args.GetSvc.Name)
 	case args.SetSvc != nil:
 		setSvc(ctx, store, args.SetSvc.File)
+	case args.DelSvc != nil:
+		delSvc(ctx, store, args.DelSvc.Name)
 	case args.LsEnv != nil:
 		lsEnv(ctx, store)
 	case args.GetEnv != nil:
 		getEnv(ctx, store, args.GetEnv.Name)
 	case args.SetEnv != nil:
 		setEnv(ctx, store, args.SetEnv.Name, args.SetEnv.File)
+	case args.DelEnv != nil:
+		delEnv(ctx, store, args.DelEnv.Name)
 	}
 }
 
@@ -113,6 +127,16 @@ func setSvc(ctx context.Context, store *bbolt.Store, file string) {
 	fmt.Printf("set service %s\n", svc.Name)
 }
 
+func delSvc(ctx context.Context, store *bbolt.Store, name string) {
+	_, err := store.GetService(ctx, name)
+	fatal(err)
+
+	err = store.DelService(ctx, name)
+	fatal(err)
+
+	fmt.Printf("deleted service %s\n", name)
+}
+
 func lsEnv(ctx context.Context, store *bbolt.Store) {
 	envs, err := store.Envs(ctx)
 	fatal(err)
@@ -142,6 +166,13 @@ func setEnv(ctx context.Context, store *bbolt.Store, name, file string) {
 	fatal(err)
 
 	fmt.Printf("set env %s (%d vars)\n", name, len(vars))
+}
+
+func delEnv(ctx context.Context, store *bbolt.Store, name string) {
+	err := store.DelEnv(ctx, name)
+	fatal(err)
+
+	fmt.Printf("deleted env %s\n", name)
 }
 
 func fatal(err error) {
