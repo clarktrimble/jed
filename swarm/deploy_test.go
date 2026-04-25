@@ -388,10 +388,10 @@ var _ = Describe("Deploy", func() {
 		})
 	})
 
-	Describe("with traefik config", func() {
+	Describe("with traefik config and strip", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
-			svc.Traefik = &jed.Traefik{Port: "8080"}
+			svc.Traefik = &jed.Traefik{Port: "8080", PathPrefixStrip: true}
 			client = newCreateMock("svc-traefik")
 			deployer = swarm.New(client, nopLogger{})
 		})
@@ -419,6 +419,33 @@ var _ = Describe("Deploy", func() {
 			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal("reauth-acp-strip"))
 			Expect(labels["traefik.http.middlewares.reauth-acp-strip.stripprefix.prefixes"]).To(Equal("/reauth-acp"))
 			Expect(labels["traefik.http.services.reauth-acp.loadbalancer.server.port"]).To(Equal("8080"))
+		})
+	})
+
+	Describe("with traefik config no strip", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Traefik = &jed.Traefik{Port: "8080"}
+			client = newCreateMock("svc-traefik-nostrip")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should not include strip middleware", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			labels := spec["Labels"].(map[string]string)
+
+			Expect(labels["traefik.enable"]).To(Equal("true"))
+			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
+			Expect(labels).NotTo(HaveKey("traefik.http.routers.reauth-acp.middlewares"))
+			Expect(labels).NotTo(HaveKey("traefik.http.middlewares.reauth-acp-strip.stripprefix.prefixes"))
 		})
 	})
 

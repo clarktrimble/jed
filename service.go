@@ -22,7 +22,8 @@ const (
 
 // Traefik specifies traefik routing configuration.
 type Traefik struct {
-	Port string `json:"port"`
+	Port            string `json:"port"`
+	PathPrefixStrip bool   `json:"path_prefix_strip,omitempty"`
 }
 
 // Resources specifies CPU and memory limits and reservations.
