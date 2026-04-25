@@ -220,6 +220,62 @@ var _ = Describe("Deploy", func() {
 		})
 	})
 
+	Describe("with configs", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Configs = map[string]string{
+				"reauth_config": "/etc/reauth/config.yaml",
+			}
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services?"):
+						mockResponse([]map[string]any{}, rcv)
+						return nil
+					case method == "GET" && strings.Contains(path, "/configs"):
+						mockResponse([]secretItem{
+							{ID: "cfg-abc-123", Spec: specName{Name: "reauth_config_v3"}},
+							{ID: "cfg-abc-100", Spec: specName{Name: "reauth_config_v1"}},
+						}, rcv)
+						return nil
+					case method == "POST" && strings.Contains(path, "/services/create"):
+						mockResponse(map[string]string{"ID": "svc-cfg-456"}, rcv)
+						return nil
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should deploy without error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should include resolved configs in spec", func() {
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			Expect(createCall).NotTo(BeNil())
+
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+
+			configs := containerSpec["Configs"].([]map[string]any)
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0]["ConfigID"]).To(Equal("cfg-abc-123"))
+			Expect(configs[0]["ConfigName"]).To(Equal("reauth_config_v3"))
+
+			file := configs[0]["File"].(map[string]any)
+			Expect(file["Name"]).To(Equal("/etc/reauth/config.yaml"))
+		})
+	})
+
 	Describe("with hosts", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
@@ -328,7 +384,7 @@ var _ = Describe("Deploy", func() {
 			spec := createCall.Snd.(map[string]any)
 			taskTemplate := spec["TaskTemplate"].(map[string]any)
 			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
-			Expect(containerSpec["User"]).To(Equal("1001"))
+			Expect(containerSpec["User"]).To(Equal("1001:1001"))
 		})
 	})
 

@@ -1,0 +1,74 @@
+[
+  {
+    "ID": "53o7ekx6p3c5q22lzqgf3wv09",
+    "Version": {
+      "Index": 72
+    },
+    "CreatedAt": "2026-01-07T00:00:27.298893466Z",
+    "UpdatedAt": "2026-01-07T00:00:27.298893466Z",
+    "Spec": {
+      "Name": "s3_secret_key_v1",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "6s47r28rnd7j842mm8ko9bu9k",
+    "Version": {
+      "Index": 19
+    },
+    "CreatedAt": "2026-01-06T23:21:43.268645106Z",
+    "UpdatedAt": "2026-01-06T23:21:43.268645106Z",
+    "Spec": {
+      "Name": "s3_secret_key",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "m1bfsw4ct23w984m3hkwq3591",
+    "Version": {
+      "Index": 69
+    },
+    "CreatedAt": "2026-01-06T23:57:35.250817691Z",
+    "UpdatedAt": "2026-01-06T23:57:35.250817691Z",
+    "Spec": {
+      "Name": "bfc_api_key_v1",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "m3bdif01oyt3tybroyia0jzgr",
+    "Version": {
+      "Index": 20
+    },
+    "CreatedAt": "2026-01-06T23:22:32.091965827Z",
+    "UpdatedAt": "2026-01-06T23:22:32.091965827Z",
+    "Spec": {
+      "Name": "bfc_api_key",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "tdb7jg738n8qcva7t4cx2q6n5",
+    "Version": {
+      "Index": 71
+    },
+    "CreatedAt": "2026-01-07T00:00:07.610797127Z",
+    "UpdatedAt": "2026-01-07T00:00:07.610797127Z",
+    "Spec": {
+      "Name": "bfc_api_key_v3",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "wj0c2ebsj1obtu79zxnnnmxaw",
+    "Version": {
+      "Index": 70
+    },
+    "CreatedAt": "2026-01-06T23:57:48.754980711Z",
+    "UpdatedAt": "2026-01-06T23:57:48.754980711Z",
+    "Spec": {
+      "Name": "bfc_api_key_v2",
+      "Labels": {}
+    }
+  }
+]

@@ -70,7 +70,7 @@ var _ = Describe("Swarm Client", func() {
 		var secrets []swarm.Secret
 
 		BeforeEach(func() {
-			testData := loadTestData("get-secrets.json")
+			testData := loadTestData("get-scrts.json")
 			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 				return json.Unmarshal(testData, rcv)
 			}
@@ -149,7 +149,7 @@ var _ = Describe("Swarm Client", func() {
 		)
 
 		BeforeEach(func() {
-			testData := loadTestData("get-secrets.json")
+			testData := loadTestData("get-scrts.json")
 			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 				if method == "GET" && strings.Contains(path, "/secrets") {
 					return json.Unmarshal(testData, rcv)

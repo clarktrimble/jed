@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,6 +106,8 @@ type Service struct {
 	Restart string `json:"restart"`
 	// Secrets lists swarm secret base names to mount (e.g., "s3_secret_key").
 	Secrets []string `json:"secrets,omitempty"`
+	// Configs maps swarm config base names to target paths (e.g., "myapp_config": "/etc/myapp/app.conf").
+	Configs map[string]string `json:"configs,omitempty"`
 	// Hosts adds /etc/hosts entries (e.g., "10.35.44.41 container4").
 	Hosts []string `json:"hosts,omitempty"`
 	// Resources specifies CPU and memory limits/reservations.
@@ -207,6 +210,9 @@ func (service Service) Validate() error {
 	if service.Network == "" {
 		issues = append(issues, "network is required")
 	}
+	if service.User != "" && !validUser(service.User) {
+		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values", service.User))
+	}
 	// Todo: sort out Restart (container) vs RestartService (swarm) validation
 	if service.Replicas < 0 {
 		issues = append(issues, "replicas cannot be negative")
@@ -286,6 +292,16 @@ func buildVolumeConfig(volumes map[string]string) []string {
 		binds = append(binds, fmt.Sprintf("%s:%s", hostPath, containerPath))
 	}
 	return binds
+}
+
+func validUser(user string) bool {
+	parts := strings.SplitN(user, ":", 2)
+	for _, p := range parts {
+		if _, err := strconv.Atoi(p); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func envLines(env map[string]string) (lines []string) {

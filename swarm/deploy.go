@@ -29,8 +29,14 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (i
 		return
 	}
 
+	// Resolve configs to latest versions
+	resolvedCfgs, err := d.resolveConfigs(ctx, service.Configs)
+	if err != nil {
+		return
+	}
+
 	// Build spec
-	spec, err := buildSpec(service, env, resolved)
+	spec, err := buildSpec(service, env, resolved, resolvedCfgs)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to build spec for %q", service.Name)
 		return
@@ -78,7 +84,30 @@ func (d *Swarm) resolveSecrets(ctx context.Context, secrets []string) ([]resolve
 	return resolved, nil
 }
 
-func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[string]any, error) {
+type resolvedConfig struct {
+	id     string
+	name   string // versioned name (e.g., "myapp_config_v2")
+	target string // mount path (e.g., "/etc/myapp/app.conf")
+}
+
+func (d *Swarm) resolveConfigs(ctx context.Context, configs map[string]string) ([]resolvedConfig, error) {
+
+	resolved := make([]resolvedConfig, 0, len(configs))
+	for baseName, target := range configs {
+		id, versionedName, err := d.ConfigLatest(ctx, baseName)
+		if err != nil {
+			return nil, err
+		}
+		resolved = append(resolved, resolvedConfig{
+			id:     id,
+			name:   versionedName,
+			target: target,
+		})
+	}
+	return resolved, nil
+}
+
+func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, configs []resolvedConfig) (map[string]any, error) {
 
 	ports, err := swarmPorts(service.Ports, service.PublishMode)
 	if err != nil {
@@ -90,16 +119,21 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 		return nil, err
 	}
 
-	user := service.User
-	if user == "" {
-		user = "1001"
+	uid := service.User
+	if uid == "" {
+		uid = "1001"
+	}
+	gid := uid
+	if i := strings.IndexByte(uid, ':'); i >= 0 {
+		gid = uid[i+1:]
+		uid = uid[:i]
 	}
 
 	containerSpec := map[string]any{
 		"Image":    service.Image,
 		"Env":      envLines(env.Vars),
 		"ReadOnly": true,
-		"User":     user,
+		"User":     uid + ":" + gid,
 	}
 
 	if len(service.Command) > 0 {
@@ -107,7 +141,11 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 	}
 
 	if len(secrets) > 0 {
-		containerSpec["Secrets"] = secretRefs(secrets)
+		containerSpec["Secrets"] = secretRefs(secrets, uid, gid)
+	}
+
+	if len(configs) > 0 {
+		containerSpec["Configs"] = configRefs(configs, uid, gid)
 	}
 
 	if len(service.Volumes) > 0 {
@@ -163,7 +201,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret) (map[
 	return spec, nil
 }
 
-func secretRefs(secrets []resolvedSecret) []map[string]any {
+func secretRefs(secrets []resolvedSecret, uid, gid string) []map[string]any {
 
 	refs := make([]map[string]any, 0, len(secrets))
 	for _, s := range secrets {
@@ -172,14 +210,33 @@ func secretRefs(secrets []resolvedSecret) []map[string]any {
 			"SecretName": s.name,
 			"File": map[string]any{
 				"Name": s.file,
-				"UID":  "1001",
-				"GID":  "1001",
-				"Mode": 292,
+				"UID":  uid,
+				"GID":  gid,
+				"Mode": 0o400,
 			},
 		})
 	}
 	return refs
 }
+
+func configRefs(configs []resolvedConfig, uid, gid string) []map[string]any {
+
+	refs := make([]map[string]any, 0, len(configs))
+	for _, c := range configs {
+		refs = append(refs, map[string]any{
+			"ConfigID":   c.id,
+			"ConfigName": c.name,
+			"File": map[string]any{
+				"Name": c.target,
+				"UID":  uid,
+				"GID":  gid,
+				"Mode": 0o400,
+			},
+		})
+	}
+	return refs
+}
+
 
 func swarmPorts(ports map[string]string, publishMode string) ([]map[string]any, error) {
 

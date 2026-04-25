@@ -48,6 +48,7 @@ Deploy to Docker Swarm using definitions from the jed store.
 transship deploy reauth-acp         # deploy/update a swarm service
 transship ls-secrets                # list swarm secrets
 transship create-secret db_password # create a versioned secret
+transship create-config app_cfg cfg.yaml # create a versioned config
 transship ls-services               # list running swarm services
 ```
 

@@ -20,6 +20,9 @@ volumes:
 secrets:
   - aruba_client_secret
 
+configs:
+  myapp_config: /etc/myapp/config.yaml
+
 hosts:
   - "10.35.44.41 container4"
 
@@ -42,6 +45,7 @@ Todo: looks like we have "string" in the above where float/int would be better?
 | ports | no | Container port to host port mapping |
 | volumes | no | Named volume or host path to container path |
 | secrets | no | List of swarm secret base names (latest version resolved automatically) |
+| configs | no | Map of swarm config base names to target mount paths |
 | hosts | no | Extra /etc/hosts entries |
 | command | no | Override container command |
 | labels | no | Container labels |
@@ -92,6 +96,15 @@ List secret base names. The latest version (e.g., `aruba_client_secret_v3`) is r
 secrets:
   - aruba_client_secret
   - db_password
+```
+
+## Configs
+
+Map config base names to target mount paths. The latest version (e.g., `myapp_config_v2`) is resolved at deploy time and mounted at the specified path.
+
+```yaml
+configs:
+  myapp_config: /etc/myapp/config.yaml
 ```
 
 ## Traefik

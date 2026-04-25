@@ -40,7 +40,7 @@ sw.CreateSecret(ctx, "db_password", []byte("hunter3"))  // creates db_password_v
 sw.CreateConfig(ctx, "app_config", []byte("key=value")) // creates app_config_v1
 ```
 
-In `jed.Service`, list base names in `Secrets`. Deploy resolves to the latest version automatically.
+In `jed.Service`, list base names in `Secrets` and map base names to mount paths in `Configs`. Deploy resolves both to the latest version automatically.
 
 ## Defaults and Hardcoded
 

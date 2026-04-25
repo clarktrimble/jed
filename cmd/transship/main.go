@@ -172,6 +172,9 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	if len(svc.Secrets) > 0 {
 		fmt.Printf("  secrets: %v\n", svc.Secrets)
 	}
+	if len(svc.Configs) > 0 {
+		fmt.Printf("  configs: %v\n", svc.Configs)
+	}
 	fmt.Printf("  env: %d vars\n", len(env.Vars))
 
 	id, err := deployer.Deploy(ctx, svc, env)
