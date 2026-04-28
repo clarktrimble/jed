@@ -12,7 +12,11 @@ import (
 )
 
 // Deploy creates or updates a swarm service from a jed.Service and jed.Env.
-func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (id string, err error) {
+// TemplateVars are merged with env vars for {{VAR}} expansion in command args
+// and labels, but are not passed to the container. Service env wins on collision.
+func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env, templateVars map[string]string) (id string, err error) {
+
+	// Todo: templateVars is a stretch here, look for a better pattern
 
 	// Todo: validate service rather than crashing around
 	// Todo: honor restart from service yaml, we're ignoring it
@@ -36,7 +40,7 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env) (i
 	}
 
 	// Build spec
-	spec, err := buildSpec(service, env, resolved, resolvedCfgs)
+	spec, err := buildSpec(service, env, templateVars, resolved, resolvedCfgs)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to build spec for %q", service.Name)
 		return
@@ -107,7 +111,12 @@ func (d *Swarm) resolveConfigs(ctx context.Context, configs map[string]string) (
 	return resolved, nil
 }
 
-func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, configs []resolvedConfig) (map[string]any, error) {
+func buildSpec(service jed.Service, env jed.Env, templateVars map[string]string, secrets []resolvedSecret, configs []resolvedConfig) (map[string]any, error) {
+
+	// Merge template vars: global first, service env wins on collision
+	tplVars := make(map[string]string, len(templateVars)+len(env.Vars))
+	maps.Copy(tplVars, templateVars)
+	maps.Copy(tplVars, env.Vars)
 
 	ports, err := swarmPorts(service.Ports, service.PublishMode)
 	if err != nil {
@@ -137,7 +146,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, confi
 	}
 
 	if len(service.Command) > 0 {
-		expanded, err := expandVars(service.Command, env.Vars)
+		expanded, err := expandVars(service.Command, tplVars)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +174,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, confi
 		labels = traefikLabels(service.Name, service.Traefik)
 		maps.Copy(labels, service.Labels) // explicit labels win
 	}
-	labels, err = expandMapVars(labels, env.Vars)
+	labels, err = expandMapVars(labels, tplVars)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +191,7 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, confi
 					"max-file": "3",
 				},
 			},
-			"Resources": resources,
+			"Resources":     resources,
 			"RestartPolicy": restartPolicy(service),
 			"Networks": []map[string]string{
 				{"Target": service.Network},
@@ -244,7 +253,6 @@ func configRefs(configs []resolvedConfig, uid, gid string) []map[string]any {
 	}
 	return refs
 }
-
 
 func swarmPorts(ports map[string]string, publishMode string) ([]map[string]any, error) {
 

@@ -60,7 +60,11 @@ type Link struct {
 }
 
 // Validate checks that the URL is parseable and has a scheme.
+// URLs containing {{template}} vars are accepted without parsing.
 func (l Link) Validate() error {
+	if strings.Contains(l.Url, "{{") { // Todo: dehax
+		return nil
+	}
 	u, err := url.Parse(l.Url)
 	if err != nil {
 		return errors.Errorf("invalid url %q: %v", l.Url, err)

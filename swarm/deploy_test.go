@@ -93,7 +93,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should create without error", func() {
@@ -177,7 +177,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should update without error", func() {
@@ -201,7 +201,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -250,7 +250,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -285,7 +285,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -317,7 +317,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -346,7 +346,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -373,7 +373,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should use default user 1001", func() {
@@ -397,7 +397,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -431,7 +431,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should not include strip middleware", func() {
@@ -463,7 +463,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should expand template vars in command", func() {
@@ -496,7 +496,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should expand template vars in labels", func() {
@@ -522,7 +522,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should expand multiple vars in one string", func() {
@@ -547,7 +547,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should return an error", func() {
@@ -568,12 +568,94 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should return an error", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("NOPE"))
+		})
+	})
+
+	Describe("with global template vars", func() {
+		var globalVars map[string]string
+
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Command = []string{"run", "--host={{VHOST}}"}
+			svc.Labels = map[string]string{
+				"external_host": "{{VHOST}}",
+			}
+			globalVars = map[string]string{
+				"VHOST": "mon.example.com",
+			}
+			client = newCreateMock("svc-global")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env, globalVars)
+		})
+
+		It("should expand global vars in command and labels", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			command := containerSpec["Command"].([]string)
+			Expect(command[1]).To(Equal("--host=mon.example.com"))
+
+			labels := spec["Labels"].(map[string]string)
+			Expect(labels["external_host"]).To(Equal("mon.example.com"))
+		})
+
+		It("should not pass global vars to container env", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			envLines := containerSpec["Env"].([]string)
+			for _, line := range envLines {
+				Expect(line).NotTo(HavePrefix("VHOST="))
+			}
+		})
+	})
+
+	Describe("with global var overridden by service env", func() {
+		var globalVars map[string]string
+
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Command = []string{"run", "--host={{VHOST}}"}
+			env.Vars["VHOST"] = "override.example.com"
+			globalVars = map[string]string{
+				"VHOST": "global.example.com",
+			}
+			client = newCreateMock("svc-override")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env, globalVars)
+		})
+
+		It("should use service env value over global", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			command := containerSpec["Command"].([]string)
+			Expect(command[1]).To(Equal("--host=override.example.com"))
 		})
 	})
 
@@ -587,7 +669,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should not recursively expand values", func() {
@@ -616,7 +698,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env)
+			id, err = deployer.Deploy(ctx, svc, env, nil)
 		})
 
 		It("should merge labels with explicit winning", func() {

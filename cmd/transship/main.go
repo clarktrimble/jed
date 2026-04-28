@@ -168,6 +168,8 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	env, err := store.GetEnv(ctx, name)
 	fatal(errors.Wrapf(err, "failed to get env %q from store", name))
 
+	globalEnv, _ := store.GetEnv(ctx, "_global")
+
 	fmt.Printf("deploying %s (%s)\n", svc.Name, svc.Image)
 	if len(svc.Secrets) > 0 {
 		fmt.Printf("  secrets: %v\n", svc.Secrets)
@@ -177,7 +179,7 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	}
 	fmt.Printf("  env: %d vars\n", len(env.Vars))
 
-	id, err := deployer.Deploy(ctx, svc, env)
+	id, err := deployer.Deploy(ctx, svc, env, globalEnv.Vars)
 	fatal(err)
 
 	if id != "" {
