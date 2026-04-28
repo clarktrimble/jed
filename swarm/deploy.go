@@ -137,7 +137,11 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, confi
 	}
 
 	if len(service.Command) > 0 {
-		containerSpec["Command"] = service.Command
+		expanded, err := expandVars(service.Command, env.Vars)
+		if err != nil {
+			return nil, err
+		}
+		containerSpec["Command"] = expanded
 	}
 
 	if len(secrets) > 0 {
@@ -160,6 +164,10 @@ func buildSpec(service jed.Service, env jed.Env, secrets []resolvedSecret, confi
 	if service.Traefik != nil {
 		labels = traefikLabels(service.Name, service.Traefik)
 		maps.Copy(labels, service.Labels) // explicit labels win
+	}
+	labels, err = expandMapVars(labels, env.Vars)
+	if err != nil {
+		return nil, err
 	}
 
 	spec := map[string]any{
@@ -385,4 +393,52 @@ func traefikLabels(name string, t *jed.Traefik) map[string]string {
 	}
 
 	return labels
+}
+
+func expandVars(args []string, vars map[string]string) ([]string, error) {
+	result := make([]string, len(args))
+	for i, arg := range args {
+		expanded, err := expandString(arg, vars)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = expanded
+	}
+	return result, nil
+}
+
+func expandMapVars(m map[string]string, vars map[string]string) (map[string]string, error) {
+	result := make(map[string]string, len(m))
+	for k, v := range m {
+		expanded, err := expandString(v, vars)
+		if err != nil {
+			return nil, err
+		}
+		result[k] = expanded
+	}
+	return result, nil
+}
+
+func expandString(s string, vars map[string]string) (string, error) {
+	var result strings.Builder
+	for {
+		start := strings.Index(s, "{{")
+		if start < 0 {
+			result.WriteString(s)
+			return result.String(), nil
+		}
+		end := strings.Index(s[start:], "}}")
+		if end < 0 {
+			result.WriteString(s)
+			return result.String(), nil
+		}
+		name := s[start+2 : start+end]
+		val, ok := vars[name]
+		if !ok {
+			return "", fmt.Errorf("template variable {{%s}} not found in env", name)
+		}
+		result.WriteString(s[:start])
+		result.WriteString(val)
+		s = s[start+end+2:]
+	}
 }

@@ -449,6 +449,160 @@ var _ = Describe("Deploy", func() {
 		})
 	})
 
+	Describe("with template vars in command", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Command = []string{
+				"elasticsearch_exporter",
+				"--es.uri={{ES_URI}}",
+				"--es.ssl-skip-verify",
+			}
+			env.Vars["ES_URI"] = "https://elastic.example.com:9200"
+			client = newCreateMock("svc-tpl-cmd")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should expand template vars in command", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			command := containerSpec["Command"].([]string)
+			Expect(command).To(Equal([]string{
+				"elasticsearch_exporter",
+				"--es.uri=https://elastic.example.com:9200",
+				"--es.ssl-skip-verify",
+			}))
+		})
+	})
+
+	Describe("with template vars in labels", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Labels = map[string]string{
+				"prometheus":      "true",
+				"prometheus_host": "{{ES_HOST}}",
+			}
+			env.Vars["ES_HOST"] = "elastic.example.com"
+			client = newCreateMock("svc-tpl-labels")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should expand template vars in labels", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			labels := spec["Labels"].(map[string]string)
+			Expect(labels["prometheus_host"]).To(Equal("elastic.example.com"))
+			Expect(labels["prometheus"]).To(Equal("true"))
+		})
+	})
+
+	Describe("with multiple template vars in one string", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Command = []string{"connect", "{{HOST}}:{{PORT}}"}
+			env.Vars["HOST"] = "db.example.com"
+			env.Vars["PORT"] = "5432"
+			client = newCreateMock("svc-tpl-multi")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should expand multiple vars in one string", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			command := containerSpec["Command"].([]string)
+			Expect(command[1]).To(Equal("db.example.com:5432"))
+		})
+	})
+
+	Describe("with missing template var", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Command = []string{"run", "--uri={{MISSING_VAR}}"}
+			client = newCreateMock("svc-tpl-missing")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should return an error", func() {
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("MISSING_VAR"))
+			Expect(err.Error()).To(ContainSubstring("not found in env"))
+		})
+	})
+
+	Describe("with missing template var in labels", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Labels = map[string]string{
+				"host": "{{NOPE}}",
+			}
+			client = newCreateMock("svc-tpl-missing-label")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should return an error", func() {
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("NOPE"))
+		})
+	})
+
+	Describe("with env value containing template syntax", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Command = []string{"run", "{{TRICKY}}"}
+			env.Vars["TRICKY"] = "has{{NESTED}}braces"
+			client = newCreateMock("svc-tpl-tricky")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env)
+		})
+
+		It("should not recursively expand values", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			calls := client.SendObjectCalls()
+			createCall := findCall(calls, "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
+			command := containerSpec["Command"].([]string)
+			Expect(command[1]).To(Equal("has{{NESTED}}braces"))
+		})
+	})
+
 	Describe("with traefik config and explicit labels", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
