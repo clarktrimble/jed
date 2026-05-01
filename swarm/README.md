@@ -5,7 +5,7 @@ Deploy services to Docker Swarm via socket API.
 ## Usage
 
 ```go
-sw := swarm.New(client) // client implements swarm.Client interface
+sw := swarm.New(client, logger) // client implements swarm.Client interface
 
 // Setup
 sw.CreateNetwork(ctx, "svc-net", true, true) // attachable, encrypted
@@ -15,7 +15,8 @@ sw.CreateSecret(ctx, "db_password", []byte("hunter2")) // creates db_password_v1
 store, err := bbolt.New("jed.db")
 svc, err := store.GetService(ctx, "myapp")
 env, err := store.GetEnv(ctx, "myapp")
-id, err := sw.Deploy(ctx, svc, env)
+globalEnv, _ := store.GetEnv(ctx, "_global")
+id, err := sw.Deploy(ctx, svc, env, globalEnv.Vars)
 
 // Inspect
 services, err := sw.ListServices(ctx)
@@ -55,3 +56,24 @@ In `jed.Service`, list base names in `Secrets` and map base names to mount paths
 | Log driver       | json-file, 10MB max, 3 files                   | hardcoded |
 
 See [service-yaml.md](../service-yaml.md) for `jed.Service` field reference.
+
+## Template Expansion
+
+Command args and labels support `{{VAR}}` expansion at deploy time. Variables are resolved from service env vars merged with global template vars (passed as the fourth arg to `Deploy`). Service env wins on collision. Global vars are not passed to the container.
+
+```yaml
+# service YAML
+command:
+  - "prometheus"
+  - "--web.external-url=https://{{VHOST}}/prometheus"
+labels:
+  prometheus_host: "{{ES_HOST}}"
+```
+
+Use `_global` env in the jed store for deployment-level values:
+
+```
+jed set-env _global global.env   # VHOST=mon.example.com
+```
+
+Missing variables cause deploy to fail with a clear error. Expansion is single-pass — values are not re-expanded.
