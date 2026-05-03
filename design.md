@@ -111,7 +111,7 @@ The common swarm workflow is:
 1. Load `jed.Service` from a `jed.Store`.
 2. Validate it.
 3. Load service env by service name.
-4. Load global template vars from `_global` env.
+4. Render a `jed.Spec` with caller-supplied vars.
 5. Call `swarm.Deploy`.
 
 That workflow lives in the `transship` package so downstream users do not have
@@ -119,10 +119,11 @@ to copy CLI glue from `cmd/transship`.
 
 ## Swarm Runtime
 
-`swarm.Swarm` deploys a `jed.Service` and `jed.Env` to Docker Swarm:
+`swarm.Swarm` deploys a rendered `jed.Spec` to Docker Swarm:
 
 ```go
-id, err := sw.Deploy(ctx, service, env, templateVars)
+spec, err := jed.NewSpec(service, env, vars)
+id, created, err := sw.Deploy(ctx, spec)
 ```
 
 `Deploy` creates the service if it does not exist and updates it if it does.

@@ -4,8 +4,9 @@ Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 
 The root `jed` package defines runtime-neutral desired state:
 
-- `jed.Service` describes what should run.
+- `jed.Service` describes editable service configuration.
 - `jed.Env` holds service environment variables.
+- `jed.Spec` is rendered intended state: `Service + Env` after template expansion.
 - `jed.Store` persists service and env definitions.
 
 Runtime packages consume those definitions:
@@ -20,13 +21,15 @@ Runtime packages consume those definitions:
 store, _ := bbolt.New("jed.db")
 sw := swarm.New(dockerClient, logger)
 
-deployer := &transship.Deployer{Store: store, Swarm: sw}
-result, err := deployer.Deploy(ctx, "postgres")
+global, _ := store.GetEnv(ctx, "_global")
+deployer := &transship.Deployer{Store: store, Swarm: sw, Vars: global.Vars}
+spec, id, created, err := deployer.Deploy(ctx, "postgres")
 if err != nil {
     // handle error
 }
-if result.Created() {
-    // result.ID is the new swarm service ID
+_ = spec // rendered intended state
+if created {
+    // id is the new swarm service ID
 }
 ```
 
@@ -37,7 +40,9 @@ svc, _ := store.GetService(ctx, "postgres")
 env, _ := store.GetEnv(ctx, "postgres")
 global, _ := store.GetEnv(ctx, "_global")
 
-id, err := sw.Deploy(ctx, svc, env, global.Vars)
+spec, _ := jed.NewSpec(svc, env, global.Vars)
+id, created, err := sw.Deploy(ctx, spec)
+_ = created
 ```
 
 ## CLIs

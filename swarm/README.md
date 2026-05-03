@@ -16,7 +16,9 @@ store, err := bbolt.New("jed.db")
 svc, err := store.GetService(ctx, "myapp")
 env, err := store.GetEnv(ctx, "myapp")
 globalEnv, _ := store.GetEnv(ctx, "_global")
-id, err := sw.Deploy(ctx, svc, env, globalEnv.Vars)
+spec, err := jed.NewSpec(svc, env, globalEnv.Vars)
+id, created, err := sw.Deploy(ctx, spec)
+_ = created
 
 // Inspect
 services, err := sw.ListServices(ctx)
@@ -59,7 +61,7 @@ See [service-yaml.md](../service-yaml.md) for `jed.Service` field reference.
 
 ## Template Expansion
 
-Command args and labels support `{{VAR}}` expansion at deploy time. Variables are resolved from service env vars merged with global template vars (passed as the fourth arg to `Deploy`). Service env wins on collision. Global vars are not passed to the container.
+Command args and labels support `{{VAR}}` expansion when building `jed.Spec` with `jed.NewSpec`. Variables are resolved from service env vars merged with caller-supplied render vars. Service env wins on collision. Render vars are not passed to the container.
 
 ```yaml
 # service YAML
@@ -70,10 +72,10 @@ labels:
   prometheus_host: "{{ES_HOST}}"
 ```
 
-Use `_global` env in the jed store for deployment-level values:
+The `transship` CLI uses `_global` env in the jed store for deployment-level values:
 
 ```
 jed set-env _global global.env   # VHOST=mon.example.com
 ```
 
-Missing variables cause deploy to fail with a clear error. Expansion is single-pass — values are not re-expanded.
+Missing variables cause `jed.NewSpec` to fail with a clear error. Expansion is single-pass — values are not re-expanded.

@@ -8,80 +8,56 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultGlobalEnvName = "_global"
-
-// Swarm deploys a service to Docker Swarm.
+// Swarm deploys a rendered service spec to Docker Swarm.
 //
 // *swarm.Swarm implements this interface. The interface lives here so tests and
 // downstream callers can provide narrow deploy targets without wrapping the full
 // swarm client API.
 type Swarm interface {
-	Deploy(ctx context.Context, service jed.Service, env jed.Env, templateVars map[string]string) (string, error)
+	Deploy(ctx context.Context, spec jed.Spec) (id string, created bool, err error)
 }
 
-// Deployer loads desired service state from a store and applies it to Swarm.
+// Deployer loads desired service state from a store and deploys it to Swarm.
 type Deployer struct {
-	Store         jed.Store
-	Swarm         Swarm
-	GlobalEnvName string
+	Store jed.Store
+	Swarm Swarm
+	Vars  map[string]string
 }
 
-// DeployResult describes a completed deploy.
-type DeployResult struct {
-	Service jed.Service
-	Env     jed.Env
-	Global  jed.Env
-	ID      string
-}
-
-// Created reports whether Deploy created a new swarm service.
-func (r DeployResult) Created() bool {
-	return r.ID != ""
-}
-
-// Deploy loads service, service env, and global template vars from the store,
+// Deploy loads service and env from the store, renders a spec using Vars,
 // then creates or updates the swarm service named name.
-func (d *Deployer) Deploy(ctx context.Context, name string) (DeployResult, error) {
-	var result DeployResult
-
+func (d *Deployer) Deploy(ctx context.Context, name string) (spec jed.Spec, id string, created bool, err error) {
 	if d.Store == nil {
-		return result, errors.New("transship deployer has nil store")
+		err = errors.New("transship deployer has nil store")
+		return
 	}
 	if d.Swarm == nil {
-		return result, errors.New("transship deployer has nil swarm")
+		err = errors.New("transship deployer has nil swarm")
+		return
 	}
 
 	svc, err := d.Store.GetService(ctx, name)
 	if err != nil {
-		return result, errors.Wrapf(err, "failed to get service %q from store", name)
+		err = errors.Wrapf(err, "failed to get service %q from store", name)
+		return
 	}
-	result.Service = svc
 
-	if err := svc.Validate(); err != nil {
-		return result, errors.Wrapf(err, "failed to validate service %q", name)
+	if err = svc.Validate(); err != nil {
+		err = errors.Wrapf(err, "failed to validate service %q", name)
+		return
 	}
 
 	env, err := d.Store.GetEnv(ctx, name)
 	if err != nil {
-		return result, errors.Wrapf(err, "failed to get env %q from store", name)
+		err = errors.Wrapf(err, "failed to get env %q from store", name)
+		return
 	}
-	result.Env = env
 
-	globalName := d.GlobalEnvName
-	if globalName == "" {
-		globalName = defaultGlobalEnvName
-	}
-	globalEnv, err := d.Store.GetEnv(ctx, globalName)
+	spec, err = jed.NewSpec(svc, env, d.Vars)
 	if err != nil {
-		return result, errors.Wrapf(err, "failed to get global env %q from store", globalName)
+		return
 	}
-	result.Global = globalEnv
 
-	id, err := d.Swarm.Deploy(ctx, svc, env, globalEnv.Vars)
-	if err != nil {
-		return result, err
-	}
-	result.ID = id
-
-	return result, nil
+	id, created, err = d.Swarm.Deploy(ctx, spec)
+	return
 }

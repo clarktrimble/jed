@@ -23,13 +23,15 @@ func TestTransship(t *testing.T) {
 
 var _ = Describe("Deployer", func() {
 	var (
-		ctx    context.Context
-		store  *fakeStore
-		client *fakeSwarmClient
-		sw     *swarm.Swarm
-		d      *transship.Deployer
-		res    transship.DeployResult
-		err    error
+		ctx     context.Context
+		store   *fakeStore
+		client  *fakeSwarmClient
+		sw      *swarm.Swarm
+		d       *transship.Deployer
+		spec    jed.Spec
+		id      string
+		created bool
+		err     error
 	)
 
 	BeforeEach(func() {
@@ -37,7 +39,11 @@ var _ = Describe("Deployer", func() {
 		store = newFakeStore()
 		client = &fakeSwarmClient{}
 		sw = swarm.New(client, nopLogger{})
-		d = &transship.Deployer{Store: store, Swarm: sw}
+		d = &transship.Deployer{
+			Store: store,
+			Swarm: sw,
+			Vars:  map[string]string{"VHOST": "app.example.com"},
+		}
 
 		store.services["app"] = jed.Service{
 			Name:    "app",
@@ -46,11 +52,10 @@ var _ = Describe("Deployer", func() {
 			Command: []string{"serve", "--host={{VHOST}}", "--port={{PORT}}"},
 		}
 		store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "8080"}}
-		store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
 	})
 
 	JustBeforeEach(func() {
-		res, err = d.Deploy(ctx, "app")
+		spec, id, created, err = d.Deploy(ctx, "app")
 	})
 
 	When("the service does not exist in swarm", func() {
@@ -61,22 +66,23 @@ var _ = Describe("Deployer", func() {
 
 		It("creates the swarm service", func() {
 			Expect(err).NotTo(HaveOccurred())
-			Expect(res.Created()).To(BeTrue())
-			Expect(res.ID).To(Equal("svc-new-1234567890"))
+			Expect(created).To(BeTrue())
+			Expect(id).To(Equal("svc-new-1234567890"))
 		})
 
-		It("returns the loaded service and envs", func() {
-			Expect(res.Service.Name).To(Equal("app"))
-			Expect(res.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
-			Expect(res.Global.Vars).To(HaveKeyWithValue("VHOST", "app.example.com"))
+		It("returns the rendered spec", func() {
+			Expect(spec.Service.Name).To(Equal("app"))
+			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=app.example.com", "--port=8080"}))
+			Expect(spec.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
+			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
 		})
 
-		It("passes global template vars to swarm deploy", func() {
+		It("passes rendered vars to swarm deploy", func() {
 			createCall := client.findCall("POST", "/services/create")
 			Expect(createCall).NotTo(BeNil())
 
-			spec := createCall.snd.(map[string]any)
-			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			body := createCall.snd.(map[string]any)
+			taskTemplate := body["TaskTemplate"].(map[string]any)
 			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
 
 			Expect(containerSpec["Command"]).To(Equal([]string{"serve", "--host=app.example.com", "--port=8080"}))
@@ -93,7 +99,7 @@ var _ = Describe("Deployer", func() {
 
 		It("updates the swarm service", func() {
 			Expect(err).NotTo(HaveOccurred())
-			Expect(res.Created()).To(BeFalse())
+			Expect(created).To(BeFalse())
 
 			updateCall := client.findCall("POST", "/update")
 			Expect(updateCall).NotTo(BeNil())
@@ -101,20 +107,19 @@ var _ = Describe("Deployer", func() {
 		})
 	})
 
-	When("a custom global env name is configured", func() {
+	When("custom vars are configured", func() {
 		BeforeEach(func() {
 			client.serviceExists = false
-			client.createID = "svc-custom-global"
-			store.envs["deploy"] = jed.Env{Name: "deploy", Vars: map[string]string{"VHOST": "deploy.example.com"}}
-			d.GlobalEnvName = "deploy"
+			client.createID = "svc-custom-vars"
+			d.Vars = map[string]string{"VHOST": "deploy.example.com"}
 		})
 
-		It("uses that env for template vars", func() {
+		It("uses them for rendering", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			createCall := client.findCall("POST", "/services/create")
-			spec := createCall.snd.(map[string]any)
-			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			body := createCall.snd.(map[string]any)
+			taskTemplate := body["TaskTemplate"].(map[string]any)
 			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
 			Expect(containerSpec["Command"]).To(ContainElement("--host=deploy.example.com"))
 		})
@@ -134,12 +139,12 @@ var _ = Describe("Deployer", func() {
 
 	When("dependencies are nil", func() {
 		It("rejects a nil store", func() {
-			_, err := (&transship.Deployer{Swarm: sw}).Deploy(ctx, "app")
+			_, _, _, err := (&transship.Deployer{Swarm: sw}).Deploy(ctx, "app")
 			Expect(err).To(MatchError("transship deployer has nil store"))
 		})
 
 		It("rejects a nil swarm", func() {
-			_, err := (&transship.Deployer{Store: store}).Deploy(ctx, "app")
+			_, _, _, err := (&transship.Deployer{Store: store}).Deploy(ctx, "app")
 			Expect(err).To(MatchError("transship deployer has nil swarm"))
 		})
 	})

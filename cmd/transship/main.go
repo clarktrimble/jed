@@ -159,11 +159,14 @@ func newDeployer(socket string) *swarm.Swarm {
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
-	tship := &transshiplib.Deployer{Store: store, Swarm: deployer}
-	result, err := tship.Deploy(ctx, name)
+	global, err := store.GetEnv(ctx, "_global")
 	fatal(err)
 
-	svc := result.Service
+	tship := &transshiplib.Deployer{Store: store, Swarm: deployer, Vars: global.Vars}
+	spec, id, created, err := tship.Deploy(ctx, name)
+	fatal(err)
+
+	svc := spec.Service
 	fmt.Printf("service: %s (%s)\n", svc.Name, svc.Image)
 	if len(svc.Secrets) > 0 {
 		fmt.Printf("  secrets: %v\n", svc.Secrets)
@@ -171,10 +174,10 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	if len(svc.Configs) > 0 {
 		fmt.Printf("  configs: %v\n", svc.Configs)
 	}
-	fmt.Printf("  env: %d vars\n", len(result.Env.Vars))
+	fmt.Printf("  env: %d vars\n", len(spec.Env.Vars))
 
-	if result.Created() {
-		fmt.Printf("created %s (%s)\n", name, result.ID[:12])
+	if created {
+		fmt.Printf("created %s (%s)\n", name, id[:12])
 	} else {
 		fmt.Printf("updated %s\n", name)
 	}

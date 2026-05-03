@@ -37,6 +37,7 @@ var _ = Describe("Deploy", func() {
 		env      jed.Env
 		err      error
 		id       string
+		created  bool
 	)
 
 	BeforeEach(func() {
@@ -93,12 +94,13 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should create without error", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(id).To(Equal("svc-new-456"))
+			Expect(created).To(BeTrue())
 		})
 
 		It("should call CreateService with correct spec", func() {
@@ -177,12 +179,13 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should update without error", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(id).To(BeEmpty())
+			Expect(created).To(BeFalse())
 		})
 
 		It("should call UpdateService with version", func() {
@@ -201,7 +204,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -229,7 +232,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should disable restarts", func() {
@@ -253,7 +256,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should include restart details", func() {
@@ -299,7 +302,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -334,7 +337,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -366,7 +369,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -395,7 +398,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -422,7 +425,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should use default user 1001", func() {
@@ -446,7 +449,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should deploy without error", func() {
@@ -480,7 +483,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should not include strip middleware", func() {
@@ -512,7 +515,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should expand template vars in command", func() {
@@ -545,7 +548,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should expand template vars in labels", func() {
@@ -571,7 +574,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should expand multiple vars in one string", func() {
@@ -596,7 +599,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should return an error", func() {
@@ -617,7 +620,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should return an error", func() {
@@ -643,7 +646,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, globalVars)
+			id, created, err = deployRendered(ctx, deployer, svc, env, globalVars)
 		})
 
 		It("should expand global vars in command and labels", func() {
@@ -692,7 +695,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, globalVars)
+			id, created, err = deployRendered(ctx, deployer, svc, env, globalVars)
 		})
 
 		It("should use service env value over global", func() {
@@ -718,7 +721,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should not recursively expand values", func() {
@@ -747,7 +750,7 @@ var _ = Describe("Deploy", func() {
 		})
 
 		JustBeforeEach(func() {
-			id, err = deployer.Deploy(ctx, svc, env, nil)
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
 		})
 
 		It("should merge labels with explicit winning", func() {
@@ -769,6 +772,14 @@ var _ = Describe("Deploy", func() {
 })
 
 // helpers
+
+func deployRendered(ctx context.Context, deployer *swarm.Swarm, svc jed.Service, env jed.Env, vars map[string]string) (string, bool, error) {
+	spec, err := jed.NewSpec(svc, env, vars)
+	if err != nil {
+		return "", false, err
+	}
+	return deployer.Deploy(ctx, spec)
+}
 
 type secretItem struct {
 	ID   string   `json:"ID"`

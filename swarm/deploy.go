@@ -11,15 +11,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Deploy creates or updates a swarm service from a jed.Service and jed.Env.
-// TemplateVars are merged with env vars for {{VAR}} expansion in command args
-// and labels, but are not passed to the container. Service env wins on collision.
-func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env, templateVars map[string]string) (id string, err error) {
+// Deploy creates or updates a swarm service from a rendered jed.Spec.
+func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created bool, err error) {
+	service := spec.Service
 
-	// Todo: templateVars is a stretch here, look for a better pattern
-
-	// Todo: validate service rather than crashing around
-	// Todo: honor restart from service yaml, we're ignoring it
 	// Todo: finding the right task for log file is flakey
 	//       2026-03-05T16:22:08     trt14okg7c2s    running traefik:v3.6.9
 	//       2026-03-05T16:22:08     ustlwf51japh    pending traefik:v3.6.9  no suitable node (host-mode port already in use on 1 node)
@@ -27,26 +22,22 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env, te
 	// Todo: fix error: open whoami.env: no such file or directory (this is deploy.sh so maybe?)
 	// Todo: is there a gid issue where transship needs docker gid?
 
-	// Resolve secrets to latest versions
 	resolved, err := d.resolveSecrets(ctx, service.Secrets)
 	if err != nil {
 		return
 	}
 
-	// Resolve configs to latest versions
 	resolvedCfgs, err := d.resolveConfigs(ctx, service.Configs)
 	if err != nil {
 		return
 	}
 
-	// Build spec
-	spec, err := buildSpec(service, env, templateVars, resolved, resolvedCfgs)
+	body, err := buildSpec(spec, resolved, resolvedCfgs)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to build spec for %q", service.Name)
 		return
 	}
 
-	// Check if service exists
 	svcInfo, verErr := d.GetService(ctx, service.Name)
 	if verErr != nil {
 		// Todo: more explicit / less fragile detection
@@ -55,13 +46,12 @@ func (d *Swarm) Deploy(ctx context.Context, service jed.Service, env jed.Env, te
 			return
 		}
 
-		// Service doesn't exist, create it
-		id, err = d.createService(ctx, spec)
+		id, err = d.createService(ctx, body)
+		created = err == nil
 		return
 	}
 
-	// Service exists, update it
-	err = d.updateService(ctx, service.Name, svcInfo.Version.Index, spec)
+	err = d.updateService(ctx, service.Name, svcInfo.Version.Index, body)
 	return
 }
 
@@ -111,12 +101,9 @@ func (d *Swarm) resolveConfigs(ctx context.Context, configs map[string]string) (
 	return resolved, nil
 }
 
-func buildSpec(service jed.Service, env jed.Env, templateVars map[string]string, secrets []resolvedSecret, configs []resolvedConfig) (map[string]any, error) {
-
-	// Merge template vars: global first, service env wins on collision
-	tplVars := make(map[string]string, len(templateVars)+len(env.Vars))
-	maps.Copy(tplVars, templateVars)
-	maps.Copy(tplVars, env.Vars)
+func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfig) (map[string]any, error) {
+	service := jspec.Service
+	env := jspec.Env
 
 	ports, err := swarmPorts(service.Ports, service.PublishMode)
 	if err != nil {
@@ -146,11 +133,7 @@ func buildSpec(service jed.Service, env jed.Env, templateVars map[string]string,
 	}
 
 	if len(service.Command) > 0 {
-		expanded, err := expandVars(service.Command, tplVars)
-		if err != nil {
-			return nil, err
-		}
-		containerSpec["Command"] = expanded
+		containerSpec["Command"] = service.Command
 	}
 
 	if len(secrets) > 0 {
@@ -169,15 +152,11 @@ func buildSpec(service jed.Service, env jed.Env, templateVars map[string]string,
 		containerSpec["Hosts"] = service.Hosts
 	}
 
-	labels := service.Labels
+	labels := map[string]string{}
 	if service.Traefik != nil {
 		labels = traefikLabels(service.Name, service.Traefik)
-		maps.Copy(labels, service.Labels) // explicit labels win
 	}
-	labels, err = expandMapVars(labels, tplVars)
-	if err != nil {
-		return nil, err
-	}
+	maps.Copy(labels, service.Labels) // explicit labels win
 
 	spec := map[string]any{
 		"Name":   service.Name,
@@ -407,52 +386,4 @@ func traefikLabels(name string, t *jed.Traefik) map[string]string {
 	}
 
 	return labels
-}
-
-func expandVars(args []string, vars map[string]string) ([]string, error) {
-	result := make([]string, len(args))
-	for i, arg := range args {
-		expanded, err := expandString(arg, vars)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = expanded
-	}
-	return result, nil
-}
-
-func expandMapVars(m map[string]string, vars map[string]string) (map[string]string, error) {
-	result := make(map[string]string, len(m))
-	for k, v := range m {
-		expanded, err := expandString(v, vars)
-		if err != nil {
-			return nil, err
-		}
-		result[k] = expanded
-	}
-	return result, nil
-}
-
-func expandString(s string, vars map[string]string) (string, error) {
-	var result strings.Builder
-	for {
-		start := strings.Index(s, "{{")
-		if start < 0 {
-			result.WriteString(s)
-			return result.String(), nil
-		}
-		end := strings.Index(s[start:], "}}")
-		if end < 0 {
-			result.WriteString(s)
-			return result.String(), nil
-		}
-		name := s[start+2 : start+end]
-		val, ok := vars[name]
-		if !ok {
-			return "", fmt.Errorf("template variable {{%s}} not found in env", name)
-		}
-		result.WriteString(s[:start])
-		result.WriteString(val)
-		s = s[start+end+2:]
-	}
 }
