@@ -48,7 +48,7 @@ var _ = Describe("Deploy", func() {
 			Ports:   map[string]string{"3031/tcp": "8012"},
 			Volumes: map[string]string{"svc-data": "/data"},
 			Network: "svc-net",
-			Restart: "on-failure",
+			Restart: jed.RestartPolicy{Condition: jed.RestartOnFailure},
 			Secrets: []string{"aruba_client_secret"},
 		}
 
@@ -217,6 +217,55 @@ var _ = Describe("Deploy", func() {
 			taskTemplate := spec["TaskTemplate"].(map[string]any)
 			containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
 			Expect(containerSpec).NotTo(HaveKey("Secrets"))
+		})
+	})
+
+	Describe("with default restart policy", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Restart = jed.RestartPolicy{}
+			client = newCreateMock("svc-restart-default")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env, nil)
+		})
+
+		It("should disable restarts", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			createCall := findCall(client.SendObjectCalls(), "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			restart := taskTemplate["RestartPolicy"].(map[string]any)
+			Expect(restart).To(Equal(map[string]any{"Condition": "none"}))
+		})
+	})
+
+	Describe("with on-failure restart policy", func() {
+		BeforeEach(func() {
+			attempts := 3
+			svc.Secrets = nil
+			svc.Restart = jed.RestartPolicy{Condition: jed.RestartOnFailure, MaxAttempts: &attempts}
+			client = newCreateMock("svc-restart-on-failure")
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, err = deployer.Deploy(ctx, svc, env, nil)
+		})
+
+		It("should include restart details", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			createCall := findCall(client.SendObjectCalls(), "POST", "/services/create")
+			spec := createCall.Snd.(map[string]any)
+			taskTemplate := spec["TaskTemplate"].(map[string]any)
+			restart := taskTemplate["RestartPolicy"].(map[string]any)
+			Expect(restart["Condition"]).To(Equal("on-failure"))
+			Expect(restart["Delay"]).To(Equal(5000000000))
+			Expect(restart["MaxAttempts"]).To(Equal(3))
 		})
 	})
 

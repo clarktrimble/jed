@@ -51,8 +51,8 @@ In `jed.Service`, list base names in `Secrets` and map base names to mount paths
 | User             | 1001                                           | default   |
 | Replicas         | 0 (stopped)                                    | default   |
 | Root filesystem  | Read-only                                      | hardcoded |
-| Restart          | on-failure, 5s delay, max 3 attempts           | hardcoded |
-| Update order     | stop-first, rollback on failure                | hardcoded |
+| Restart          | none by default; optional condition, 5s delay  | default   |
+| Update order     | stop-first, pause on failure                   | hardcoded |
 | Log driver       | json-file, 10MB max, 3 files                   | hardcoded |
 
 See [service-yaml.md](../service-yaml.md) for `jed.Service` field reference.

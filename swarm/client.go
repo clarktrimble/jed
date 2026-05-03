@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/clarktrimble/jed"
+	"github.com/clarktrimble/jed/internal/dockerlog"
 	"github.com/pkg/errors"
 )
 
@@ -300,7 +300,7 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 		return nil, errors.Wrapf(err, "failed to get logs for task %q", taskID)
 	}
 
-	reader := jed.DecodeLogs(bytes.NewReader(rawLogs))
+	reader := dockerlog.Decode(bytes.NewReader(rawLogs))
 	logs, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to decode logs for task %q", taskID)

@@ -365,21 +365,27 @@ func parseMem(s string) (int64, error) {
 }
 
 func restartPolicy(service jed.Service) map[string]any {
-	if !service.RestartService {
+	condition := service.Restart.Condition
+	if condition == "" {
+		condition = jed.RestartNone
+	}
+
+	if condition == jed.RestartNone {
 		return map[string]any{
 			"Condition": "none",
 		}
 	}
 
-	n := 1
-	if service.RestartAttempts != nil {
-		n = *service.RestartAttempts
+	restart := map[string]any{
+		"Condition": condition,
+		"Delay":     5000000000,
 	}
-	return map[string]any{
-		"Condition":   "on-failure",
-		"Delay":       5000000000,
-		"MaxAttempts": n,
+	if service.Restart.MaxAttempts != nil {
+		restart["MaxAttempts"] = *service.Restart.MaxAttempts
+	} else if condition == jed.RestartOnFailure {
+		restart["MaxAttempts"] = 1
 	}
+	return restart
 }
 
 // traefikLabels generates traefik routing labels for a service.

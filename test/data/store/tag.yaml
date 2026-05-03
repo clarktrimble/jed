@@ -3,7 +3,8 @@ image: local/tag:c197117
 ports:
   3031/tcp: "8010"
 network: svc-net
-restart: on-failure
+restart:
+  condition: on-failure
 secrets:
   - s3_secret_key
   - bfc_api_key

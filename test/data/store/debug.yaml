@@ -2,4 +2,5 @@ name: debug
 image: alpine:latest
 command: ["sleep", "3600"]
 network: svc-net
-restart: on-failure
+restart:
+  condition: on-failure

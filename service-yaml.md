@@ -8,7 +8,9 @@ Define a service for deployment to Docker Swarm.
 name: reauth-acp
 image: local/reauth-acp:3c070f2
 network: svc-net
-restart: on-failure
+restart:
+  condition: on-failure
+  max_attempts: 3
 replicas: 1
 
 ports:
@@ -41,7 +43,7 @@ Todo: looks like we have "string" in the above where float/int would be better?
 | name | yes | Service name |
 | image | yes | Docker image with tag |
 | network | yes | Docker network name |
-| restart | yes | Restart policy (on-failure, always, unless-stopped) |
+| restart | no | Restart policy (`condition`, optional `max_attempts`). Empty means no restart |
 | ports | no | Container port to host port mapping |
 | volumes | no | Named volume or host path to container path |
 | secrets | no | List of swarm secret base names (latest version resolved automatically) |
@@ -54,6 +56,17 @@ Todo: looks like we have "string" in the above where float/int would be better?
 | user | no | Container user (e.g., "1001", "1000:967"). Default is "1001" |
 | traefik | no | Traefik routing config (generates labels automatically) |
 | replicas | no | Number of service instances. Default is 0 (stopped) |
+
+## Restart
+
+Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`.
+For swarm, `on-failure` defaults to one attempt when `max_attempts` is omitted.
+
+```yaml
+restart:
+  condition: on-failure
+  max_attempts: 3
+```
 
 ## Resources
 

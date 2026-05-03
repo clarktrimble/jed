@@ -1,11 +1,14 @@
-package jed
+package container
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+var deployNamePattern = regexp.MustCompile(`^/(.+)-[a-zA-Z0-9]{7}$`)
 
 // Container represents a Docker container as returned by the Docker API.
 type Container struct {

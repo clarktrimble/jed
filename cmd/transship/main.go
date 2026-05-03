@@ -15,11 +15,11 @@ import (
 	"github.com/alexflint/go-arg"
 	"github.com/clarktrimble/giant"
 	"github.com/clarktrimble/sabot"
-	"github.com/pkg/errors"
 	"golang.org/x/term"
 
 	"github.com/clarktrimble/jed/store/bbolt"
 	"github.com/clarktrimble/jed/swarm"
+	transshiplib "github.com/clarktrimble/jed/transship"
 )
 
 // Todo: regularize commands "ls-" etc
@@ -159,31 +159,22 @@ func newDeployer(socket string) *swarm.Swarm {
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
-	svc, err := store.GetService(ctx, name)
-	fatal(errors.Wrapf(err, "failed to get service %q from store", name))
+	tship := &transshiplib.Deployer{Store: store, Swarm: deployer}
+	result, err := tship.Deploy(ctx, name)
+	fatal(err)
 
-	err = svc.Validate()
-	fatal(errors.Wrapf(err, "failed to validate service %q", name))
-
-	env, err := store.GetEnv(ctx, name)
-	fatal(errors.Wrapf(err, "failed to get env %q from store", name))
-
-	globalEnv, _ := store.GetEnv(ctx, "_global")
-
-	fmt.Printf("deploying %s (%s)\n", svc.Name, svc.Image)
+	svc := result.Service
+	fmt.Printf("service: %s (%s)\n", svc.Name, svc.Image)
 	if len(svc.Secrets) > 0 {
 		fmt.Printf("  secrets: %v\n", svc.Secrets)
 	}
 	if len(svc.Configs) > 0 {
 		fmt.Printf("  configs: %v\n", svc.Configs)
 	}
-	fmt.Printf("  env: %d vars\n", len(env.Vars))
+	fmt.Printf("  env: %d vars\n", len(result.Env.Vars))
 
-	id, err := deployer.Deploy(ctx, svc, env, globalEnv.Vars)
-	fatal(err)
-
-	if id != "" {
-		fmt.Printf("created %s (%s)\n", name, id[:12])
+	if result.Created() {
+		fmt.Printf("created %s (%s)\n", name, result.ID[:12])
 	} else {
 		fmt.Printf("updated %s\n", name)
 	}

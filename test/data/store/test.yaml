@@ -2,6 +2,7 @@ name: test
 image: alpine:latest
 command: ["sleep", "infinity"]
 network: svc-net
-restart: on-failure
+restart:
+  condition: on-failure
 labels:
   version: "round2"

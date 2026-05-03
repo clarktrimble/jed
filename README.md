@@ -1,30 +1,43 @@
 # Jed
 
-Manage Docker containers as services with persistent configuration and environment.
-Note: this is a little stale.  See swarm/README.md.
+Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 
-## Quick Start
+The root `jed` package defines runtime-neutral desired state:
+
+- `jed.Service` describes what should run.
+- `jed.Env` holds service environment variables.
+- `jed.Store` persists service and env definitions.
+
+Runtime packages consume those definitions:
+
+- `swarm` deploys services to Docker Swarm.
+- `container` deploys services as standalone Docker containers.
+- `transship` loads a named service from a store and applies it to Swarm.
+
+## Quick Start: Swarm
 
 ```go
-    cfg := &jed.Config{}
-    j, _ := cfg.New(ctx, dockerClient, logger, store)
+store, _ := bbolt.New("jed.db")
+sw := swarm.New(dockerClient, logger)
 
-    service := jed.Service{
-        Name:    "postgres",
-        Image:   "postgres:16",
-        Network: "mynet",
-        Restart: "unless-stopped",
-        Ports:   map[string]string{"5432/tcp": "5432"},
-    }
-    j.CreateService(ctx, service)
+deployer := &transship.Deployer{Store: store, Swarm: sw}
+result, err := deployer.Deploy(ctx, "postgres")
+if err != nil {
+    // handle error
+}
+if result.Created() {
+    // result.ID is the new swarm service ID
+}
+```
 
-    store.SetEnv(ctx, jed.Env{
-        Name: "postgres",
-        Vars: map[string]string{"POSTGRES_PASSWORD": "secret"},
-    })
+For direct runtime use:
 
-    id, _ := j.Deploy(ctx, service)
-    //j.Undeploy(ctx, service)
+```go
+svc, _ := store.GetService(ctx, "postgres")
+env, _ := store.GetEnv(ctx, "postgres")
+global, _ := store.GetEnv(ctx, "_global")
+
+id, err := sw.Deploy(ctx, svc, env, global.Vars)
 ```
 
 ## CLIs
@@ -33,7 +46,7 @@ Note: this is a little stale.  See swarm/README.md.
 
 Manage service and env definitions in the store.
 
-```
+```text
 jed ls-svc                          # list services
 jed get-svc postgres                # show service details
 jed set-svc postgres.yaml           # create/update from YAML
@@ -44,7 +57,7 @@ jed set-env postgres postgres.env   # set env from .env file
 
 Deploy to Docker Swarm using definitions from the jed store.
 
-```
+```text
 transship deploy reauth-acp         # deploy/update a swarm service
 transship ls-secrets                # list swarm secrets
 transship create-secret db_password # create a versioned secret
@@ -54,5 +67,7 @@ transship ls-services               # list running swarm services
 
 ## Documentation
 
-- [Reference](https://pkg.go.dev/github.com/clarktrimble/jed)
+- [Swarm](swarm/README.md)
+- [Service YAML](service-yaml.md)
+- [Store](store/README.md)
 - [Design](design.md)

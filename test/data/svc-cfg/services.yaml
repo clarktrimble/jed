@@ -1,7 +1,8 @@
 - image: traefik:v3.0
   name: traefik
   env_form: none
-  restart: always
+  restart:
+    condition: any
   auto_deploy: true
   network: admin-int
   ports:
@@ -18,7 +19,8 @@
 - image: axis-camera:36e0971
   name: axis-camera-1
   env_form: axis-camera
-  restart: "no"
+  restart:
+    condition: none
   network: admin-int
   features:
   - settings
@@ -33,7 +35,8 @@
 - image: logscale:ec0d40e
   name: logscale-1
   env_form: none
-  restart: "no"
+  restart:
+    condition: none
   network: admin-int
   labels:
     traefik.enable: "true"
@@ -44,7 +47,8 @@
 - image: borken:ea0d70f
   name: borken-1
   env_form: none
-  restart: "no"
+  restart:
+    condition: none
   network: admin-int
   labels:
     traefik.enable: "true"

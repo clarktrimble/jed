@@ -5,6 +5,7 @@ ports:
 volumes:
   svc-data: /data
 network: svc-net
-restart: on-failure
+restart:
+  condition: on-failure
 secrets:
   - aruba_client_secret

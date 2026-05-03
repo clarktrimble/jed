@@ -15,11 +15,10 @@
 //
 // Simplifying Constraints:
 //
-//   - Single replica only
 //   - Read-only root filesystem
-//   - Secrets mounted with UID/GID 1001, mode 0444
-//   - Restart on-failure with 5s delay, max 3 attempts
-//   - Update order stop-first, rollback on failure
+//   - Secrets mounted with the service UID/GID, mode 0400
+//   - Restart disabled by default; optional on-failure restart has 5s delay
+//   - Update order stop-first, pause on failure
 //   - JSON file logging with 10MB rotation, 3 files
 package swarm
 

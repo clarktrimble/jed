@@ -1,4 +1,4 @@
-package jed
+package dockerlog
 
 import (
 	"encoding/binary"
@@ -11,8 +11,8 @@ const (
 	maxFrameSize uint32 = 65536
 )
 
-// DecodeLogs wraps a Docker log stream, stripping multiplexed frame headers.
-func DecodeLogs(src io.Reader) io.Reader {
+// Decode wraps a Docker log stream, stripping multiplexed frame headers.
+func Decode(src io.Reader) io.Reader {
 	return &logDecoder{
 		src:    src,
 		header: make([]byte, 8),
