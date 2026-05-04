@@ -3,6 +3,7 @@ package swarm_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -193,6 +194,53 @@ var _ = Describe("Deploy", func() {
 			updateCall := findCall(calls, "POST", "/update")
 			Expect(updateCall).NotTo(BeNil())
 			Expect(updateCall.Path).To(ContainSubstring("version=42"))
+		})
+	})
+
+	Describe("with invalid service", func() {
+		BeforeEach(func() {
+			svc.Network = ""
+			client = &ClientMock{}
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
+		})
+
+		It("should fail before calling Docker", func() {
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to validate service"))
+			Expect(err.Error()).To(ContainSubstring("network is required"))
+			Expect(id).To(BeEmpty())
+			Expect(created).To(BeFalse())
+			Expect(client.SendObjectCalls()).To(BeEmpty())
+		})
+	})
+
+	Describe("when service lookup fails with another not found error", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					if method == "GET" && strings.Contains(path, "/services?") {
+						return errors.New("backend index not found")
+					}
+					return nil
+				},
+			}
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, created, err = deployRendered(ctx, deployer, svc, env, nil)
+		})
+
+		It("should not treat it as a missing service", func() {
+			Expect(err).To(HaveOccurred())
+			Expect(id).To(BeEmpty())
+			Expect(created).To(BeFalse())
+			Expect(findCall(client.SendObjectCalls(), "POST", "/services/create")).To(BeNil())
 		})
 	})
 
@@ -838,6 +886,36 @@ func newCreateMock(id string) *ClientMock {
 		},
 	}
 }
+
+var _ = Describe("GetService not found", func() {
+	var (
+		client   *ClientMock
+		deployer *swarm.Swarm
+		ctx      context.Context
+		err      error
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		client = &ClientMock{
+			SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+				mockResponse([]map[string]any{}, rcv)
+				return nil
+			},
+		}
+		deployer = swarm.New(client, nopLogger{})
+	})
+
+	JustBeforeEach(func() {
+		_, err = deployer.GetService(ctx, "missing")
+	})
+
+	It("should return ErrServiceNotFound", func() {
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, swarm.ErrServiceNotFound)).To(BeTrue())
+		Expect(err.Error()).To(ContainSubstring("missing"))
+	})
+})
 
 var _ = Describe("GetService", func() {
 	var (

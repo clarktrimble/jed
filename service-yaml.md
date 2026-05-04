@@ -1,6 +1,6 @@
 # Service YAML
 
-Define a service for deployment to Docker Swarm.
+Define a `jed.Service` for deployment.
 
 ## Example
 
@@ -8,10 +8,11 @@ Define a service for deployment to Docker Swarm.
 name: reauth-acp
 image: local/reauth-acp:3c070f2
 network: svc-net
+replicas: 1
+
 restart:
   condition: on-failure
   max_attempts: 3
-replicas: 1
 
 ports:
   3031/tcp: "8012"
@@ -34,33 +35,48 @@ resources:
   cpu_reserve: "0.1"
   mem_reserve: "64M"
 ```
-Todo: looks like we have "string" in the above where float/int would be better?
 
 ## Fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| name | yes | Service name |
-| image | yes | Docker image with tag |
-| network | yes | Docker network name |
-| restart | no | Restart policy (`condition`, optional `max_attempts`). Empty means no restart |
-| ports | no | Container port to host port mapping |
-| volumes | no | Named volume or host path to container path |
-| secrets | no | List of swarm secret base names (latest version resolved automatically) |
-| configs | no | Map of swarm config base names to target mount paths |
-| hosts | no | Extra /etc/hosts entries |
-| command | no | Override container command |
-| labels | no | Container labels |
-| resources | no | CPU and memory limits/reservations |
-| publish_mode | no | Port publish mode: "host" for direct binding, default is ingress |
-| user | no | Container user (e.g., "1001", "1000:967"). Default is "1001" |
-| traefik | no | Traefik routing config (generates labels automatically) |
-| replicas | no | Number of service instances. Default is 0 (stopped) |
+| `name` | yes | Service name |
+| `image` | yes | Docker image with tag |
+| `network` | yes | Docker network name |
+| `command` | no | Override container command |
+| `labels` | no | Container labels |
+| `ports` | no | Container port to host port mapping |
+| `volumes` | no | Named volume or host path to container path |
+| `secrets` | no | Swarm secret base names; latest version resolved at deploy |
+| `configs` | no | Swarm config base names mapped to target mount paths |
+| `hosts` | no | Extra `/etc/hosts` entries |
+| `resources` | no | CPU and memory limits/reservations |
+| `restart` | no | Restart policy (`condition`, optional `max_attempts`) |
+| `publish_mode` | no | Port publish mode: `host` for direct binding; default is ingress |
+| `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1001` |
+| `traefik` | no | Traefik routing config; generates labels automatically |
+| `replicas` | no | Number of service instances; default is `0` (stopped) |
+| `about` | no | User-facing description, links, and notes |
+
+## Template Expansion
+
+Command args and label values may contain `{{VAR}}` placeholders. They are rendered by `jed.NewSpec` / `jed.Jed.Spec` before runtime deploy.
+
+```yaml
+command:
+  - "prometheus"
+  - "--web.external-url=https://{{VHOST}}/prometheus"
+labels:
+  prometheus_host: "{{PROM_HOST}}"
+```
+
+Render vars come from caller-supplied vars plus the service env. Service env wins on collisions. Caller-supplied render vars are not added to the container environment.
+
+Expansion is single-pass. Missing variables fail spec rendering. CLI-specific render-var conventions are documented with the CLIs.
 
 ## Restart
 
-Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`.
-For swarm, `on-failure` defaults to one attempt when `max_attempts` is omitted.
+Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`. For swarm, `on-failure` defaults to one attempt when `max_attempts` is omitted.
 
 ```yaml
 restart:
@@ -70,20 +86,20 @@ restart:
 
 ## Resources
 
-CPU values are decimals (e.g., "0.5" for half a CPU, "2.0" for two CPUs).
+CPU values are decimal strings, e.g. `"0.5"` for half a CPU or `"2.0"` for two CPUs.
 
-Memory values require M suffix (e.g., "128M" for 128 megabytes).
+Memory values are strings with an `M` suffix, e.g. `"128M"`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| cpu_limit | 0.5 | Maximum CPU |
-| mem_limit | 128M | Maximum memory |
-| cpu_reserve | 0.1 | Reserved CPU |
-| mem_reserve | 64M | Reserved memory |
+| `cpu_limit` | `0.5` | Maximum CPU |
+| `mem_limit` | `128M` | Maximum memory |
+| `cpu_reserve` | `0.1` | Reserved CPU |
+| `mem_reserve` | `64M` | Reserved memory |
 
 ## Ports
 
-Format: `"container_port/protocol": "host_port"`
+Format: `"container_port/protocol": "host_port"`.
 
 ```yaml
 ports:
@@ -91,9 +107,11 @@ ports:
   53/udp: "5353"
 ```
 
+Set `publish_mode: host` for direct host-mode publishing. Empty or omitted uses Docker Swarm ingress/routing mesh behavior.
+
 ## Volumes
 
-Named volumes use a simple name. Bind mounts use an absolute path.
+Named volumes use a simple name. Bind mounts use an absolute host path.
 
 ```yaml
 volumes:
@@ -103,7 +121,7 @@ volumes:
 
 ## Secrets
 
-List secret base names. The latest version (e.g., `aruba_client_secret_v3`) is resolved at deploy time and mounted at `/run/secrets/<base_name>`.
+List swarm secret base names. The latest version, e.g. `aruba_client_secret_v3`, is resolved at deploy time and mounted using the base name as the secret filename.
 
 ```yaml
 secrets:
@@ -113,23 +131,32 @@ secrets:
 
 ## Configs
 
-Map config base names to target mount paths. The latest version (e.g., `myapp_config_v2`) is resolved at deploy time and mounted at the specified path.
+Map swarm config base names to target mount paths. The latest version, e.g. `myapp_config_v2`, is resolved at deploy time and mounted at the specified path.
 
 ```yaml
 configs:
   myapp_config: /etc/myapp/config.yaml
 ```
 
+## User
+
+`user` may be a UID or `UID:GID`. If omitted, swarm deploy uses `1001:1001`.
+
+```yaml
+user: "1000:967"
+```
+
 ## Traefik
 
-When `traefik` is present, routing labels are generated automatically for PathPrefix routing at `/{service name}` with TLS on the websecure entrypoint, plus stripprefix middleware.
+When `traefik` is present, routing labels are generated automatically for PathPrefix routing at `/{service name}` with TLS on the `websecure` entrypoint.
 
 ```yaml
 traefik:
   port: "8080"
+  path_prefix_strip: true
 ```
 
-Generates these labels:
+Generated labels include:
 
 ```yaml
 labels:
@@ -142,4 +169,4 @@ labels:
   traefik.http.services.{name}.loadbalancer.server.port: "{port}"
 ```
 
-Explicit labels in `labels:` take precedence over generated traefik labels.
+Explicit labels in `labels:` take precedence over generated Traefik labels.

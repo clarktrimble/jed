@@ -1,8 +1,9 @@
 // Package jed defines service configuration and persistence contracts for Just Enough Docker.
 //
 // The root package is intentionally runtime-neutral. It contains the shared
-// service model used by runtime packages such as swarm and container, plus the
-// Store interface used to persist desired service state.
+// service model used by runtime packages such as swarm and container, the
+// Store interface used to persist desired service state, and Jed helpers for
+// loading rendered specs from a store.
 package jed
 
 import "context"

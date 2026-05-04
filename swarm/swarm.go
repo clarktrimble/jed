@@ -57,6 +57,9 @@ type Swarm struct {
 	logger Logger
 }
 
+// ErrServiceNotFound is returned when a swarm service does not exist.
+var ErrServiceNotFound = errors.New("swarm service not found")
+
 // New creates a Swarm.
 func New(client Client, logger Logger) *Swarm {
 	return &Swarm{client: client, logger: logger}
@@ -173,7 +176,6 @@ type UpdateStatus struct {
 	StartedAt   time.Time `json:"StartedAt"`
 	CompletedAt time.Time `json:"CompletedAt"`
 }
-
 
 // unexported
 

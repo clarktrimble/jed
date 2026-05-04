@@ -2,73 +2,54 @@
 
 Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 
-The root `jed` package defines runtime-neutral desired state:
+## Concepts
 
-- `jed.Service` describes editable service configuration.
-- `jed.Env` holds service environment variables.
-- `jed.Spec` is rendered intended state: `Service + Env` after template expansion.
-- `jed.Store` persists service and env definitions.
+- `jed.Service` is editable service configuration. It may contain `{{VAR}}` templates in command args and labels.
+- `jed.Env` is the container/runtime environment for a service.
+- `jed.Spec` is rendered, runtime-neutral intended state: `Service + Env` after template expansion.
+- `jed.Store` persists services and envs.
+- `jed.Jed` loads stored state and renders specs by service name.
 
-Runtime packages consume those definitions:
+Runtime packages consume `jed.Spec`:
 
-- `swarm` deploys services to Docker Swarm.
-- `container` deploys services as standalone Docker containers.
-- `transship` loads a named service from a store and applies it to Swarm.
+- `swarm` deploys rendered specs to Docker Swarm.
+- `container` deploys standalone Docker containers from raw service/env values.
 
 ## Quick Start: Swarm
 
 ```go
-store, _ := bbolt.New("jed.db")
-sw := swarm.New(dockerClient, logger)
-
-global, _ := store.GetEnv(ctx, "_global")
-deployer := &transship.Deployer{Store: store, Swarm: sw, Vars: global.Vars}
-spec, id, created, err := deployer.Deploy(ctx, "postgres")
+store, err := bbolt.New("jed.db")
 if err != nil {
     // handle error
 }
-_ = spec // rendered intended state
+
+sw := swarm.New(dockerClient, logger)
+
+// Load render vars from a named env, then render the named service from the store.
+j, err := jed.New(ctx, store, "_global")
+if err != nil {
+    // handle error
+}
+
+spec, err := j.Spec(ctx, "postgres")
+if err != nil {
+    // handle error
+}
+
+id, created, err := sw.Deploy(ctx, spec)
+if err != nil {
+    // handle error
+}
 if created {
     // id is the new swarm service ID
 }
 ```
 
-For direct runtime use:
-
-```go
-svc, _ := store.GetService(ctx, "postgres")
-env, _ := store.GetEnv(ctx, "postgres")
-global, _ := store.GetEnv(ctx, "_global")
-
-spec, _ := jed.NewSpec(svc, env, global.Vars)
-id, created, err := sw.Deploy(ctx, spec)
-_ = created
-```
 
 ## CLIs
 
-### jed
-
-Manage service and env definitions in the store.
-
-```text
-jed ls-svc                          # list services
-jed get-svc postgres                # show service details
-jed set-svc postgres.yaml           # create/update from YAML
-jed set-env postgres postgres.env   # set env from .env file
-```
-
-### transship
-
-Deploy to Docker Swarm using definitions from the jed store.
-
-```text
-transship deploy reauth-acp         # deploy/update a swarm service
-transship ls-secrets                # list swarm secrets
-transship create-secret db_password # create a versioned secret
-transship create-config app_cfg cfg.yaml # create a versioned config
-transship ls-services               # list running swarm services
-```
+- [`cmd/jed`](cmd/jed/README.md): edit service and env definitions in the store.
+- [`cmd/transship`](cmd/transship/README.md): deploy and operate stored services on Docker Swarm.
 
 ## Documentation
 

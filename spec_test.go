@@ -1,11 +1,91 @@
 package jed_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/clarktrimble/jed"
 )
+
+var _ = Describe("Jed", func() {
+	Describe("New", func() {
+		It("loads render vars from the named env", func() {
+			ctx := context.Background()
+			store := newFakeStore()
+			store.services["app"] = jed.Service{
+				Name:    "app",
+				Image:   "local/app:v1",
+				Network: "svc-net",
+				Command: []string{"--host={{VHOST}}"},
+			}
+			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{}}
+			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
+
+			j, err := jed.New(ctx, store, "_global")
+			Expect(err).NotTo(HaveOccurred())
+
+			spec, err := j.Spec(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.Command).To(Equal([]string{"--host=app.example.com"}))
+		})
+
+		It("rejects a nil store", func() {
+			_, err := jed.New(context.Background(), nil, "_global")
+			Expect(err).To(MatchError("jed has nil store"))
+		})
+	})
+
+	Describe("Spec", func() {
+		var (
+			ctx   context.Context
+			store *fakeStore
+			j     *jed.Jed
+			spec  jed.Spec
+			err   error
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			store = newFakeStore()
+			store.services["app"] = jed.Service{
+				Name:    "app",
+				Image:   "local/app:v1",
+				Network: "svc-net",
+				Command: []string{"serve", "--host={{VHOST}}", "--port={{PORT}}"},
+			}
+			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "8080"}}
+			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
+
+			j, err = jed.New(ctx, store, "_global")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		JustBeforeEach(func() {
+			spec, err = j.Spec(ctx, "app")
+		})
+
+		It("loads service and env and returns a rendered spec", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.Name).To(Equal("app"))
+			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=app.example.com", "--port=8080"}))
+			Expect(spec.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
+			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
+		})
+
+		When("the service is invalid", func() {
+			BeforeEach(func() {
+				store.services["app"] = jed.Service{Name: "app", Image: "local/app:v1"}
+			})
+
+			It("fails validation", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to validate service"))
+			})
+		})
+	})
+})
 
 var _ = Describe("Spec", func() {
 	Describe("NewSpec", func() {

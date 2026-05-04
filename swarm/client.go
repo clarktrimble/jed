@@ -23,7 +23,7 @@ func (d *Swarm) GetService(ctx context.Context, name string) (*ServiceInfo, erro
 	}
 
 	if len(svcs) == 0 {
-		return nil, errors.Errorf("service %q not found", name)
+		return nil, errors.Wrapf(ErrServiceNotFound, "service %q", name)
 	}
 
 	return &svcs[0], nil

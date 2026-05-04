@@ -1,48 +1,42 @@
 # Jed Design Decisions
 
-Jed is organized around one shared service model and multiple Docker runtimes.
-The root `jed` package is intentionally runtime-neutral; runtime packages such
-as `swarm` and `container` consume `jed.Service`, `jed.Env`, and `jed.Store`.
+Jed is organized around one shared service model, store-backed desired state, and Docker runtimes.
+
+The root `jed` package is intentionally runtime-neutral. Runtime packages such as `swarm` consume rendered `jed.Spec` values rather than raw template context.
 
 ## Package Boundaries
 
 ```text
-jed          shared service model and Store interface
-store        Store contract tests and helpers
-store/bbolt  persistent Store implementation
-store/memo   in-memory Store implementation
-swarm        Docker Swarm runtime
-container    standalone Docker container runtime
-transship    store-to-swarm orchestration
-cmd/jed      CLI for editing stored desired state
+jed           service model, Store interface, spec rendering
+store         Store contract tests and helpers
+store/bbolt   persistent Store implementation
+store/memo    in-memory Store implementation
+swarm         Docker Swarm runtime
+container     standalone Docker container runtime
+cmd/jed       CLI for editing stored desired state
 cmd/transship CLI for operating swarm state
 ```
 
-**Why this shape?**
+The original root package mixed the service model, store contract, and standalone container runtime. Swarm later became the primary runtime, which made `jed/swarm` feel bolted on. Moving the standalone runtime to `container` makes both runtimes peers while keeping `jed.Service` as the central downstream API.
 
-The original root package mixed the service model, store contract, and
-standalone container runtime. Swarm later became the primary runtime, which made
-`jed/swarm` feel bolted on. Moving the standalone runtime to `container` makes
-both runtimes peers while keeping `jed.Service` as the central downstream API.
+## Desired State and Rendered Specs
 
-## Service as Desired State
-
-`jed.Service` defines what should run: image, command, ports, volumes, network,
-labels, secrets, configs, resources, user, replicas, and related metadata.
+`jed.Service` defines what should run: image, command, ports, volumes, network, labels, secrets, configs, resources, user, replicas, and related metadata. It is editable and persisted, and may contain templates in currently supported fields.
 
 `jed.Env` holds environment variables separately from the service definition.
 
-**Why separate definition from runtime?**
+`jed.Spec` is rendered intended state: a `Service` and `Env` after Jed-level template expansion. It is still runtime-neutral.
 
-- The same service model can be applied by different runtimes.
+Why separate definition from runtime?
+
+- The same rendered spec can be consumed by different runtimes.
 - Store implementations only persist desired state.
 - Runtime packages own Docker API details and deployment mechanics.
 - Downstream callers can compose their own workflows from stable building blocks.
 
-## Store as Dependency
+## Store
 
-The `jed.Store` interface persists service definitions and environment variable
-sets:
+The `jed.Store` interface persists service definitions and environment variable sets:
 
 ```go
 type Store interface {
@@ -58,89 +52,67 @@ type Store interface {
 }
 ```
 
-**Why an interface?**
+Why an interface?
 
 - Production can use `store/bbolt`.
 - Tests and embedded users can use `store/memo` or their own implementation.
 - The store contract is testable via `store.RunStoreContractTests`.
 
-## Separated Service and Env Storage
+`Store.GetEnv` returns an empty `Env` with an initialized `Vars` map when no env has been stored for a service. A service with no environment variables is valid, and deploy code does not need to special-case missing env. Store failures remain distinguishable as errors.
 
-Service definitions and environment variables are stored separately.
+Tradeoff: callers cannot distinguish “no env exists” from “empty env exists” without additional store-level conventions.
 
-**Why separate?**
+## Rendering
 
-- Env can change without rewriting the service definition.
-- Secret rotation and environment updates have different lifecycles than image,
-  port, or volume changes.
-- `transship.Deployer` can load fresh env at deploy time.
+There are two rendering entry points.
 
-## GetEnv Returns Empty Env for Missing Env
-
-`Store.GetEnv` returns an empty `Env` with an initialized `Vars` map when no env
-has been stored for a service.
-
-**Why not an error?**
-
-- A service with no environment variables is valid.
-- Deploy code does not need special-case missing env.
-- Store failures remain distinguishable as errors.
-
-**Tradeoff:** callers cannot distinguish “no env exists” from “empty env exists”
-without additional store-level conventions.
-
-## Slice-Based APIs
-
-Collection APIs return slices, not maps. For example:
+If you already have raw values:
 
 ```go
-func (s Services) Find(name string) (Service, error)
-func (rt *container.Runtime) Containers(ctx context.Context) (container.Containers, error)
+spec, err := jed.NewSpec(service, env, vars)
 ```
 
-**Why slices?**
+If you have a store and a service name:
 
-- Iteration is the common case for CLI and UI use.
-- The slice types can provide `Find` helpers for lookup.
-- Callers can build maps if they need O(1) lookup.
+```go
+j, err := jed.New(ctx, store, "deploy-vars")
+spec, err := j.Spec(ctx, "app")
+```
 
-## Transship Orchestration
+`jed.New(ctx, store, name)` loads render vars from the named env. The env name is explicit; `_global` is a CLI convention used by `cmd/transship`, not a magic library default.
 
-The common swarm workflow is:
+`jed.Jed.Spec` loads service and service env by name, validates the raw service, and returns a rendered `jed.Spec`.
 
-1. Load `jed.Service` from a `jed.Store`.
-2. Validate it.
-3. Load service env by service name.
-4. Render a `jed.Spec` with caller-supplied vars.
-5. Call `swarm.Deploy`.
+Rendering rules:
 
-That workflow lives in the `transship` package so downstream users do not have
-to copy CLI glue from `cmd/transship`.
+- Caller-supplied vars and `env.Vars` participate in rendering.
+- `env.Vars` wins on key collisions.
+- Render vars are not added to `Spec.Env`.
+- Expansion is single-pass.
+- Missing vars fail before runtime deploy.
+- Current render surface is intentionally small: command args and labels.
 
 ## Swarm Runtime
 
 `swarm.Swarm` deploys a rendered `jed.Spec` to Docker Swarm:
 
 ```go
-spec, err := jed.NewSpec(service, env, vars)
+j, err := jed.New(ctx, store, "deploy-vars")
+spec, err := j.Spec(ctx, "app")
 id, created, err := sw.Deploy(ctx, spec)
 ```
 
-`Deploy` creates the service if it does not exist and updates it if it does.
-This matches how the swarm functionality is used operationally.
+`Deploy` creates the service if it does not exist and updates it if it does. It returns `created=true` only for creates. Missing service detection uses `swarm.ErrServiceNotFound` and `errors.Is` rather than string matching.
 
-### Swarm Spec Built Programmatically
+The swarm package builds Docker API payloads from typed Go data rather than JSON templates.
 
-The swarm package builds Docker API specs from typed Go data rather than JSON
-templates.
+Why typed over templates?
 
-**Why typed over templates?**
-
-- Spec shape is easier to test.
+- Payload shape is easier to test.
 - There is no placeholder convention to keep in sync.
 - Runtime-specific mapping stays inside the swarm package.
 
-### Swarm Defaults
+## Swarm Defaults and Versioned Resources
 
 The swarm runtime currently supplies these defaults/constraints:
 
@@ -153,21 +125,14 @@ The swarm runtime currently supplies these defaults/constraints:
 - Enabled restart uses the configured condition, 5s delay, and configurable attempts.
 - Updates use stop-first order and pause on failure.
 
-These should become clearer service fields in the next breaking model cleanup.
-
-## Versioned Secrets and Configs
-
-Docker Swarm secrets and configs are immutable. Jed treats the names in
-`Service.Secrets` and `Service.Configs` as base names and resolves them to the
-latest versioned swarm resource at deploy time:
+Docker Swarm secrets and configs are immutable. Jed treats names in `Service.Secrets` and `Service.Configs` as base names and resolves them to the latest versioned swarm resource at deploy time:
 
 ```text
 s3_secret_key -> s3_secret_key_v1, s3_secret_key_v2, ...
 app_config    -> app_config_v1, app_config_v2, ...
 ```
 
-Creating a secret or config creates the next version. Deploying resolves the
-highest version.
+Creating a secret or config creates the next version. Deploying resolves the highest version.
 
 ## Standalone Container Runtime
 
@@ -178,36 +143,28 @@ rt := container.New(client, logger)
 id, err := rt.Deploy(ctx, service, env)
 ```
 
-It preserves the original behavior of naming deployed containers with a random
-suffix, e.g. `postgres-k7m9x2n`, and labeling them with `managed_by=jed`.
+It preserves the original behavior of naming deployed containers with a random suffix, e.g. `postgres-k7m9x2n`, and labeling them with `managed_by=jed`.
 
-**Why random suffixes?**
+Why random suffixes?
 
 - Avoids name collisions when containers linger after failed undeploy.
 - Keeps the service name readable in Docker listings.
 - Requires no persisted sequence state.
 
-**Limitation:** multiple deployments of the same service are still rejected by
-Jed and would often conflict on ports, volumes, and network aliases anyway.
+Limitation: multiple deployments of the same service are still rejected by Jed and would often conflict on ports, volumes, and network aliases anyway.
 
 ## Known Limitations
 
 ### Service Model Still Has Runtime-Specific Fields
 
-`jed.Service` remains the shared desired-state model. Some fields are still only
-used by one runtime today, such as swarm secrets/configs and port publish mode.
-Keeping them on the shared model is a pragmatic choice while the project remains
-small.
+`jed.Service` remains the shared desired-state model. Some fields are still only used by one runtime today, such as swarm secrets/configs and port publish mode. Keeping them on the shared model is a pragmatic choice while the project remains small.
 
 ### Store Does Not Enforce Referential Integrity
 
-The store does not require env to have a matching service. You can set env for a
-non-existent service, and deleting a service does not inherently delete env
-unless a caller chooses to do both.
+The store does not require env to have a matching service. You can set env for a non-existent service, and deleting a service does not inherently delete env unless a caller chooses to do both.
 
 This is flexible, but callers that need stricter behavior must enforce it.
 
 ### Service and Env Changes Are Applied at Deploy Time
 
-Runtimes do not watch the store. Updating stored service/env data only affects a
-running deployment when a caller deploys or redeploys the service.
+Runtimes do not watch the store. Updating stored service/env data only affects a running deployment when a caller deploys or redeploys the service.

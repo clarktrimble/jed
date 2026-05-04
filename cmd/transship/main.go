@@ -17,9 +17,9 @@ import (
 	"github.com/clarktrimble/sabot"
 	"golang.org/x/term"
 
+	"github.com/clarktrimble/jed"
 	"github.com/clarktrimble/jed/store/bbolt"
 	"github.com/clarktrimble/jed/swarm"
-	transshiplib "github.com/clarktrimble/jed/transship"
 )
 
 // Todo: regularize commands "ls-" etc
@@ -159,11 +159,13 @@ func newDeployer(socket string) *swarm.Swarm {
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
-	global, err := store.GetEnv(ctx, "_global")
+	j, err := jed.New(ctx, store, "_global")
 	fatal(err)
 
-	tship := &transshiplib.Deployer{Store: store, Swarm: deployer, Vars: global.Vars}
-	spec, id, created, err := tship.Deploy(ctx, name)
+	spec, err := j.Spec(ctx, name)
+	fatal(err)
+
+	id, created, err := deployer.Deploy(ctx, spec)
 	fatal(err)
 
 	svc := spec.Service

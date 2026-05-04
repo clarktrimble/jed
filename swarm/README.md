@@ -1,22 +1,20 @@
 # swarm
 
-Deploy services to Docker Swarm via socket API.
+Deploy rendered Jed specs to Docker Swarm via the Docker socket API.
 
 ## Usage
 
 ```go
-sw := swarm.New(client, logger) // client implements swarm.Client interface
+sw := swarm.New(client, logger) // client implements swarm.Client
 
 // Setup
-sw.CreateNetwork(ctx, "svc-net", true, true) // attachable, encrypted
+sw.CreateNetwork(ctx, "svc-net", true, true)         // attachable, encrypted
 sw.CreateSecret(ctx, "db_password", []byte("hunter2")) // creates db_password_v1
 
-// Deploy (creates or updates)
+// Deploy from stored Jed state
 store, err := bbolt.New("jed.db")
-svc, err := store.GetService(ctx, "myapp")
-env, err := store.GetEnv(ctx, "myapp")
-globalEnv, _ := store.GetEnv(ctx, "_global")
-spec, err := jed.NewSpec(svc, env, globalEnv.Vars)
+j, err := jed.New(ctx, store, "deploy-vars")
+spec, err := j.Spec(ctx, "myapp")
 id, created, err := sw.Deploy(ctx, spec)
 _ = created
 
@@ -24,17 +22,45 @@ _ = created
 services, err := sw.ListServices(ctx)
 tasks, err := sw.ServiceTasks(ctx, "myapp")
 logs, err := sw.TaskLogs(ctx, tasks[0].ID, "100")
-state, err := sw.Status(ctx, "myapp") // "stopped", "running", or "error"
+state, err := sw.Status(ctx, "myapp") // "stopped", "running", "pending", or "error"
 
 // Teardown
-sw.DeleteService(ctx, "myapp")
+err = sw.DeleteService(ctx, "myapp")
 ```
 
 See [store README](../store/README.md) for store docs.
 
+## Deploy Input
+
+Swarm deploy consumes a rendered `jed.Spec`:
+
+```go
+id, created, err := sw.Deploy(ctx, spec)
+```
+
+`swarm.Deploy` does not perform template expansion. It validates the rendered service, resolves swarm secrets/configs, builds the Docker service payload, and creates or updates the Docker service. See [service-yaml.md](../service-yaml.md#template-expansion) for render-template behavior.
+
+Return values:
+
+- `created == true`: a new service was created and `id` is its Docker service ID.
+- `created == false`: an existing service was updated and `id` is empty.
+
+To build a spec from stored state, load render vars from whichever env name your application uses:
+
+```go
+j, err := jed.New(ctx, store, "deploy-vars")
+spec, err := j.Spec(ctx, "myapp")
+```
+
+If you already have raw service and env values:
+
+```go
+spec, err := jed.NewSpec(svc, env, vars)
+```
+
 ## Secrets and Configs
 
-Swarm secrets and configs are immutable. This package uses versioned naming (`db_password_v1`, `db_password_v2`, etc.):
+Swarm secrets and configs are immutable. This package uses versioned naming:
 
 ```go
 sw.CreateSecret(ctx, "db_password", []byte("hunter2"))  // creates db_password_v1
@@ -43,39 +69,18 @@ sw.CreateSecret(ctx, "db_password", []byte("hunter3"))  // creates db_password_v
 sw.CreateConfig(ctx, "app_config", []byte("key=value")) // creates app_config_v1
 ```
 
-In `jed.Service`, list base names in `Secrets` and map base names to mount paths in `Configs`. Deploy resolves both to the latest version automatically.
+In `jed.Service`, list secret base names in `Secrets` and map config base names to mount paths in `Configs`. Deploy resolves both to the latest version automatically.
 
-## Defaults and Hardcoded
+## Defaults and Constraints
 
-| Setting          | Value                                          |           |
+| Setting          | Value                                          | Kind      |
 |------------------|------------------------------------------------|-----------|
 | Resources        | 0.5 CPU / 128MB limit, 0.1 CPU / 64MB reserve  | default   |
-| User             | 1001                                           | default   |
+| User             | 1001:1001                                      | default   |
 | Replicas         | 0 (stopped)                                    | default   |
 | Root filesystem  | Read-only                                      | hardcoded |
 | Restart          | none by default; optional condition, 5s delay  | default   |
 | Update order     | stop-first, pause on failure                   | hardcoded |
 | Log driver       | json-file, 10MB max, 3 files                   | hardcoded |
 
-See [service-yaml.md](../service-yaml.md) for `jed.Service` field reference.
-
-## Template Expansion
-
-Command args and labels support `{{VAR}}` expansion when building `jed.Spec` with `jed.NewSpec`. Variables are resolved from service env vars merged with caller-supplied render vars. Service env wins on collision. Render vars are not passed to the container.
-
-```yaml
-# service YAML
-command:
-  - "prometheus"
-  - "--web.external-url=https://{{VHOST}}/prometheus"
-labels:
-  prometheus_host: "{{ES_HOST}}"
-```
-
-The `transship` CLI uses `_global` env in the jed store for deployment-level values:
-
-```
-jed set-env _global global.env   # VHOST=mon.example.com
-```
-
-Missing variables cause `jed.NewSpec` to fail with a clear error. Expansion is single-pass — values are not re-expanded.
+See [service-yaml.md](../service-yaml.md) for `jed.Service` fields.

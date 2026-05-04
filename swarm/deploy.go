@@ -14,6 +14,10 @@ import (
 // Deploy creates or updates a swarm service from a rendered jed.Spec.
 func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created bool, err error) {
 	service := spec.Service
+	if err = service.Validate(); err != nil {
+		err = errors.Wrapf(err, "failed to validate service %q", service.Name)
+		return
+	}
 
 	// Todo: finding the right task for log file is flakey
 	//       2026-03-05T16:22:08     trt14okg7c2s    running traefik:v3.6.9
@@ -40,8 +44,7 @@ func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created b
 
 	svcInfo, verErr := d.GetService(ctx, service.Name)
 	if verErr != nil {
-		// Todo: more explicit / less fragile detection
-		if !strings.Contains(verErr.Error(), "not found") {
+		if !errors.Is(verErr, ErrServiceNotFound) {
 			err = verErr
 			return
 		}
