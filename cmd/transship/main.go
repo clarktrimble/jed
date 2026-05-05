@@ -40,6 +40,11 @@ exit status 1
 
 */
 
+var (
+	version = "dev"
+	release = "untagged"
+)
+
 type deployCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
@@ -100,6 +105,10 @@ type args struct {
 
 	Socket string `arg:"-s,--socket" default:"/var/run/docker.sock" help:"docker socket path"`
 	DB     string `arg:"-d,--db" default:"jed.db" help:"path to jed store"`
+}
+
+func (args) Version() string {
+	return fmt.Sprintf("transship %s (%s)", release, version)
 }
 
 func main() {

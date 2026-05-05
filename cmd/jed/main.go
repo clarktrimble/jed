@@ -15,6 +15,11 @@ import (
 	"github.com/clarktrimble/jed/store/bbolt"
 )
 
+var (
+	version = "dev"
+	release = "untagged"
+)
+
 type lsSvcCmd struct{}
 
 type getSvcCmd struct {
@@ -55,6 +60,10 @@ type args struct {
 	DelEnv *delEnvCmd `arg:"subcommand:del-env" help:"delete env for a service"`
 
 	DB string `arg:"-d,--db" default:"jed.db" help:"path to bbolt database"`
+}
+
+func (args) Version() string {
+	return fmt.Sprintf("jed %s (%s)", release, version)
 }
 
 func main() {

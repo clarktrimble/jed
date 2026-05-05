@@ -10,6 +10,12 @@
 
 ## Commands
 
+Version:
+
+```sh
+jed --version
+```
+
 Service definitions:
 
 ```sh

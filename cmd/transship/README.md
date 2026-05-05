@@ -20,6 +20,12 @@ Deploy flow:
 
 ## Commands
 
+Version:
+
+```sh
+transship --version
+```
+
 Deploy and service inspection:
 
 ```sh
