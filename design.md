@@ -19,7 +19,7 @@ cmd/transship CLI for operating swarm state
 
 The root `jed` package is intentionally runtime-neutral. It contains the shared service model, store contract, and rendering helpers. Runtime packages such as `swarm` and `container` own Docker API details and deployment mechanics.
 
-The original root package mixed the service model, store contract, and standalone container runtime. Swarm later became the primary runtime, which made `jed/swarm` feel bolted on. Moving the standalone runtime to `container` makes both runtimes peers while keeping `jed.Service` as the central downstream API.
+The standalone runtime lives in `container`, making it a peer of `swarm` while keeping `jed.Service` as the central downstream API.
 
 ## Desired State vs Rendered Specs
 
@@ -50,7 +50,7 @@ The store does not enforce referential integrity. Env can exist without a matchi
 
 There are two rendering entry points:
 
-- `jed.NewSpec(service, env, vars)` renders raw values supplied by the caller.
+- `jed.Render(service, env, vars)` renders raw values supplied by the caller.
 - `jed.New(ctx, store, varsEnvName)` plus `j.Spec(ctx, name)` loads from a store and renders by service name.
 
 `jed.New(ctx, store, varsEnvName)` loads render vars from the named env. The env name is explicit. `_global` is a `cmd/transship` CLI convention, not a magic library default.
@@ -101,7 +101,7 @@ Traefik support is modeled on `jed.Service` as high-level routing intent. Swarm 
 
 ## Standalone Container Runtime
 
-The legacy standalone Docker runtime now lives in `container`. It preserves the original behavior of naming deployed containers with a random suffix, e.g. `postgres-k7m9x2n`, and labeling them with `managed_by=jed`.
+The standalone Docker runtime lives in `container`. It names deployed containers with a random suffix, e.g. `postgres-k7m9x2n`, and labels them with `managed_by=jed`.
 
 Why random suffixes?
 

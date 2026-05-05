@@ -17,7 +17,7 @@ func TestStoreContract(t *testing.T) {
 	RunSpecs(t, "Store Contract Suite")
 }
 
-// Simple in-memory store implementation for testing the contract itself
+// Simple in-memory store implementation for testing the contract itself.
 type mockStore struct {
 	services map[string]jed.Service
 	envs     map[string]jed.Env

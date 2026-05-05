@@ -58,15 +58,15 @@ type Jed struct {
 	vars  map[string]string
 }
 
-// New creates a Jed using render vars loaded from the env named name.
-func New(ctx context.Context, store Store, name string) (*Jed, error) {
+// New creates a Jed using render vars loaded from varsEnvName.
+func New(ctx context.Context, store Store, varsEnvName string) (*Jed, error) {
 	if store == nil {
 		return nil, errors.New("jed has nil store")
 	}
 
-	env, err := store.GetEnv(ctx, name)
+	env, err := store.GetEnv(ctx, varsEnvName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get vars env %q from store", name)
+		return nil, errors.Wrapf(err, "failed to get vars env %q from store", varsEnvName)
 	}
 
 	return &Jed{store: store, vars: maps.Clone(env.Vars)}, nil
@@ -95,7 +95,7 @@ func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 		return Spec{}, errors.Wrapf(err, "failed to get env %q from store", name)
 	}
 
-	spec, err := NewSpec(svc, env, j.vars)
+	spec, err := Render(svc, env, j.vars)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to render spec for service %q", name)
 	}

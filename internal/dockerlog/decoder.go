@@ -1,3 +1,4 @@
+// Package dockerlog decodes Docker's multiplexed container log stream.
 package dockerlog
 
 import (
@@ -27,7 +28,7 @@ type logDecoder struct {
 	offset int
 }
 
-// Read implements io.Reader .
+// Read implements io.Reader.
 func (dec *logDecoder) Read(dst []byte) (n int, err error) {
 
 	// If we have buffered data, return it first

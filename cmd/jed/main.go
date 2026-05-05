@@ -15,44 +15,44 @@ import (
 	"github.com/clarktrimble/jed/store/bbolt"
 )
 
-type LsSvcCmd struct{}
+type lsSvcCmd struct{}
 
-type GetSvcCmd struct {
+type getSvcCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
-type SetSvcCmd struct {
+type setSvcCmd struct {
 	File string `arg:"positional,required" help:"YAML file with service definition"`
 }
 
-type DelSvcCmd struct {
+type delSvcCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
-type LsEnvCmd struct{}
+type lsEnvCmd struct{}
 
-type GetEnvCmd struct {
+type getEnvCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
-type SetEnvCmd struct {
+type setEnvCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 	File string `arg:"positional,required" help:".env file"`
 }
 
-type DelEnvCmd struct {
+type delEnvCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
 type args struct {
-	LsSvc  *LsSvcCmd  `arg:"subcommand:ls-svc" help:"list services"`
-	GetSvc *GetSvcCmd `arg:"subcommand:get-svc" help:"get a service"`
-	SetSvc *SetSvcCmd `arg:"subcommand:set-svc" help:"set a service from YAML"`
-	DelSvc *DelSvcCmd `arg:"subcommand:del-svc" help:"delete a service"`
-	LsEnv  *LsEnvCmd  `arg:"subcommand:ls-env" help:"list envs"`
-	GetEnv *GetEnvCmd `arg:"subcommand:get-env" help:"get env for a service"`
-	SetEnv *SetEnvCmd `arg:"subcommand:set-env" help:"set env from .env file"`
-	DelEnv *DelEnvCmd `arg:"subcommand:del-env" help:"delete env for a service"`
+	LsSvc  *lsSvcCmd  `arg:"subcommand:ls-svc" help:"list services"`
+	GetSvc *getSvcCmd `arg:"subcommand:get-svc" help:"get a service"`
+	SetSvc *setSvcCmd `arg:"subcommand:set-svc" help:"set a service from YAML"`
+	DelSvc *delSvcCmd `arg:"subcommand:del-svc" help:"delete a service"`
+	LsEnv  *lsEnvCmd  `arg:"subcommand:ls-env" help:"list envs"`
+	GetEnv *getEnvCmd `arg:"subcommand:get-env" help:"get env for a service"`
+	SetEnv *setEnvCmd `arg:"subcommand:set-env" help:"set env from .env file"`
+	DelEnv *delEnvCmd `arg:"subcommand:del-env" help:"delete env for a service"`
 
 	DB string `arg:"-d,--db" default:"jed.db" help:"path to bbolt database"`
 }

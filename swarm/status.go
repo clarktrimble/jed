@@ -11,10 +11,14 @@ import (
 type Status string
 
 const (
+	// StatusRunning means all desired service tasks are running.
 	StatusRunning Status = "running"
+	// StatusStopped means a service has no desired or running tasks.
 	StatusStopped Status = "stopped"
+	// StatusPending means a service is deploying, updating, or stopping.
 	StatusPending Status = "pending"
-	StatusError   Status = "error"
+	// StatusError means a service update failed or task counts do not match desired state.
+	StatusError Status = "error"
 )
 
 // ServiceStatus holds task counts for a service.

@@ -10,19 +10,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Resource defaults
 const (
-	DefaultCPULimit   = "0.5"
-	DefaultMemLimit   = "128M"
+	// DefaultCPULimit is the default CPU limit applied by runtimes.
+	DefaultCPULimit = "0.5"
+	// DefaultMemLimit is the default memory limit applied by runtimes.
+	DefaultMemLimit = "128M"
+	// DefaultCPUReserve is the default CPU reservation applied by runtimes.
 	DefaultCPUReserve = "0.1"
+	// DefaultMemReserve is the default memory reservation applied by runtimes.
 	DefaultMemReserve = "64M"
 )
 
-// Restart policy conditions.
 const (
-	RestartNone      = "none"
+	// RestartNone disables runtime restarts.
+	RestartNone = "none"
+	// RestartOnFailure restarts tasks or containers that fail.
 	RestartOnFailure = "on-failure"
-	RestartAny       = "any"
+	// RestartAny restarts tasks or containers after any exit.
+	RestartAny = "any"
 )
 
 // RestartPolicy specifies whether a runtime should restart failed tasks or containers.

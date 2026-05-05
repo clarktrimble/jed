@@ -40,7 +40,7 @@ Swarm deploy consumes a rendered `jed.Spec`:
 id, created, err := sw.Deploy(ctx, spec)
 ```
 
-`swarm.Deploy` does not perform template expansion. It validates the rendered service, resolves swarm secrets/configs, builds the Docker service payload, and creates or updates the Docker service. See [service-yaml.md](../service-yaml.md#template-expansion) for render-template behavior.
+`Swarm.Deploy` does not perform template expansion. It validates the rendered service, resolves swarm secrets/configs, builds the Docker service payload, and creates or updates the Docker service. See [service-yaml.md](../service-yaml.md#template-expansion) for render-template behavior.
 
 Use `Swarm.Spec` to inspect the exact Docker service payload without creating or updating the service:
 
@@ -60,12 +60,6 @@ To build a spec from stored state, load render vars from whichever env name your
 ```go
 j, err := jed.New(ctx, store, "deploy-vars")
 spec, err := j.Spec(ctx, "myapp")
-```
-
-If you already have raw service and env values:
-
-```go
-spec, err := jed.NewSpec(svc, env, vars)
 ```
 
 ## Secrets and Configs

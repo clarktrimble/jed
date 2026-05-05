@@ -40,63 +40,63 @@ exit status 1
 
 */
 
-type DeployCmd struct {
+type deployCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
-type LsServicesCmd struct{}
+type lsServicesCmd struct{}
 
-type DeleteServiceCmd struct {
+type deleteServiceCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
-type InspectCmd struct {
+type inspectCmd struct {
 	Name string `arg:"positional,required" help:"service name"`
 }
 
-type TasksCmd struct {
+type tasksCmd struct {
 	Service string `arg:"positional,required" help:"service name"`
 }
 
-type LogsCmd struct {
+type logsCmd struct {
 	Task string `arg:"positional,required" help:"task ID"`
 	Tail string `arg:"-n,--tail" default:"100" help:"number of lines to show"`
 }
 
-type LsSecretsCmd struct{}
+type lsSecretsCmd struct{}
 
-type CreateSecretCmd struct {
+type createSecretCmd struct {
 	Name string `arg:"positional,required" help:"secret name (value from stdin)"`
 }
 
-type LsConfigsCmd struct{}
+type lsConfigsCmd struct{}
 
-type CreateConfigCmd struct {
+type createConfigCmd struct {
 	Name string `arg:"positional,required" help:"config name"`
 	File string `arg:"positional,required" help:"file containing config value"`
 }
 
-type CreateNetworkCmd struct {
+type createNetworkCmd struct {
 	Name       string `arg:"positional,required" help:"network name"`
 	Attachable bool   `arg:"-a,--attachable" default:"true" help:"allow manual container attachment"`
 	Encrypted  bool   `arg:"-e,--encrypted" help:"encrypt overlay traffic"`
 }
 
-type EventsCmd struct{}
+type eventsCmd struct{}
 
 type args struct {
-	Deploy        *DeployCmd        `arg:"subcommand:deploy" help:"deploy/update a swarm service"`
-	LsServices    *LsServicesCmd    `arg:"subcommand:ls-services" help:"list swarm services"`
-	DeleteService *DeleteServiceCmd `arg:"subcommand:delete-service" help:"delete a swarm service"`
-	Inspect       *InspectCmd       `arg:"subcommand:inspect" help:"show service spec"`
-	Tasks         *TasksCmd         `arg:"subcommand:tasks" help:"show service tasks"`
-	Logs          *LogsCmd          `arg:"subcommand:logs" help:"show service logs"`
-	Events        *EventsCmd        `arg:"subcommand:events" help:"stream docker events"`
-	LsSecrets     *LsSecretsCmd     `arg:"subcommand:ls-secrets" help:"list secrets"`
-	CreateSecret  *CreateSecretCmd  `arg:"subcommand:create-secret" help:"create a secret"`
-	LsConfigs     *LsConfigsCmd     `arg:"subcommand:ls-configs" help:"list configs"`
-	CreateConfig  *CreateConfigCmd  `arg:"subcommand:create-config" help:"create a config"`
-	CreateNetwork *CreateNetworkCmd `arg:"subcommand:create-network" help:"create overlay network"`
+	Deploy        *deployCmd        `arg:"subcommand:deploy" help:"deploy/update a swarm service"`
+	LsServices    *lsServicesCmd    `arg:"subcommand:ls-services" help:"list swarm services"`
+	DeleteService *deleteServiceCmd `arg:"subcommand:delete-service" help:"delete a swarm service"`
+	Inspect       *inspectCmd       `arg:"subcommand:inspect" help:"show service spec"`
+	Tasks         *tasksCmd         `arg:"subcommand:tasks" help:"show service tasks"`
+	Logs          *logsCmd          `arg:"subcommand:logs" help:"show service logs"`
+	Events        *eventsCmd        `arg:"subcommand:events" help:"stream docker events"`
+	LsSecrets     *lsSecretsCmd     `arg:"subcommand:ls-secrets" help:"list secrets"`
+	CreateSecret  *createSecretCmd  `arg:"subcommand:create-secret" help:"create a secret"`
+	LsConfigs     *lsConfigsCmd     `arg:"subcommand:ls-configs" help:"list configs"`
+	CreateConfig  *createConfigCmd  `arg:"subcommand:create-config" help:"create a config"`
+	CreateNetwork *createNetworkCmd `arg:"subcommand:create-network" help:"create overlay network"`
 
 	Socket string `arg:"-s,--socket" default:"/var/run/docker.sock" help:"docker socket path"`
 	DB     string `arg:"-d,--db" default:"jed.db" help:"path to jed store"`
@@ -294,7 +294,7 @@ func createConfig(ctx context.Context, deployer *swarm.Swarm, name, file string)
 	fmt.Printf("created config %s: %s\n", name, id)
 }
 
-func createNetwork(ctx context.Context, deployer *swarm.Swarm, cmd *CreateNetworkCmd) {
+func createNetwork(ctx context.Context, deployer *swarm.Swarm, cmd *createNetworkCmd) {
 	id, err := deployer.CreateNetwork(ctx, cmd.Name, cmd.Attachable, cmd.Encrypted)
 	fatal(err)
 

@@ -59,6 +59,7 @@ func (str *Store) Close() error {
 	return str.db.Close()
 }
 
+// GetService retrieves a service definition by name.
 func (str *Store) GetService(ctx context.Context, name string) (service jed.Service, err error) {
 
 	err = str.db.View(func(tx *bbolt.Tx) error {
@@ -74,6 +75,7 @@ func (str *Store) GetService(ctx context.Context, name string) (service jed.Serv
 	return
 }
 
+// SetService creates or updates a service definition.
 func (str *Store) SetService(ctx context.Context, service jed.Service) (err error) {
 
 	data, err := json.Marshal(service)
@@ -90,8 +92,9 @@ func (str *Store) SetService(ctx context.Context, service jed.Service) (err erro
 	return
 }
 
-// Todo: check key existence before delete, bbolt is silent on missing keys
+// DelService removes a service definition by name.
 func (str *Store) DelService(ctx context.Context, name string) (err error) {
+	// Todo: check key existence before delete, bbolt is silent on missing keys.
 
 	err = str.db.Update(func(tx *bbolt.Tx) error {
 		bkt := tx.Bucket(servicesBucket)
@@ -101,6 +104,7 @@ func (str *Store) DelService(ctx context.Context, name string) (err error) {
 	return
 }
 
+// Services returns all service definitions.
 func (str *Store) Services(ctx context.Context) (services []jed.Service, err error) {
 
 	err = str.db.View(func(tx *bbolt.Tx) error {
@@ -119,6 +123,7 @@ func (str *Store) Services(ctx context.Context) (services []jed.Service, err err
 	return
 }
 
+// GetEnv retrieves environment variables by name.
 func (str *Store) GetEnv(ctx context.Context, name string) (env jed.Env, err error) {
 
 	err = str.db.View(func(tx *bbolt.Tx) error {
@@ -137,6 +142,7 @@ func (str *Store) GetEnv(ctx context.Context, name string) (env jed.Env, err err
 	return
 }
 
+// SetEnv creates or updates environment variables.
 func (str *Store) SetEnv(ctx context.Context, env jed.Env) (err error) {
 
 	data, err := json.Marshal(env)
@@ -153,8 +159,9 @@ func (str *Store) SetEnv(ctx context.Context, env jed.Env) (err error) {
 	return
 }
 
-// Todo: check key existence before delete, bbolt is silent on missing keys
+// DelEnv removes environment variables by name.
 func (str *Store) DelEnv(ctx context.Context, name string) (err error) {
+	// Todo: check key existence before delete, bbolt is silent on missing keys.
 
 	err = str.db.Update(func(tx *bbolt.Tx) error {
 		bkt := tx.Bucket(envsBucket)
@@ -164,6 +171,7 @@ func (str *Store) DelEnv(ctx context.Context, name string) (err error) {
 	return
 }
 
+// Envs returns all environment variable sets.
 func (str *Store) Envs(ctx context.Context) (envs []jed.Env, err error) {
 
 	err = str.db.View(func(tx *bbolt.Tx) error {

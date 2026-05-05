@@ -36,8 +36,8 @@ func (d *Swarm) SecretLatest(ctx context.Context, name string) (id, versionedNam
 
 // ConfigLatest returns the ID and versioned name of the latest config by base name.
 // Looks for configs matching {name}_v{N} and returns the highest version.
-// Todo: add test data with configs and test this
 func (d *Swarm) ConfigLatest(ctx context.Context, name string) (id, versionedName string, err error) {
+	// Todo: add test data with configs and test this.
 
 	configs, err := d.ListConfigs(ctx)
 	if err != nil {

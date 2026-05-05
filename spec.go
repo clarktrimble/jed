@@ -13,9 +13,9 @@ type Spec struct {
 	Env     Env
 }
 
-// NewSpec renders service using vars and env.Vars as template variables.
+// Render renders service using vars and env.Vars as template variables.
 // env.Vars win over vars on key collisions. Render vars are not added to Env.
-func NewSpec(service Service, env Env, vars map[string]string) (Spec, error) {
+func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 	tplVars := make(map[string]string, len(vars)+len(env.Vars))
 	maps.Copy(tplVars, vars)
 	maps.Copy(tplVars, env.Vars)

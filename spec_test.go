@@ -88,7 +88,7 @@ var _ = Describe("Jed", func() {
 })
 
 var _ = Describe("Spec", func() {
-	Describe("NewSpec", func() {
+	Describe("Render", func() {
 		var (
 			svc  jed.Service
 			env  jed.Env
@@ -111,13 +111,13 @@ var _ = Describe("Spec", func() {
 		})
 
 		It("expands command vars", func() {
-			spec, err := jed.NewSpec(svc, env, vars)
+			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=app.example.com", "--port=8080"}))
 		})
 
 		It("expands label vars", func() {
-			spec, err := jed.NewSpec(svc, env, vars)
+			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Labels).To(HaveKeyWithValue("host", "app.example.com"))
 			Expect(spec.Service.Labels).To(HaveKeyWithValue("mode", "prod"))
@@ -126,14 +126,14 @@ var _ = Describe("Spec", func() {
 		It("lets service env win over injected vars", func() {
 			env.Vars["VHOST"] = "override.example.com"
 
-			spec, err := jed.NewSpec(svc, env, vars)
+			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(ContainElement("--host=override.example.com"))
 			Expect(spec.Service.Labels).To(HaveKeyWithValue("host", "override.example.com"))
 		})
 
 		It("does not add injected vars to Spec.Env", func() {
-			spec, err := jed.NewSpec(svc, env, vars)
+			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
 			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
@@ -142,7 +142,7 @@ var _ = Describe("Spec", func() {
 		It("fails on missing vars", func() {
 			delete(vars, "VHOST")
 
-			_, err := jed.NewSpec(svc, env, vars)
+			_, err := jed.Render(svc, env, vars)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("VHOST"))
 		})
@@ -151,7 +151,7 @@ var _ = Describe("Spec", func() {
 			svc.Command = []string{"run", "{{TRICKY}}"}
 			env.Vars["TRICKY"] = "has{{NESTED}}braces"
 
-			spec, err := jed.NewSpec(svc, env, vars)
+			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"run", "has{{NESTED}}braces"}))
 		})
@@ -159,7 +159,7 @@ var _ = Describe("Spec", func() {
 		It("leaves unmatched opening braces unchanged", func() {
 			svc.Command = []string{"run", "before {{VHOST"}
 
-			spec, err := jed.NewSpec(svc, env, vars)
+			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"run", "before {{VHOST"}))
 		})

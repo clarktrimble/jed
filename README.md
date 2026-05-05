@@ -10,10 +10,10 @@ Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 - `jed.Store` persists services and envs.
 - `jed.Jed` loads stored state and renders specs by service name.
 
-Runtime packages consume `jed.Spec`:
+Runtime packages consume Jed model values:
 
-- `swarm` deploys rendered specs to Docker Swarm.
-- `container` deploys standalone Docker containers from raw service/env values.
+- `swarm` deploys rendered `jed.Spec` values to Docker Swarm.
+- `container` deploys standalone Docker containers from raw `jed.Service` and `jed.Env` values.
 
 ## Quick Start: Swarm
 
