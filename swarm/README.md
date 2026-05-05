@@ -15,6 +15,8 @@ sw.CreateSecret(ctx, "db_password", []byte("hunter2")) // creates db_password_v1
 store, err := bbolt.New("jed.db")
 j, err := jed.New(ctx, store, "deploy-vars")
 spec, err := j.Spec(ctx, "myapp")
+body, err := sw.Spec(ctx, spec) // optional: inspect exact Docker service payload
+_ = body
 id, created, err := sw.Deploy(ctx, spec)
 _ = created
 
@@ -39,6 +41,14 @@ id, created, err := sw.Deploy(ctx, spec)
 ```
 
 `swarm.Deploy` does not perform template expansion. It validates the rendered service, resolves swarm secrets/configs, builds the Docker service payload, and creates or updates the Docker service. See [service-yaml.md](../service-yaml.md#template-expansion) for render-template behavior.
+
+Use `Swarm.Spec` to inspect the exact Docker service payload without creating or updating the service:
+
+```go
+body, err := sw.Spec(ctx, spec) // body has type swarm.Spec
+```
+
+`Swarm.Spec` still contacts Docker to resolve latest versioned secrets/configs.
 
 Return values:
 
