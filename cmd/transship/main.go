@@ -168,7 +168,10 @@ func newDeployer(socket string) *swarm.Swarm {
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
-	j, err := jed.New(ctx, store, "_global")
+	lgrCfg := sabot.Config{MaxLen: 999}
+	lgr := lgrCfg.New(os.Stderr)
+
+	j, err := jed.New(ctx, store, "_global", lgr)
 	fatal(err)
 
 	spec, err := j.Spec(ctx, name)

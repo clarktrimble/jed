@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/clarktrimble/jed"
-	"github.com/pkg/errors"
 )
 
 // Store implements jed.Store interface using in-memory storage.
@@ -38,7 +37,7 @@ func (s *Store) GetService(ctx context.Context, name string) (jed.Service, error
 
 	svc, ok := s.svcs[name]
 	if !ok {
-		return jed.Service{}, errors.Errorf("service not found: %s", name)
+		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name}
 	}
 	return svc, nil
 }

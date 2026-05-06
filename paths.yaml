@@ -1,0 +1,264 @@
+# OpenApi path definitions for endpoints registered by jed/api.
+
+paths:
+  /store/services:
+    get:
+      summary: List services
+      description: Return all stored service definitions.
+      operationId: listServices
+      tags:
+        - store
+      responses:
+        '200':
+          description: Services retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /store/services/{name}:
+    get:
+      summary: Get service
+      description: Retrieve a stored service definition by name.
+      operationId: getService
+      tags:
+        - store
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Service name
+          schema:
+            type: string
+          example: web
+      responses:
+        '200':
+          description: Service retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Set service
+      description: Create or update a stored service definition.
+      operationId: setService
+      tags:
+        - store
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Service name
+          schema:
+            type: string
+          example: web
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      responses:
+        '200':
+          description: Service stored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          description: Invalid JSON request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Service name mismatch or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete service
+      description: Delete a stored service definition by name.
+      operationId: delService
+      tags:
+        - store
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Service name
+          schema:
+            type: string
+          example: web
+      responses:
+        '200':
+          description: Service deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /store/envs:
+    get:
+      summary: List envs
+      description: Return all stored environment variable sets.
+      operationId: listEnvs
+      tags:
+        - store
+      responses:
+        '200':
+          description: Envs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Env'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /store/envs/{name}:
+    get:
+      summary: Get env
+      description: Retrieve stored environment variables for a service. Missing envs return an empty variable map.
+      operationId: getEnv
+      tags:
+        - store
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Service name
+          schema:
+            type: string
+          example: web
+      responses:
+        '200':
+          description: Env retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Env'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Set env
+      description: Create or update stored environment variables for a service.
+      operationId: setEnv
+      tags:
+        - store
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Service name
+          schema:
+            type: string
+          example: web
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Env'
+      responses:
+        '200':
+          description: Env stored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Env'
+        '400':
+          description: Invalid JSON request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Env name mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete env
+      description: Delete stored environment variables for a service.
+      operationId: delEnv
+      tags:
+        - store
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Service name
+          schema:
+            type: string
+          example: web
+      responses:
+        '200':
+          description: Env deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

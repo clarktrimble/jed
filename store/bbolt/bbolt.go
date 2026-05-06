@@ -66,7 +66,7 @@ func (str *Store) GetService(ctx context.Context, name string) (service jed.Serv
 		bkt := tx.Bucket(servicesBucket)
 		data := bkt.Get([]byte(name))
 		if data == nil {
-			return errors.Errorf("service not found: %s", name)
+			return jed.NotFoundError{Kind: "service", Name: name}
 		}
 		err := json.Unmarshal(data, &service)
 		err = errors.Wrapf(err, "failed to decode service")

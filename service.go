@@ -35,23 +35,31 @@ const (
 // Condition is one of "none", "on-failure", or "any". Empty means "none".
 // MaxAttempts limits restart attempts where supported. Nil means runtime default.
 type RestartPolicy struct {
-	Condition   string `json:"condition,omitempty"`
-	MaxAttempts *int   `json:"max_attempts,omitempty"`
+	// Condition controls when the runtime restarts a failed task or container.
+	Condition string `json:"condition,omitempty"`
+	// MaxAttempts limits restart attempts where supported by the runtime.
+	MaxAttempts *int `json:"max_attempts,omitempty"`
 }
 
 // Traefik specifies traefik routing configuration.
 type Traefik struct {
-	Port            string `json:"port"`
-	PathPrefixStrip bool   `json:"path_prefix_strip,omitempty"`
+	// Port is the container port that traefik should route traffic to.
+	Port string `json:"port"`
+	// PathPrefixStrip enables stripping the matched path prefix before forwarding.
+	PathPrefixStrip bool `json:"path_prefix_strip,omitempty"`
 }
 
 // Resources specifies CPU and memory limits and reservations.
 // CPU values are decimal strings (e.g., "0.5" for half a CPU).
 // Memory values require M suffix (e.g., "128M" for 128 megabytes).
 type Resources struct {
-	CPULimit   string `json:"cpu_limit,omitempty"`
-	MemLimit   string `json:"mem_limit,omitempty"`
+	// CPULimit is the maximum CPU allocation, expressed as decimal CPUs.
+	CPULimit string `json:"cpu_limit,omitempty"`
+	// MemLimit is the maximum memory allocation, expressed with an M suffix.
+	MemLimit string `json:"mem_limit,omitempty"`
+	// CPUReserve is the reserved CPU allocation, expressed as decimal CPUs.
 	CPUReserve string `json:"cpu_reserve,omitempty"`
+	// MemReserve is the reserved memory allocation, expressed with an M suffix.
 	MemReserve string `json:"mem_reserve,omitempty"`
 }
 
@@ -74,8 +82,10 @@ func (r Resources) WithDefaults() Resources {
 
 // Link is a labeled URL.
 type Link struct {
+	// Text is the human-readable link label.
 	Text string `json:"text"`
-	Url  string `json:"url"`
+	// Url is the target URL. It may contain {{template}} variables rendered from Env.
+	Url string `json:"url"`
 }
 
 // Validate checks that the URL is parseable and has a scheme.
@@ -96,15 +106,21 @@ func (l Link) Validate() error {
 
 // Note is a timestamped, authored comment.
 type Note struct {
-	Ts      time.Time `json:"ts"`
-	Author  string    `json:"author"`
-	Content string    `json:"content"`
+	// Ts is when the note was written.
+	Ts time.Time `json:"ts"`
+	// Author identifies who wrote the note.
+	Author string `json:"author"`
+	// Content is the note body.
+	Content string `json:"content"`
 }
 
 // About holds user-facing descriptive information for a service.
 type About struct {
-	Desc  string `json:"desc,omitempty"`
+	// Desc is a short human-readable description of the service.
+	Desc string `json:"desc,omitempty"`
+	// Links are related URLs for operators or users.
 	Links []Link `json:"links,omitempty"`
+	// Notes are timestamped operational notes about the service.
 	Notes []Note `json:"notes,omitempty"`
 }
 

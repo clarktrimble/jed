@@ -6,7 +6,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	"github.com/clarktrimble/jed"
 	"github.com/clarktrimble/jed/store"
@@ -33,7 +32,7 @@ func newMockStore() *mockStore {
 func (m *mockStore) GetService(ctx context.Context, name string) (jed.Service, error) {
 	svc, ok := m.services[name]
 	if !ok {
-		return jed.Service{}, errors.Errorf("service not found: %s", name)
+		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name}
 	}
 	return svc, nil
 }

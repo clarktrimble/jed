@@ -26,7 +26,7 @@ if err != nil {
 sw := swarm.New(dockerClient, logger)
 
 // Load render vars from a named env, then render the named service from the store.
-j, err := jed.New(ctx, store, "_global")
+j, err := jed.New(ctx, store, "_global", logger)
 if err != nil {
     // handle error
 }

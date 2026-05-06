@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/clarktrimble/jed"
-	"github.com/pkg/errors"
 )
 
 type fakeStore struct {
@@ -22,7 +21,7 @@ func newFakeStore() *fakeStore {
 func (s *fakeStore) GetService(ctx context.Context, name string) (jed.Service, error) {
 	svc, ok := s.services[name]
 	if !ok {
-		return jed.Service{}, errors.Errorf("service not found: %s", name)
+		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name}
 	}
 	return svc, nil
 }

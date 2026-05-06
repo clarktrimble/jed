@@ -8,7 +8,9 @@ package jed
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/clarktrimble/jed/logger"
 	"github.com/pkg/errors"
 )
 
@@ -18,7 +20,7 @@ import (
 // of truth for all service definitions and environment variables.
 type Store interface {
 	// GetService retrieves a service definition by name.
-	// Returns an error if the service does not exist.
+	// Returns NotFoundError if the service does not exist.
 	GetService(ctx context.Context, name string) (Service, error)
 
 	// SetService creates or updates a service definition.
@@ -45,29 +47,48 @@ type Store interface {
 	Envs(ctx context.Context) ([]Env, error)
 }
 
-// Env holds environment variables for a service.
-type Env struct {
+// NotFoundError reports a missing stored object.
+type NotFoundError struct {
+	Kind string
 	Name string
-	Vars map[string]string
+}
+
+func (err NotFoundError) Error() string {
+	return fmt.Sprintf("%s not found: %s", err.Kind, err.Name)
+}
+
+// Env holds named environment variables for a service.
+//
+// Env entries are stored separately from Service definitions so sensitive or
+// deployment-specific values can be updated without changing the service model.
+type Env struct {
+	// Name is the service or variable-set name this environment belongs to.
+	Name string `json:"name"`
+	// Vars maps environment variable names to their values.
+	Vars map[string]string `json:"vars"`
 }
 
 // Jed loads stored service state and renders runtime-neutral specs.
 type Jed struct {
 	store       Store
 	varsEnvName string
+	logger      logger.Logger
 }
 
 // New creates a Jed that uses render vars from varsEnvName.
-func New(ctx context.Context, store Store, varsEnvName string) (*Jed, error) {
+func New(ctx context.Context, store Store, varsEnvName string, lgr logger.Logger) (*Jed, error) {
 	if store == nil {
 		return nil, errors.New("jed has nil store")
+	}
+	if lgr == nil {
+		return nil, errors.New("jed has nil logger")
 	}
 
 	if _, err := store.GetEnv(ctx, varsEnvName); err != nil {
 		return nil, errors.Wrapf(err, "failed to get vars env %q from store", varsEnvName)
 	}
 
-	return &Jed{store: store, varsEnvName: varsEnvName}, nil
+	return &Jed{store: store, varsEnvName: varsEnvName, logger: lgr}, nil
 }
 
 // Store returns the underlying store.

@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -77,10 +79,14 @@ func RunStoreContractTests(
 			})
 
 			When("getting a non-existent service", func() {
-				It("should return an error", func() {
+				It("should return NotFoundError", func() {
 					_, err = store.GetService(ctx, "nonexistent")
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("service not found"))
+
+					var notFound jed.NotFoundError
+					Expect(errors.As(err, &notFound)).To(BeTrue())
+					Expect(notFound.Kind).To(Equal("service"))
+					Expect(notFound.Name).To(Equal("nonexistent"))
 				})
 			})
 		})

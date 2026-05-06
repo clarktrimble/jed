@@ -5,7 +5,7 @@
 Deploy flow:
 
 1. Open the Jed store.
-2. Select `_global` as the render-vars env with `jed.New(ctx, store, "_global")`.
+2. Select `_global` as the render-vars env with `jed.New(ctx, store, "_global", logger)`.
 3. Render the named service with `j.Spec(ctx, name)`, which loads current render vars from the store.
 4. Deploy the rendered `jed.Spec` with `Swarm.Deploy`.
 

@@ -13,7 +13,7 @@ sw.CreateSecret(ctx, "db_password", []byte("hunter2")) // creates db_password_v1
 
 // Deploy from stored Jed state
 store, err := bbolt.New("jed.db")
-j, err := jed.New(ctx, store, "deploy-vars")
+j, err := jed.New(ctx, store, "deploy-vars", logger)
 spec, err := j.Spec(ctx, "myapp")
 body, err := sw.Spec(ctx, spec) // optional: inspect exact Docker service payload
 _ = body
@@ -59,7 +59,7 @@ Return values:
 To build a spec from stored state, load render vars from whichever env name your application uses:
 
 ```go
-j, err := jed.New(ctx, store, "deploy-vars")
+j, err := jed.New(ctx, store, "deploy-vars", logger)
 spec, err := j.Spec(ctx, "myapp")
 ```
 

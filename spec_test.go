@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/clarktrimble/jed"
+	"github.com/clarktrimble/jed/logger/loggertest"
 )
 
 var _ = Describe("Jed", func() {
@@ -23,7 +24,7 @@ var _ = Describe("Jed", func() {
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
 
-			j, err := jed.New(ctx, store, "_global")
+			j, err := jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
 			Expect(err).NotTo(HaveOccurred())
 
 			spec, err := j.Spec(ctx, "app")
@@ -32,8 +33,13 @@ var _ = Describe("Jed", func() {
 		})
 
 		It("rejects a nil store", func() {
-			_, err := jed.New(context.Background(), nil, "_global")
+			_, err := jed.New(context.Background(), nil, "_global", loggertest.NewLoggerMock())
 			Expect(err).To(MatchError("jed has nil store"))
+		})
+
+		It("rejects a nil logger", func() {
+			_, err := jed.New(context.Background(), newFakeStore(), "_global", nil)
+			Expect(err).To(MatchError("jed has nil logger"))
 		})
 	})
 
@@ -42,7 +48,7 @@ var _ = Describe("Jed", func() {
 			ctx := context.Background()
 			store := newFakeStore()
 
-			j, err := jed.New(ctx, store, "_global")
+			j, err := jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(j.Store()).To(BeIdenticalTo(store))
 		})
@@ -70,7 +76,7 @@ var _ = Describe("Jed", func() {
 				Network:  "svc-net",
 				Replicas: 1,
 			}
-			j, err = jed.New(ctx, store, "_global")
+			j, err = jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -121,7 +127,7 @@ var _ = Describe("Jed", func() {
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "8080"}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
 
-			j, err = jed.New(ctx, store, "_global")
+			j, err = jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
 			Expect(err).NotTo(HaveOccurred())
 		})
 
