@@ -36,6 +36,11 @@ func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created b
 	}
 
 	err = d.updateService(ctx, service.Name, svcInfo.Version.Index, body)
+	if err != nil {
+		return
+	}
+
+	id = svcInfo.ID
 	return
 }
 

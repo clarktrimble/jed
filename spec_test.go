@@ -37,6 +37,69 @@ var _ = Describe("Jed", func() {
 		})
 	})
 
+	Describe("Store", func() {
+		It("returns the underlying store", func() {
+			ctx := context.Background()
+			store := newFakeStore()
+
+			j, err := jed.New(ctx, store, "_global")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(j.Store()).To(BeIdenticalTo(store))
+		})
+
+		It("returns nil for a nil Jed", func() {
+			var j *jed.Jed
+			Expect(j.Store()).To(BeNil())
+		})
+	})
+
+	Describe("Scale", func() {
+		var (
+			ctx   context.Context
+			store *fakeStore
+			j     *jed.Jed
+			err   error
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			store = newFakeStore()
+			store.services["app"] = jed.Service{
+				Name:     "app",
+				Image:    "local/app:v1",
+				Network:  "svc-net",
+				Replicas: 1,
+			}
+			j, err = jed.New(ctx, store, "_global")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("updates the stored replica count", func() {
+			err := j.Scale(ctx, "app", 3)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.services["app"].Replicas).To(Equal(3))
+		})
+
+		It("allows scaling to zero", func() {
+			err := j.Scale(ctx, "app", 0)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.services["app"].Replicas).To(Equal(0))
+		})
+
+		It("rejects negative replica counts", func() {
+			err := j.Scale(ctx, "app", -1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("replicas cannot be negative"))
+			Expect(store.services["app"].Replicas).To(Equal(1))
+		})
+
+		It("returns store lookup errors", func() {
+			err := j.Scale(ctx, "missing", 2)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to get service"))
+		})
+	})
+
 	Describe("Spec", func() {
 		var (
 			ctx   context.Context
@@ -123,6 +186,18 @@ var _ = Describe("Spec", func() {
 			Expect(spec.Service.Labels).To(HaveKeyWithValue("mode", "prod"))
 		})
 
+		It("expands link URL vars", func() {
+			svc.About.Links = []jed.Link{
+				{Text: "app", Url: "https://{{VHOST}}/dashboard?port={{PORT}}"},
+			}
+
+			spec, err := jed.Render(svc, env, vars)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.About.Links).To(Equal([]jed.Link{
+				{Text: "app", Url: "https://app.example.com/dashboard?port=8080"},
+			}))
+		})
+
 		It("lets service env win over injected vars", func() {
 			env.Vars["VHOST"] = "override.example.com"
 
@@ -140,6 +215,17 @@ var _ = Describe("Spec", func() {
 		})
 
 		It("fails on missing vars", func() {
+			delete(vars, "VHOST")
+
+			_, err := jed.Render(svc, env, vars)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("VHOST"))
+		})
+
+		It("fails on missing link URL vars", func() {
+			svc.Command = nil
+			svc.Labels = nil
+			svc.About.Links = []jed.Link{{Text: "app", Url: "https://{{VHOST}}"}}
 			delete(vars, "VHOST")
 
 			_, err := jed.Render(svc, env, vars)

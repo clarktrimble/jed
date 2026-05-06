@@ -17,6 +17,7 @@ type Service struct {
 
 // ServiceInfo holds the full response from the Docker service endpoint.
 type ServiceInfo struct {
+	ID      string `json:"ID"`
 	Version struct {
 		Index int `json:"Index"`
 	} `json:"Version"`

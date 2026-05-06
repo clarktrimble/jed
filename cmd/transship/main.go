@@ -187,10 +187,14 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	}
 	fmt.Printf("  env: %d vars\n", len(spec.Env.Vars))
 
+	shortID := id
+	if len(shortID) > 12 {
+		shortID = shortID[:12]
+	}
 	if created {
-		fmt.Printf("created %s (%s)\n", name, id[:12])
+		fmt.Printf("created %s (%s)\n", name, shortID)
 	} else {
-		fmt.Printf("updated %s\n", name)
+		fmt.Printf("updated %s (%s)\n", name, shortID)
 	}
 }
 

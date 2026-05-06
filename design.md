@@ -46,6 +46,8 @@ Tradeoff: callers cannot distinguish “no env exists” from “empty env exist
 
 The store does not enforce referential integrity. Env can exist without a matching service, and deleting a service does not inherently delete env unless a caller chooses to do both. This keeps the store simple and flexible, but stricter applications must enforce their own policy.
 
+`Jed.Scale(ctx, name, count)` updates the stored replica count for callers that manage desired scale separately from service YAML editing. It changes desired state only; runtimes still apply the new count on a later deploy.
+
 ## Rendering Decisions
 
 There are two rendering entry points:
@@ -62,7 +64,7 @@ Rendering rules:
 - Render vars are not added to `Spec.Env`.
 - Expansion is single-pass.
 - Missing vars fail before runtime deploy.
-- Current render surface is intentionally small: command args and labels.
+- Current render surface is intentionally small: command args, labels, and about link URLs.
 
 ## Swarm Runtime Projection
 
@@ -70,7 +72,7 @@ Rendering rules:
 
 `Swarm.Spec(ctx, spec)` validates the rendered service, resolves latest versioned swarm secrets/configs, and returns the Docker service payload as `swarm.Spec` without creating or updating anything. This is the introspection seam for dry-run/preview-style consumers.
 
-`Swarm.Deploy(ctx, spec)` uses the same projection and then creates the service if it does not exist or updates it if it does. It returns `created=true` only for creates. Missing service detection uses `swarm.ErrServiceNotFound` and `errors.Is` rather than string matching.
+`Swarm.Deploy(ctx, spec)` uses the same projection and then creates the service if it does not exist or updates it if it does. It returns the Docker service ID for both creates and updates, and returns `created=true` only for creates. Missing service detection uses `swarm.ErrServiceNotFound` and `errors.Is` rather than string matching.
 
 The swarm package builds Docker API payloads from assembled Go values rather than JSON templates.
 

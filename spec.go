@@ -13,7 +13,7 @@ type Spec struct {
 	Env     Env
 }
 
-// Render renders service using vars and env.Vars as template variables.
+// Render renders service command args, labels, and about link URLs using vars and env.Vars as template variables.
 // env.Vars win over vars on key collisions. Render vars are not added to Env.
 func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 	tplVars := make(map[string]string, len(vars)+len(env.Vars))
@@ -36,6 +36,14 @@ func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 			return Spec{}, err
 		}
 		renderedService.Labels = labels
+	}
+
+	if len(service.About.Links) > 0 {
+		links, err := expandLinkVars(service.About.Links, tplVars)
+		if err != nil {
+			return Spec{}, err
+		}
+		renderedService.About.Links = links
 	}
 
 	return Spec{
@@ -95,6 +103,19 @@ func expandMapVars(m map[string]string, vars map[string]string) (map[string]stri
 			return nil, err
 		}
 		result[k] = expanded
+	}
+	return result, nil
+}
+
+func expandLinkVars(links []Link, vars map[string]string) ([]Link, error) {
+	result := make([]Link, len(links))
+	for i, link := range links {
+		expanded, err := expandString(link.Url, vars)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = link
+		result[i].Url = expanded
 	}
 	return result, nil
 }

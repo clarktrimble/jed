@@ -52,8 +52,9 @@ body, err := sw.Spec(ctx, spec) // body has type swarm.Spec
 
 Return values:
 
-- `created == true`: a new service was created and `id` is its Docker service ID.
-- `created == false`: an existing service was updated and `id` is empty.
+- `id`: the Docker service ID after create or update.
+- `created == true`: a new service was created.
+- `created == false`: an existing service was updated.
 
 To build a spec from stored state, load render vars from whichever env name your application uses:
 

@@ -72,6 +72,40 @@ func New(ctx context.Context, store Store, varsEnvName string) (*Jed, error) {
 	return &Jed{store: store, vars: maps.Clone(env.Vars)}, nil
 }
 
+// Store returns the underlying store.
+func (j *Jed) Store() Store {
+	if j == nil {
+		return nil
+	}
+	return j.store
+}
+
+// Scale updates the stored replica count for service name.
+func (j *Jed) Scale(ctx context.Context, name string, count int) error {
+	if j == nil {
+		return errors.New("nil jed")
+	}
+	if j.store == nil {
+		return errors.New("jed has nil store")
+	}
+
+	svc, err := j.store.GetService(ctx, name)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get service %q from store", name)
+	}
+
+	svc.Replicas = count
+	if err := svc.Validate(); err != nil {
+		return errors.Wrapf(err, "failed to validate service %q", name)
+	}
+
+	if err := j.store.SetService(ctx, svc); err != nil {
+		return errors.Wrapf(err, "failed to set service %q in store", name)
+	}
+
+	return nil
+}
+
 // Spec loads service and env by name from the store and returns a rendered spec.
 func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 	if j == nil {

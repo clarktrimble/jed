@@ -8,7 +8,7 @@ Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 - `jed.Env` is the container/runtime environment for a service.
 - `jed.Spec` is rendered, runtime-neutral intended state: `Service + Env` after template expansion.
 - `jed.Store` persists services and envs.
-- `jed.Jed` loads stored state and renders specs by service name.
+- `jed.Jed` loads stored state, renders specs by service name, and updates selected stored state such as replica counts.
 
 Runtime packages consume Jed model values:
 
@@ -41,7 +41,9 @@ if err != nil {
     // handle error
 }
 if created {
-    // id is the new swarm service ID
+    // id is the created swarm service ID
+} else {
+    // id is the updated swarm service ID
 }
 ```
 

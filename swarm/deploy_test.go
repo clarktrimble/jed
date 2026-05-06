@@ -105,7 +105,7 @@ var _ = Describe("Deploy", func() {
 					// GetService: return list with one service
 					case method == "GET" && strings.Contains(path, "/services?"):
 						mockResponse([]map[string]any{
-							{"Version": map[string]any{"Index": 42}},
+							{"ID": "svc-existing-123", "Version": map[string]any{"Index": 42}},
 						}, rcv)
 						return nil
 
@@ -134,7 +134,7 @@ var _ = Describe("Deploy", func() {
 
 		It("should update without error", func() {
 			Expect(err).NotTo(HaveOccurred())
-			Expect(id).To(BeEmpty())
+			Expect(id).To(Equal("svc-existing-123"))
 			Expect(created).To(BeFalse())
 		})
 
