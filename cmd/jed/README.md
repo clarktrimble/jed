@@ -40,7 +40,7 @@ Env files use `.env` syntax. Env is stored separately from service definitions, 
 
 ## Render Vars
 
-Env entries can also render `{{VAR}}` placeholders in service command args and labels. The `transship` CLI convention is to load deployment-level render vars from `_global`:
+Env entries can also render `{{VAR}}` placeholders in service command args, labels, and about link URLs. The `transship` CLI convention is to load deployment-level render vars from `_global` when rendering:
 
 ```sh
 jed set-env _global global.env

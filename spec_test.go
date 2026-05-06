@@ -137,6 +137,15 @@ var _ = Describe("Jed", func() {
 			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
 		})
 
+		It("reloads render vars from the store", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "updated.example.com"}}
+			spec, err = j.Spec(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=updated.example.com", "--port=8080"}))
+		})
+
 		When("the service is invalid", func() {
 			BeforeEach(func() {
 				store.services["app"] = jed.Service{Name: "app", Image: "local/app:v1"}

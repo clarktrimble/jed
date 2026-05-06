@@ -55,7 +55,7 @@ There are two rendering entry points:
 - `jed.Render(service, env, vars)` renders raw values supplied by the caller.
 - `jed.New(ctx, store, varsEnvName)` plus `j.Spec(ctx, name)` loads from a store and renders by service name.
 
-`jed.New(ctx, store, varsEnvName)` loads render vars from the named env. The env name is explicit. `_global` is a `cmd/transship` CLI convention, not a magic library default.
+`jed.New(ctx, store, varsEnvName)` records the named env to use for render vars, and `j.Spec(ctx, name)` reloads that env when rendering so store edits are visible to existing `Jed` values. The env name is explicit. `_global` is a `cmd/transship` CLI convention, not a magic library default.
 
 Rendering rules:
 

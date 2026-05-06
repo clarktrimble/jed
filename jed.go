@@ -8,7 +8,6 @@ package jed
 
 import (
 	"context"
-	"maps"
 
 	"github.com/pkg/errors"
 )
@@ -54,22 +53,21 @@ type Env struct {
 
 // Jed loads stored service state and renders runtime-neutral specs.
 type Jed struct {
-	store Store
-	vars  map[string]string
+	store       Store
+	varsEnvName string
 }
 
-// New creates a Jed using render vars loaded from varsEnvName.
+// New creates a Jed that uses render vars from varsEnvName.
 func New(ctx context.Context, store Store, varsEnvName string) (*Jed, error) {
 	if store == nil {
 		return nil, errors.New("jed has nil store")
 	}
 
-	env, err := store.GetEnv(ctx, varsEnvName)
-	if err != nil {
+	if _, err := store.GetEnv(ctx, varsEnvName); err != nil {
 		return nil, errors.Wrapf(err, "failed to get vars env %q from store", varsEnvName)
 	}
 
-	return &Jed{store: store, vars: maps.Clone(env.Vars)}, nil
+	return &Jed{store: store, varsEnvName: varsEnvName}, nil
 }
 
 // Store returns the underlying store.
@@ -106,7 +104,7 @@ func (j *Jed) Scale(ctx context.Context, name string, count int) error {
 	return nil
 }
 
-// Spec loads service and env by name from the store and returns a rendered spec.
+// Spec loads service, env, and current render vars from the store and returns a rendered spec.
 func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 	if j == nil {
 		return Spec{}, errors.New("nil jed")
@@ -124,12 +122,17 @@ func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 		return Spec{}, errors.Wrapf(err, "failed to validate service %q", name)
 	}
 
+	varsEnv, err := j.store.GetEnv(ctx, j.varsEnvName)
+	if err != nil {
+		return Spec{}, errors.Wrapf(err, "failed to get vars env %q from store", j.varsEnvName)
+	}
+
 	env, err := j.store.GetEnv(ctx, name)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to get env %q from store", name)
 	}
 
-	spec, err := Render(svc, env, j.vars)
+	spec, err := Render(svc, env, varsEnv.Vars)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to render spec for service %q", name)
 	}
