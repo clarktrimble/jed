@@ -59,8 +59,9 @@ There are two rendering entry points:
 
 Rendering rules:
 
-- Caller-supplied vars and `env.Vars` participate in rendering.
-- `env.Vars` wins on key collisions.
+- Caller-supplied vars and `env.Vars` participate in rendering service values.
+- `env.Vars` wins on key collisions when rendering service values.
+- Env values render from caller-supplied vars only; env vars do not template each other.
 - Render vars are not added to `Spec.Env`.
 - Expansion is single-pass.
 - Missing vars fail before runtime deploy.

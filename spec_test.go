@@ -281,11 +281,22 @@ var _ = Describe("Spec", func() {
 			Expect(spec.Service.Labels).To(HaveKeyWithValue("host", "override.example.com"))
 		})
 
-		It("does not add injected vars to Spec.Env", func() {
+		It("renders env values from injected vars without adding injected vars to Spec.Env", func() {
+			env.Vars["FWD_URL"] = "https://{{VHOST}}/fwd"
+
 			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
+			Expect(spec.Env.Vars).To(HaveKeyWithValue("FWD_URL", "https://app.example.com/fwd"))
 			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
+		})
+
+		It("does not render env values from sibling env vars", func() {
+			env.Vars["FWD_URL"] = "https://{{PORT}}/fwd"
+
+			_, err := jed.Render(svc, env, vars)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("PORT"))
 		})
 
 		It("fails on missing vars", func() {
@@ -309,7 +320,7 @@ var _ = Describe("Spec", func() {
 
 		It("expands in a single pass", func() {
 			svc.Command = []string{"run", "{{TRICKY}}"}
-			env.Vars["TRICKY"] = "has{{NESTED}}braces"
+			vars["TRICKY"] = "has{{NESTED}}braces"
 
 			spec, err := jed.Render(svc, env, vars)
 			Expect(err).NotTo(HaveOccurred())

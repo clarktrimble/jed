@@ -16,8 +16,10 @@ type Spec struct {
 	Env Env `json:"env"`
 }
 
-// Render renders all string values in service using vars and env.Vars as template variables.
-// env.Vars win over vars on key collisions. Render vars are not added to Env.
+// Render renders all string values in service and env using template variables.
+// Service values render with vars and env.Vars; env.Vars win on key collisions.
+// Env values render with vars only, so env vars do not template each other.
+// Render vars are not added to Env.
 func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 	tplVars := make(map[string]string, len(vars)+len(env.Vars))
 	maps.Copy(tplVars, vars)
@@ -28,9 +30,14 @@ func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 		return Spec{}, err
 	}
 
+	renderedEnv := cloneEnv(env)
+	if err := expandStrings(reflect.ValueOf(&renderedEnv).Elem(), vars); err != nil {
+		return Spec{}, err
+	}
+
 	return Spec{
 		Service: renderedService,
-		Env:     cloneEnv(env),
+		Env:     renderedEnv,
 	}, nil
 }
 

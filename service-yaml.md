@@ -68,7 +68,7 @@ labels:
   prometheus_host: "{{PROM_HOST}}"
 ```
 
-Render vars come from caller-supplied vars plus the service env. Service env wins on collisions. Caller-supplied render vars are not added to the container environment.
+Service values render from caller-supplied vars plus the service env. Service env wins on collisions. Env values render from caller-supplied vars only; env vars do not template each other. Caller-supplied render vars are not added to the container environment.
 
 Expansion is single-pass. Missing variables fail spec rendering. CLI-specific render-var conventions are documented with the CLIs.
 
