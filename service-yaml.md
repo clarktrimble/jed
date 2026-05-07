@@ -60,7 +60,7 @@ resources:
 
 ## Template Expansion
 
-Command args, label values, and about link URLs may contain `{{VAR}}` placeholders. They are rendered by `jed.Render` / `jed.Jed.Spec` before runtime deploy.
+Any string value in a service definition may contain `{{VAR}}` placeholders. They are rendered by `jed.Render` / `jed.Jed.Spec` before runtime deploy.
 
 ```yaml
 command:

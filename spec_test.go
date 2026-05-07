@@ -213,6 +213,65 @@ var _ = Describe("Spec", func() {
 			}))
 		})
 
+		It("expands vars throughout service strings", func() {
+			gid := 1234
+			svc.Image = "postgres:{{PG_VERSION}}"
+			svc.Network = "{{NETWORK}}"
+			svc.User = "1000:{{DOCKER_GID}}"
+			svc.Volumes = map[string]string{"{{CERTS_PATH}}": "/certs/{{CERT_NAME}}"}
+			svc.Ports = map[string]string{"{{CONTAINER_PORT}}/tcp": "{{HOST_PORT}}"}
+			svc.Secrets = []string{"{{SECRET_NAME}}"}
+			svc.Configs = map[string]string{"{{CONFIG_NAME}}": "/etc/{{CONFIG_FILE}}"}
+			svc.Hosts = []string{"{{HOST_IP}} {{HOST_NAME}}"}
+			svc.Resources = jed.Resources{CPULimit: "{{CPU_LIMIT}}"}
+			svc.Restart.MaxAttempts = &gid
+			svc.Traefik = &jed.Traefik{Port: "{{TRAEFIK_PORT}}"}
+			svc.About = jed.About{
+				Desc:  "{{DESC}}",
+				Links: []jed.Link{{Text: "{{LINK_TEXT}}", Url: "https://{{VHOST}}"}},
+				Notes: []jed.Note{{Author: "{{AUTHOR}}", Content: "{{NOTE}}"}},
+			}
+			vars = map[string]string{
+				"AUTHOR":         "ops",
+				"CERT_NAME":      "ca.pem",
+				"CERTS_PATH":     "/srv/certs",
+				"CONFIG_FILE":    "app.conf",
+				"CONFIG_NAME":    "app_config",
+				"CONTAINER_PORT": "5432",
+				"CPU_LIMIT":      "1.0",
+				"DESC":           "database",
+				"DOCKER_GID":     "967",
+				"HOST_IP":        "10.0.0.10",
+				"HOST_NAME":      "db.local",
+				"HOST_PORT":      "15432",
+				"LINK_TEXT":      "dashboard",
+				"NETWORK":        "prod-net",
+				"NOTE":           "ready",
+				"PG_VERSION":     "16",
+				"SECRET_NAME":    "db_password",
+				"TRAEFIK_PORT":   "8080",
+				"VHOST":          "app.example.com",
+			}
+
+			spec, err := jed.Render(svc, env, vars)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.Image).To(Equal("postgres:16"))
+			Expect(spec.Service.Network).To(Equal("prod-net"))
+			Expect(spec.Service.User).To(Equal("1000:967"))
+			Expect(spec.Service.Volumes).To(HaveKeyWithValue("/srv/certs", "/certs/ca.pem"))
+			Expect(spec.Service.Ports).To(HaveKeyWithValue("5432/tcp", "15432"))
+			Expect(spec.Service.Secrets).To(Equal([]string{"db_password"}))
+			Expect(spec.Service.Configs).To(HaveKeyWithValue("app_config", "/etc/app.conf"))
+			Expect(spec.Service.Hosts).To(Equal([]string{"10.0.0.10 db.local"}))
+			Expect(spec.Service.Resources.CPULimit).To(Equal("1.0"))
+			Expect(*spec.Service.Restart.MaxAttempts).To(Equal(gid))
+			Expect(spec.Service.Traefik.Port).To(Equal("8080"))
+			Expect(spec.Service.About.Desc).To(Equal("database"))
+			Expect(spec.Service.About.Links).To(Equal([]jed.Link{{Text: "dashboard", Url: "https://app.example.com"}}))
+			Expect(spec.Service.About.Notes[0].Author).To(Equal("ops"))
+			Expect(spec.Service.About.Notes[0].Content).To(Equal("ready"))
+		})
+
 		It("lets service env win over injected vars", func() {
 			env.Vars["VHOST"] = "override.example.com"
 

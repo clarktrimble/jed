@@ -4,7 +4,7 @@ Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 
 ## Concepts
 
-- `jed.Service` is editable service configuration. It may contain `{{VAR}}` templates in command args and labels.
+- `jed.Service` is editable service configuration. Any string value may contain `{{VAR}}` templates.
 - `jed.Env` is the container/runtime environment for a service.
 - `jed.Spec` is rendered, runtime-neutral intended state: `Service + Env` after template expansion.
 - `jed.Store` persists services and envs.

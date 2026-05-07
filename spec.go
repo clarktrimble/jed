@@ -3,6 +3,7 @@ package jed
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 )
@@ -15,7 +16,7 @@ type Spec struct {
 	Env Env `json:"env"`
 }
 
-// Render renders service command args, labels, and about link URLs using vars and env.Vars as template variables.
+// Render renders all string values in service using vars and env.Vars as template variables.
 // env.Vars win over vars on key collisions. Render vars are not added to Env.
 func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 	tplVars := make(map[string]string, len(vars)+len(env.Vars))
@@ -23,29 +24,8 @@ func Render(service Service, env Env, vars map[string]string) (Spec, error) {
 	maps.Copy(tplVars, env.Vars)
 
 	renderedService := cloneService(service)
-
-	if len(service.Command) > 0 {
-		command, err := expandVars(service.Command, tplVars)
-		if err != nil {
-			return Spec{}, err
-		}
-		renderedService.Command = command
-	}
-
-	if len(service.Labels) > 0 {
-		labels, err := expandMapVars(service.Labels, tplVars)
-		if err != nil {
-			return Spec{}, err
-		}
-		renderedService.Labels = labels
-	}
-
-	if len(service.About.Links) > 0 {
-		links, err := expandLinkVars(service.About.Links, tplVars)
-		if err != nil {
-			return Spec{}, err
-		}
-		renderedService.About.Links = links
+	if err := expandStrings(reflect.ValueOf(&renderedService).Elem(), tplVars); err != nil {
+		return Spec{}, err
 	}
 
 	return Spec{
@@ -85,41 +65,78 @@ func cloneEnv(env Env) Env {
 	}
 }
 
-func expandVars(args []string, vars map[string]string) ([]string, error) {
-	result := make([]string, len(args))
-	for i, arg := range args {
-		expanded, err := expandString(arg, vars)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = expanded
+// expandStrings walks Go values directly rather than marshal/replace/unmarshal.
+// Rendering is a Service-domain operation, not a YAML/JSON text transform: walking
+// values avoids coupling render behavior to serialization tags, omitempty behavior,
+// timestamp formatting, or nil-vs-empty collection round trips.
+func expandStrings(v reflect.Value, vars map[string]string) error {
+	if !v.IsValid() {
+		return nil
 	}
-	return result, nil
+
+	switch v.Kind() {
+	case reflect.Pointer:
+		if v.IsNil() {
+			return nil
+		}
+		return expandStrings(v.Elem(), vars)
+	case reflect.Struct:
+		for i := range v.NumField() {
+			field := v.Field(i)
+			if !field.CanSet() {
+				continue
+			}
+			if err := expandStrings(field, vars); err != nil {
+				return err
+			}
+		}
+	case reflect.Slice:
+		for i := range v.Len() {
+			if err := expandStrings(v.Index(i), vars); err != nil {
+				return err
+			}
+		}
+	case reflect.Map:
+		expanded := reflect.MakeMapWithSize(v.Type(), v.Len())
+		for _, key := range v.MapKeys() {
+			expandedKey, err := expandMapKey(key, vars)
+			if err != nil {
+				return err
+			}
+
+			expandedVal := reflect.New(v.Type().Elem()).Elem()
+			expandedVal.Set(v.MapIndex(key))
+			if err := expandStrings(expandedVal, vars); err != nil {
+				return err
+			}
+
+			expanded.SetMapIndex(expandedKey, expandedVal)
+		}
+		v.Set(expanded)
+	case reflect.String:
+		expanded, err := expandString(v.String(), vars)
+		if err != nil {
+			return err
+		}
+		v.SetString(expanded)
+	}
+
+	return nil
 }
 
-func expandMapVars(m map[string]string, vars map[string]string) (map[string]string, error) {
-	result := make(map[string]string, len(m))
-	for k, v := range m {
-		expanded, err := expandString(v, vars)
-		if err != nil {
-			return nil, err
-		}
-		result[k] = expanded
+func expandMapKey(key reflect.Value, vars map[string]string) (reflect.Value, error) {
+	if key.Kind() != reflect.String {
+		return key, nil
 	}
-	return result, nil
-}
 
-func expandLinkVars(links []Link, vars map[string]string) ([]Link, error) {
-	result := make([]Link, len(links))
-	for i, link := range links {
-		expanded, err := expandString(link.Url, vars)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = link
-		result[i].Url = expanded
+	expanded, err := expandString(key.String(), vars)
+	if err != nil {
+		return reflect.Value{}, err
 	}
-	return result, nil
+
+	expandedKey := reflect.New(key.Type()).Elem()
+	expandedKey.SetString(expanded)
+	return expandedKey, nil
 }
 
 func expandString(s string, vars map[string]string) (string, error) {

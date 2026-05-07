@@ -23,7 +23,7 @@ The standalone runtime lives in `container`, making it a peer of `swarm` while k
 
 ## Desired State vs Rendered Specs
 
-`jed.Service` is editable and persisted desired state. It describes what should run: image, command, ports, volumes, network, labels, secrets, configs, resources, user, replicas, and related metadata. It may contain templates in currently supported fields.
+`jed.Service` is editable and persisted desired state. It describes what should run: image, command, ports, volumes, network, labels, secrets, configs, resources, user, replicas, and related metadata. Any string value in the service may contain templates.
 
 `jed.Env` holds container/runtime environment variables separately from the service definition.
 
@@ -64,7 +64,7 @@ Rendering rules:
 - Render vars are not added to `Spec.Env`.
 - Expansion is single-pass.
 - Missing vars fail before runtime deploy.
-- Current render surface is intentionally small: command args, labels, and about link URLs.
+- All string values in `Service` participate in rendering, including nested structs, slices, maps, and map keys.
 
 ## Swarm Runtime Projection
 
