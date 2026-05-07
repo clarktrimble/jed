@@ -44,6 +44,13 @@ var _ = Describe("Service", func() {
 			Expect(string(data)).NotTo(ContainSubstring(`"Name"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Image"`))
 		})
+
+		It("accepts restart as a string", func() {
+			var svc jed.Service
+			err := json.Unmarshal([]byte(`{"name":"app","image":"app:v1","network":"svc-net","restart":"on-failure"}`), &svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(svc.Restart).To(Equal(jed.RestartOnFailure))
+		})
 	})
 
 	Describe("Validate", func() {
@@ -66,24 +73,11 @@ var _ = Describe("Service", func() {
 				Name:    "app",
 				Image:   "app:v1",
 				Network: "svc-net",
-				Restart: jed.RestartPolicy{Condition: "sometimes"},
+				Restart: "sometimes",
 			}
 			err := svc.Validate()
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("restart condition"))
-		})
-
-		It("rejects negative restart attempts", func() {
-			attempts := -1
-			svc := jed.Service{
-				Name:    "app",
-				Image:   "app:v1",
-				Network: "svc-net",
-				Restart: jed.RestartPolicy{Condition: jed.RestartOnFailure, MaxAttempts: &attempts},
-			}
-			err := svc.Validate()
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("restart max_attempts cannot be negative"))
+			Expect(err.Error()).To(ContainSubstring("restart"))
 		})
 	})
 })

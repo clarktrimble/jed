@@ -64,8 +64,7 @@ func buildVolumeConfig(volumes map[string]string) []string {
 	return binds
 }
 
-func containerRestartPolicy(policy jed.RestartPolicy) map[string]any {
-	name := policy.Condition
+func containerRestartPolicy(name string) map[string]any {
 	switch name {
 	case "", jed.RestartNone:
 		name = "no"
@@ -73,11 +72,7 @@ func containerRestartPolicy(policy jed.RestartPolicy) map[string]any {
 		name = "always"
 	}
 
-	restart := map[string]any{"Name": name}
-	if policy.MaxAttempts != nil {
-		restart["MaximumRetryCount"] = *policy.MaxAttempts
-	}
-	return restart
+	return map[string]any{"Name": name}
 }
 
 func envLines(env map[string]string) (lines []string) {

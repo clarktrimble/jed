@@ -10,9 +10,7 @@ image: local/reauth-acp:3c070f2
 network: svc-net
 replicas: 1
 
-restart:
-  condition: on-failure
-  max_attempts: 3
+restart: on-failure
 
 ports:
   3031/tcp: "8012"
@@ -51,7 +49,7 @@ resources:
 | `configs` | no | Swarm config base names mapped to target mount paths |
 | `hosts` | no | Extra `/etc/hosts` entries |
 | `resources` | no | CPU and memory limits/reservations |
-| `restart` | no | Restart policy (`condition`, optional `max_attempts`) |
+| `restart` | no | Restart policy (`none`, `on-failure`, `any`) |
 | `publish_mode` | no | Port publish mode: `host` for direct binding; default is ingress |
 | `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1001` |
 | `traefik` | no | Traefik routing config; generates labels automatically |
@@ -76,12 +74,10 @@ Expansion is single-pass. Missing variables fail spec rendering. CLI-specific re
 
 ## Restart
 
-Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`. For swarm, `on-failure` defaults to one attempt when `max_attempts` is omitted.
+Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`. For swarm, `on-failure` uses one restart attempt.
 
 ```yaml
-restart:
-  condition: on-failure
-  max_attempts: 3
+restart: on-failure
 ```
 
 ## Resources

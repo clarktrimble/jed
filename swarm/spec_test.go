@@ -31,7 +31,7 @@ var _ = Describe("Spec", func() {
 			Ports:   map[string]string{"3031/tcp": "8012"},
 			Volumes: map[string]string{"svc-data": "/data"},
 			Network: "svc-net",
-			Restart: jed.RestartPolicy{Condition: jed.RestartOnFailure},
+			Restart: jed.RestartOnFailure,
 			Secrets: []string{"aruba_client_secret"},
 		}
 		env = jed.Env{
@@ -128,7 +128,7 @@ var _ = Describe("Spec", func() {
 	Describe("with default restart policy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
-			svc.Restart = jed.RestartPolicy{}
+			svc.Restart = ""
 		})
 
 		It("disables restarts", func() {
@@ -141,9 +141,8 @@ var _ = Describe("Spec", func() {
 
 	Describe("with on-failure restart policy", func() {
 		BeforeEach(func() {
-			attempts := 3
 			svc.Secrets = nil
-			svc.Restart = jed.RestartPolicy{Condition: jed.RestartOnFailure, MaxAttempts: &attempts}
+			svc.Restart = jed.RestartOnFailure
 		})
 
 		It("includes restart details", func() {
@@ -152,7 +151,7 @@ var _ = Describe("Spec", func() {
 			restart := body["TaskTemplate"].(map[string]any)["RestartPolicy"].(map[string]any)
 			Expect(restart["Condition"]).To(Equal("on-failure"))
 			Expect(restart["Delay"]).To(Equal(5000000000))
-			Expect(restart["MaxAttempts"]).To(Equal(3))
+			Expect(restart["MaxAttempts"]).To(Equal(1))
 		})
 	})
 

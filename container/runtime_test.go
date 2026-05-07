@@ -49,7 +49,7 @@ var _ = Describe("Runtime", func() {
 			Name:    "test-app",
 			Image:   "test:v1",
 			Network: "test-net",
-			Restart: jed.RestartPolicy{Condition: jed.RestartAny},
+			Restart: jed.RestartAny,
 			Ports:   map[string]string{"8080/tcp": "8080"},
 			Labels:  map[string]string{"app": "test", "version": "1.0"},
 			Volumes: map[string]string{"/host/path": "/container/path"},

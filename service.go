@@ -30,17 +30,6 @@ const (
 	RestartAny = "any"
 )
 
-// RestartPolicy specifies whether a runtime should restart failed tasks or containers.
-//
-// Condition is one of "none", "on-failure", or "any". Empty means "none".
-// MaxAttempts limits restart attempts where supported. Nil means runtime default.
-type RestartPolicy struct {
-	// Condition controls when the runtime restarts a failed task or container.
-	Condition string `json:"condition,omitempty"`
-	// MaxAttempts limits restart attempts where supported by the runtime.
-	MaxAttempts *int `json:"max_attempts,omitempty"`
-}
-
 // Traefik specifies traefik routing configuration.
 type Traefik struct {
 	// Port is the container port that traefik should route traffic to.
@@ -141,7 +130,7 @@ type Service struct {
 	// Network is the Docker network name.
 	Network string `json:"network"`
 	// Restart specifies restart behavior. Empty means no restart.
-	Restart RestartPolicy `json:"restart,omitempty"`
+	Restart string `json:"restart,omitempty"`
 	// Secrets lists swarm secret base names to mount (e.g., "s3_secret_key").
 	Secrets []string `json:"secrets,omitempty"`
 	// Configs maps swarm config base names to target paths (e.g., "myapp_config": "/etc/myapp/app.conf").
@@ -193,11 +182,8 @@ func (service Service) Validate() error {
 	if service.User != "" && !validUser(service.User) {
 		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values", service.User))
 	}
-	if service.Restart.Condition != "" && service.Restart.Condition != RestartNone && service.Restart.Condition != RestartOnFailure && service.Restart.Condition != RestartAny {
-		issues = append(issues, fmt.Sprintf("restart condition %q must be one of %q, %q, or %q", service.Restart.Condition, RestartNone, RestartOnFailure, RestartAny))
-	}
-	if service.Restart.MaxAttempts != nil && *service.Restart.MaxAttempts < 0 {
-		issues = append(issues, "restart max_attempts cannot be negative")
+	if service.Restart != "" && service.Restart != RestartNone && service.Restart != RestartOnFailure && service.Restart != RestartAny {
+		issues = append(issues, fmt.Sprintf("restart %q must be one of %q, %q, or %q", service.Restart, RestartNone, RestartOnFailure, RestartAny))
 	}
 	if service.Replicas < 0 {
 		issues = append(issues, "replicas cannot be negative")

@@ -52,7 +52,7 @@ func RunStoreContractTests(
 					Name:    "postgres",
 					Image:   "postgres:14",
 					Network: "app-net",
-					Restart: jed.RestartPolicy{Condition: jed.RestartAny},
+					Restart: jed.RestartAny,
 					Ports: map[string]string{
 						"5432/tcp": "5432",
 					},

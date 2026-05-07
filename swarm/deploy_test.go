@@ -33,7 +33,7 @@ var _ = Describe("Deploy", func() {
 			Ports:   map[string]string{"3031/tcp": "8012"},
 			Volumes: map[string]string{"svc-data": "/data"},
 			Network: "svc-net",
-			Restart: jed.RestartPolicy{Condition: jed.RestartOnFailure},
+			Restart: jed.RestartOnFailure,
 			Secrets: []string{"aruba_client_secret"},
 		}
 

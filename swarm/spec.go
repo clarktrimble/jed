@@ -284,7 +284,7 @@ func parseMem(s string) (int64, error) {
 }
 
 func restartPolicy(service jed.Service) map[string]any {
-	condition := service.Restart.Condition
+	condition := service.Restart
 	if condition == "" {
 		condition = jed.RestartNone
 	}
@@ -299,9 +299,7 @@ func restartPolicy(service jed.Service) map[string]any {
 		"Condition": condition,
 		"Delay":     5000000000,
 	}
-	if service.Restart.MaxAttempts != nil {
-		restart["MaxAttempts"] = *service.Restart.MaxAttempts
-	} else if condition == jed.RestartOnFailure {
+	if condition == jed.RestartOnFailure {
 		restart["MaxAttempts"] = 1
 	}
 	return restart

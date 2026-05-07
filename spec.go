@@ -46,10 +46,6 @@ func cloneService(service Service) Service {
 	clone.About.Links = slices.Clone(service.About.Links)
 	clone.About.Notes = slices.Clone(service.About.Notes)
 
-	if service.Restart.MaxAttempts != nil {
-		attempts := *service.Restart.MaxAttempts
-		clone.Restart.MaxAttempts = &attempts
-	}
 	if service.Traefik != nil {
 		traefik := *service.Traefik
 		clone.Traefik = &traefik

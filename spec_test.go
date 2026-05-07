@@ -214,7 +214,6 @@ var _ = Describe("Spec", func() {
 		})
 
 		It("expands vars throughout service strings", func() {
-			gid := 1234
 			svc.Image = "postgres:{{PG_VERSION}}"
 			svc.Network = "{{NETWORK}}"
 			svc.User = "1000:{{DOCKER_GID}}"
@@ -224,7 +223,7 @@ var _ = Describe("Spec", func() {
 			svc.Configs = map[string]string{"{{CONFIG_NAME}}": "/etc/{{CONFIG_FILE}}"}
 			svc.Hosts = []string{"{{HOST_IP}} {{HOST_NAME}}"}
 			svc.Resources = jed.Resources{CPULimit: "{{CPU_LIMIT}}"}
-			svc.Restart.MaxAttempts = &gid
+			svc.Restart = "{{RESTART}}"
 			svc.Traefik = &jed.Traefik{Port: "{{TRAEFIK_PORT}}"}
 			svc.About = jed.About{
 				Desc:  "{{DESC}}",
@@ -248,6 +247,7 @@ var _ = Describe("Spec", func() {
 				"NETWORK":        "prod-net",
 				"NOTE":           "ready",
 				"PG_VERSION":     "16",
+				"RESTART":        "on-failure",
 				"SECRET_NAME":    "db_password",
 				"TRAEFIK_PORT":   "8080",
 				"VHOST":          "app.example.com",
@@ -264,7 +264,7 @@ var _ = Describe("Spec", func() {
 			Expect(spec.Service.Configs).To(HaveKeyWithValue("app_config", "/etc/app.conf"))
 			Expect(spec.Service.Hosts).To(Equal([]string{"10.0.0.10 db.local"}))
 			Expect(spec.Service.Resources.CPULimit).To(Equal("1.0"))
-			Expect(*spec.Service.Restart.MaxAttempts).To(Equal(gid))
+			Expect(spec.Service.Restart).To(Equal("on-failure"))
 			Expect(spec.Service.Traefik.Port).To(Equal("8080"))
 			Expect(spec.Service.About.Desc).To(Equal("database"))
 			Expect(spec.Service.About.Links).To(Equal([]jed.Link{{Text: "dashboard", Url: "https://app.example.com"}}))
