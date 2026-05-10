@@ -20,6 +20,9 @@ _ = body
 id, created, err := sw.Deploy(ctx, spec)
 _ = created
 
+// Restart/roll existing tasks without changing stored Jed service config
+err = sw.Restart(ctx, "myapp")
+
 // Inspect
 services, err := sw.ListServices(ctx)
 tasks, err := sw.ServiceTasks(ctx, "myapp")
@@ -61,6 +64,16 @@ To build a spec from stored state, load render vars from whichever env name your
 ```go
 j, err := jed.New(ctx, store, "deploy-vars", logger)
 spec, err := j.Spec(ctx, "myapp")
+```
+
+## Restarting Services
+
+`Swarm.Restart(ctx, name)` forces Docker Swarm to roll an existing service's tasks without changing `jed.Service` or persisted store state. It reads the current Docker service spec, increments Docker's `TaskTemplate.ForceUpdate`, and updates the service with the current Docker service version.
+
+Normal `Swarm.Deploy` updates preserve Docker's existing `ForceUpdate` value so a later deploy does not accidentally reset the restart counter.
+
+```go
+err := sw.Restart(ctx, "myapp")
 ```
 
 ## Secrets and Configs

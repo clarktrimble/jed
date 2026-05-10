@@ -221,11 +221,10 @@ func inspect(ctx context.Context, deployer *swarm.Swarm, name string) {
 	svc, err := deployer.GetService(ctx, name)
 	fatal(err)
 
-	var buf bytes.Buffer
-	err = json.Indent(&buf, svc.Spec, "", "  ")
+	data, err := json.MarshalIndent(svc.Spec, "", "  ")
 	fatal(err)
 
-	fmt.Println(buf.String())
+	fmt.Println(string(data))
 }
 
 func tasks(ctx context.Context, deployer *swarm.Swarm, service string) {

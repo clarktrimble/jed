@@ -92,9 +92,10 @@ var _ = Describe("Service", func() {
 			Expect(svcInfo.Version.Index).To(BeNumerically(">", 0))
 		})
 
-		It("should parse Spec as raw JSON", func() {
-			Expect(svcInfo.Spec).NotTo(BeEmpty())
-			Expect(string(svcInfo.Spec)).To(ContainSubstring("tag"))
+		It("should parse Spec", func() {
+			Expect(svcInfo.Spec.Name).To(Equal("tag"))
+			Expect(svcInfo.Spec.TaskTemplate.ForceUpdate).To(Equal(uint64(0)))
+			Expect(svcInfo.Spec.TaskTemplate.ContainerSpec).NotTo(BeEmpty())
 		})
 
 		It("should parse Endpoint", func() {

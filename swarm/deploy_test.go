@@ -2,6 +2,7 @@ package swarm_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -105,7 +106,13 @@ var _ = Describe("Deploy", func() {
 					// GetService: return list with one service
 					case method == "GET" && strings.Contains(path, "/services?"):
 						mockResponse([]map[string]any{
-							{"ID": "svc-existing-123", "Version": map[string]any{"Index": 42}},
+							{
+								"ID":      "svc-existing-123",
+								"Version": map[string]any{"Index": 42},
+								"Spec": map[string]any{
+									"TaskTemplate": map[string]any{"ForceUpdate": 0},
+								},
+							},
 						}, rcv)
 						return nil
 
@@ -193,8 +200,144 @@ var _ = Describe("Deploy", func() {
 		})
 	})
 
+	Describe("preserving force update on normal deploy", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services?"):
+						mockResponse([]map[string]any{{
+							"ID":      "svc-existing-123",
+							"Version": map[string]any{"Index": 42},
+							"Spec": map[string]any{
+								"TaskTemplate": map[string]any{"ForceUpdate": 7},
+							},
+						}}, rcv)
+						return nil
+					case method == "POST" && strings.Contains(path, "/update"):
+						return nil
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			id, created, err = deploySpec(ctx, deployer, svc, env)
+		})
+
+		It("keeps Docker's current ForceUpdate value", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created).To(BeFalse())
+
+			updateCall := findCall(client.SendObjectCalls(), "POST", "/update")
+			Expect(updateCall).NotTo(BeNil())
+			Expect(sentForceUpdate(updateCall.Snd)).To(Equal(7))
+		})
+	})
+
+	Describe("Restart", func() {
+		BeforeEach(func() {
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services?"):
+						mockResponse([]map[string]any{{
+							"ID":      "svc-existing-123",
+							"Version": map[string]any{"Index": 42},
+							"Spec": map[string]any{
+								"Name": "reauth-acp",
+								"TaskTemplate": map[string]any{
+									"ForceUpdate": 7,
+									"ContainerSpec": map[string]any{
+										"Image": "local/reauth-acp:a1b2c3d",
+									},
+								},
+							},
+						}}, rcv)
+						return nil
+					case method == "POST" && strings.Contains(path, "/update"):
+						return nil
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			err = deployer.Restart(ctx, svc.Name)
+		})
+
+		It("increments ForceUpdate and updates with the current version", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			updateCall := findCall(client.SendObjectCalls(), "POST", "/update")
+			Expect(updateCall).NotTo(BeNil())
+			Expect(updateCall.Path).To(ContainSubstring("version=42"))
+
+			Expect(sentForceUpdate(updateCall.Snd)).To(Equal(8))
+		})
+	})
+
+	Describe("Restart with missing force update", func() {
+		BeforeEach(func() {
+			client = &ClientMock{
+				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+					switch {
+					case method == "GET" && strings.Contains(path, "/services?"):
+						mockResponse([]map[string]any{{
+							"ID":      "svc-existing-123",
+							"Version": map[string]any{"Index": 42},
+							"Spec": map[string]any{
+								"Name":         "reauth-acp",
+								"TaskTemplate": map[string]any{},
+							},
+						}}, rcv)
+						return nil
+					case method == "POST" && strings.Contains(path, "/update"):
+						return nil
+					default:
+						return nil
+					}
+				},
+			}
+			deployer = swarm.New(client, nopLogger{})
+		})
+
+		JustBeforeEach(func() {
+			err = deployer.Restart(ctx, svc.Name)
+		})
+
+		It("treats missing ForceUpdate as zero", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			updateCall := findCall(client.SendObjectCalls(), "POST", "/update")
+			Expect(updateCall).NotTo(BeNil())
+			Expect(sentForceUpdate(updateCall.Snd)).To(Equal(1))
+		})
+	})
+
 })
 
 func deploySpec(ctx context.Context, deployer *swarm.Swarm, svc jed.Service, env jed.Env) (string, bool, error) {
 	return deployer.Deploy(ctx, jed.Spec{Service: svc, Env: env})
+}
+
+func sentForceUpdate(snd any) int {
+	data, err := json.Marshal(snd)
+	Expect(err).NotTo(HaveOccurred())
+
+	var spec struct {
+		TaskTemplate struct {
+			ForceUpdate int `json:"ForceUpdate"`
+		} `json:"TaskTemplate"`
+	}
+	err = json.Unmarshal(data, &spec)
+	Expect(err).NotTo(HaveOccurred())
+	return spec.TaskTemplate.ForceUpdate
 }

@@ -7,6 +7,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+/*
+Todo: fix
+
+ Important wrinkle: our spec generation is not fully deterministic because some slices come from Go map iteration:
+
+ - env lines from env.Vars
+ - ports from service.Ports
+ - mounts from service.Volumes
+ - configs from service.Configs
+*/
+
 // Deploy creates or updates a swarm service from a rendered jed.Spec.
 func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created bool, err error) {
 	service := spec.Service
@@ -35,6 +46,11 @@ func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created b
 		return
 	}
 
+	if err = preserveForceUpdate(body, svcInfo.Spec); err != nil {
+		err = errors.Wrapf(err, "failed to preserve force update for %q", service.Name)
+		return
+	}
+
 	err = d.updateService(ctx, service.Name, svcInfo.Version.Index, body)
 	if err != nil {
 		return
@@ -42,6 +58,33 @@ func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created b
 
 	id = svcInfo.ID
 	return
+}
+
+// Restart forces Docker Swarm to roll the service tasks without changing Jed
+// service configuration.
+func (d *Swarm) Restart(ctx context.Context, name string) error {
+	svcInfo, err := d.GetService(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	svcInfo.Spec.TaskTemplate.ForceUpdate++
+
+	return d.updateService(ctx, name, svcInfo.Version.Index, svcInfo.Spec)
+}
+
+func preserveForceUpdate(spec Spec, current ServiceSpec) error {
+	setForceUpdate(spec, current.TaskTemplate.ForceUpdate)
+	return nil
+}
+
+func setForceUpdate(spec Spec, value uint64) {
+	taskTemplate, ok := spec["TaskTemplate"].(map[string]any)
+	if !ok {
+		taskTemplate = map[string]any{}
+		spec["TaskTemplate"] = taskTemplate
+	}
+	taskTemplate["ForceUpdate"] = value
 }
 
 type resolvedSecret struct {
