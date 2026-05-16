@@ -17,8 +17,8 @@ var _ = Describe("Data", func() {
 		sw      *swarm.Swarm
 		ctx     context.Context
 		err     error
-		secrets []swarm.Secret
-		configs []swarm.Config
+		secrets []swarm.SecretResource
+		configs []swarm.ConfigResource
 		id      string
 	)
 

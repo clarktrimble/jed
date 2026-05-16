@@ -13,7 +13,6 @@ import (
 	"sort"
 
 	"github.com/alexflint/go-arg"
-	"github.com/clarktrimble/giant"
 	"github.com/clarktrimble/sabot"
 	"golang.org/x/term"
 
@@ -158,13 +157,10 @@ func newDeployer(socket string) *swarm.Swarm {
 	lgrCfg := sabot.Config{MaxLen: 999}
 	lgr := lgrCfg.New(os.Stderr)
 
-	clientCfg := &giant.Config{
-		BaseUri:    "http://localhost",
-		UnixSocket: socket,
-	}
-	client := clientCfg.NewWithTrippers(lgr)
+	deployer, err := (&swarm.Config{Socket: socket}).New(lgr)
+	fatal(err)
 
-	return swarm.New(client, lgr)
+	return deployer
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {

@@ -16,7 +16,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Secret'
+                  $ref: '#/components/schemas/SecretResource'
         '500':
           description: Internal server error
           content:
@@ -84,7 +84,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Config'
+                  $ref: '#/components/schemas/ConfigResource'
         '500':
           description: Internal server error
           content:

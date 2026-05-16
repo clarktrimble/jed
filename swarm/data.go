@@ -10,8 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Secret represents a Docker Swarm secret.
-type Secret struct {
+// SecretResource represents a Docker Swarm secret resource.
+type SecretResource struct {
 	// ID is the Docker secret ID.
 	ID string
 
@@ -19,8 +19,8 @@ type Secret struct {
 	Name string
 }
 
-// Config represents a Docker Swarm config.
-type Config struct {
+// ConfigResource represents a Docker Swarm config resource.
+type ConfigResource struct {
 	// ID is the Docker config ID.
 	ID string
 
@@ -54,7 +54,7 @@ func (d *Swarm) ConfigLatest(ctx context.Context, name string) (id, versionedNam
 }
 
 // ListSecrets returns all secrets.
-func (d *Swarm) ListSecrets(ctx context.Context) ([]Secret, error) {
+func (d *Swarm) ListSecrets(ctx context.Context) ([]SecretResource, error) {
 
 	var secrets []namedResource
 	err := d.client.SendObject(ctx, "GET", "/v1.52/secrets", nil, &secrets)
@@ -62,9 +62,9 @@ func (d *Swarm) ListSecrets(ctx context.Context) ([]Secret, error) {
 		return nil, errors.Wrap(err, "failed to list secrets")
 	}
 
-	result := make([]Secret, len(secrets))
+	result := make([]SecretResource, len(secrets))
 	for i, s := range secrets {
-		result[i] = Secret{
+		result[i] = SecretResource{
 			ID:   s.ID,
 			Name: s.Spec.Name,
 		}
@@ -98,7 +98,7 @@ func (d *Swarm) CreateSecret(ctx context.Context, name string, value []byte) (st
 }
 
 // ListConfigs returns all configs.
-func (d *Swarm) ListConfigs(ctx context.Context) ([]Config, error) {
+func (d *Swarm) ListConfigs(ctx context.Context) ([]ConfigResource, error) {
 
 	var configs []namedResource
 	err := d.client.SendObject(ctx, "GET", "/v1.52/configs", nil, &configs)
@@ -106,9 +106,9 @@ func (d *Swarm) ListConfigs(ctx context.Context) ([]Config, error) {
 		return nil, errors.Wrap(err, "failed to list configs")
 	}
 
-	result := make([]Config, len(configs))
+	result := make([]ConfigResource, len(configs))
 	for i, c := range configs {
-		result[i] = Config{
+		result[i] = ConfigResource{
 			ID:   c.ID,
 			Name: c.Spec.Name,
 		}
@@ -170,7 +170,7 @@ type namedItem struct {
 	Name string
 }
 
-func secretsToItems(secrets []Secret) []namedItem {
+func secretsToItems(secrets []SecretResource) []namedItem {
 	items := make([]namedItem, len(secrets))
 	for i, s := range secrets {
 		items[i] = namedItem(s)
@@ -178,7 +178,7 @@ func secretsToItems(secrets []Secret) []namedItem {
 	return items
 }
 
-func configsToItems(configs []Config) []namedItem {
+func configsToItems(configs []ConfigResource) []namedItem {
 	items := make([]namedItem, len(configs))
 	for i, c := range configs {
 		items[i] = namedItem(c)

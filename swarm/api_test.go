@@ -39,9 +39,9 @@ var _ = Describe("API", func() {
 		res = doRequest(rtr, http.MethodGet, "/swarm/secrets", nil)
 		Expect(res).To(HaveHTTPStatus(http.StatusOK))
 
-		var got []swarm.Secret
+		var got []swarm.SecretResource
 		decodeJSON(res, &got)
-		Expect(got).To(Equal([]swarm.Secret{{ID: "sec-123", Name: "db_password_v1"}}))
+		Expect(got).To(Equal([]swarm.SecretResource{{ID: "sec-123", Name: "db_password_v1"}}))
 	})
 
 	It("creates secrets from the request body", func() {
@@ -80,9 +80,9 @@ var _ = Describe("API", func() {
 		res = doRequest(rtr, http.MethodGet, "/swarm/configs", nil)
 		Expect(res).To(HaveHTTPStatus(http.StatusOK))
 
-		var got []swarm.Config
+		var got []swarm.ConfigResource
 		decodeJSON(res, &got)
-		Expect(got).To(Equal([]swarm.Config{{ID: "cfg-123", Name: "app_config_v1"}}))
+		Expect(got).To(Equal([]swarm.ConfigResource{{ID: "cfg-123", Name: "app_config_v1"}}))
 	})
 
 	It("creates configs from the request body", func() {
