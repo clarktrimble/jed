@@ -3,6 +3,7 @@ package swarm_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,6 +60,42 @@ var _ = Describe("Network", func() {
 				opts := sentRequest["Options"].(map[string]any)
 				Expect(opts["encrypted"]).To(Equal("true"))
 			})
+		})
+
+		Describe("when the network already exists", func() {
+			JustBeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					return errors.New(`unexpected status code 409 with body: {"message":"network with name my-net already exists"}`)
+				}
+
+				id, err = sw.CreateNetwork(ctx, "my-net", true, true)
+			})
+
+			It("should return ErrNetworkExists", func() {
+				Expect(id).To(BeEmpty())
+				Expect(swarm.IsNetworkExists(err)).To(BeTrue())
+				Expect(err).To(MatchError(ContainSubstring("failed to create network \"my-net\"")))
+			})
+		})
+	})
+
+	Describe("EnsureNetwork", func() {
+		It("should return without error when the network already exists", func() {
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				return errors.New(`unexpected status code 409 with body: {"message":"network with name my-net already exists"}`)
+			}
+
+			err := sw.EnsureNetwork(ctx, "my-net", true, true)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should propagate other errors", func() {
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				return errors.New("boom")
+			}
+
+			err := sw.EnsureNetwork(ctx, "my-net", true, true)
+			Expect(err).To(MatchError(ContainSubstring("boom")))
 		})
 	})
 })
