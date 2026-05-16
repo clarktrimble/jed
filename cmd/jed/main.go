@@ -76,7 +76,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	store, err := bbolt.New(args.DB)
+	store, err := (&bbolt.Config{Path: args.DB}).New()
 	fatal(err)
 	defer store.Close()
 

@@ -18,7 +18,7 @@ Runtime packages consume Jed model values:
 ## Quick Start: Swarm
 
 ```go
-store, err := bbolt.New("jed.db")
+store, err := (&bbolt.Config{Path: "jed.db"}).New()
 if err != nil {
     // handle error
 }

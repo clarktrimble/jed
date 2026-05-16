@@ -14,7 +14,7 @@ Deploy flow:
 ## Flags
 
 ```text
--d, --db string       path to jed store (default "jed.db")
+-d, --db string       path to jed store (default "/data/jed.db")
 -s, --socket string   docker socket path (default "/var/run/docker.sock")
 ```
 

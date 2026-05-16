@@ -12,7 +12,7 @@ sw.CreateNetwork(ctx, "svc-net", true, true)         // attachable, encrypted
 sw.CreateSecret(ctx, "db_password", []byte("hunter2")) // creates db_password_v1
 
 // Deploy from stored Jed state
-store, err := bbolt.New("jed.db")
+store, err := (&bbolt.Config{Path: "jed.db"}).New()
 j, err := jed.New(ctx, store, "deploy-vars", logger)
 spec, err := j.Spec(ctx, "myapp")
 body, err := sw.Spec(ctx, spec) // optional: inspect exact Docker service payload

@@ -104,7 +104,7 @@ type args struct {
 	CreateNetwork *createNetworkCmd `arg:"subcommand:create-network" help:"create overlay network"`
 
 	Socket string `arg:"-s,--socket" default:"/var/run/docker.sock" help:"docker socket path"`
-	DB     string `arg:"-d,--db" default:"jed.db" help:"path to jed store"`
+	DB     string `arg:"-d,--db" default:"/data/jed.db" help:"path to jed store"`
 }
 
 func (args) Version() string {
@@ -125,7 +125,7 @@ func main() {
 
 	switch {
 	case args.Deploy != nil:
-		store, err := bbolt.New(args.DB)
+		store, err := (&bbolt.Config{Path: args.DB}).New()
 		fatal(err)
 		defer store.Close()
 		deploy(ctx, deployer, store, args.Deploy.Name)

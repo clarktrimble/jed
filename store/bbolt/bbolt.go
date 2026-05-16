@@ -6,11 +6,21 @@ package bbolt
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/clarktrimble/jed"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
+	bberrors "go.etcd.io/bbolt/errors"
 )
+
+const (
+	// DefaultDBPath is the conventional path for production Jed data.
+	DefaultDBPath = "/data/jed.db"
+)
+
+// DefaultOpenTimeout is how long New waits for the BoltDB file lock.
+var DefaultOpenTimeout = 2 * time.Second
 
 var (
 	servicesBucket = []byte("services")
@@ -19,17 +29,47 @@ var (
 
 // Todo: can store just handle name, bytes; unmarshalling into passed pointer?
 
+// Config controls bbolt store creation.
+type Config struct {
+	// Timeout is the amount of time to wait for the database file lock.
+	Timeout time.Duration `json:"timeout" default:"2s"`
+
+	// Path is the path to the bbolt database.
+	Path string `json:"path" default:"/data/jed.db"`
+}
+
 // Store implements jed.Store interface on BoltDB.
 type Store struct {
 	db *bbolt.DB
 }
 
-// New creates a new bbolt-backed store.
-func New(path string) (str *Store, err error) {
+// New creates a new bbolt-backed store using cfg.Path.
+func (cfg *Config) New() (str *Store, err error) {
+	if cfg == nil {
+		return nil, errors.New("bbolt config is nil")
+	}
 
-	db, err := bbolt.Open(path, 0600, nil)
+	path := DefaultDBPath
+	if cfg.Path != "" {
+		path = cfg.Path
+	}
+
+	timeout := DefaultOpenTimeout
+	if cfg.Timeout != 0 {
+		timeout = cfg.Timeout
+	}
+
+	return open(path, timeout)
+}
+
+func open(path string, timeout time.Duration) (str *Store, err error) {
+	db, err := bbolt.Open(path, 0600, &bbolt.Options{Timeout: timeout})
 	if err != nil {
-		err = errors.Wrapf(err, "failed to open bbolt db")
+		if errors.Is(err, bberrors.ErrTimeout) {
+			err = errors.Wrapf(err, "failed to open bbolt db %q: timed out waiting for file lock after %s; another process has a lock?", path, timeout)
+			return
+		}
+		err = errors.Wrapf(err, "failed to open bbolt db %q", path)
 		return
 	}
 
