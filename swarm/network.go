@@ -27,7 +27,7 @@ func (d *Swarm) CreateNetwork(ctx context.Context, name string, attachable, encr
 		req.Options = map[string]string{"encrypted": "true"}
 	}
 
-	var resp idResponse
+	var resp IDResponse
 	err := d.client.SendObject(ctx, "POST", "/v1.52/networks/create", req, &resp)
 	if err != nil {
 		if isNetworkExistsError(err, name) {

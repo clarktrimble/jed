@@ -30,6 +30,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/clarktrimble/jed/logger"
 	"github.com/pkg/errors"
 )
 
@@ -40,27 +41,22 @@ type Client interface {
 	StreamLines(ctx context.Context, path string) (<-chan []byte, error)
 }
 
-// Logger specifies a contextual, structured logger.
-type Logger interface {
-	Info(ctx context.Context, msg string, kv ...any)
-	Debug(ctx context.Context, msg string, kv ...any)
-	Error(ctx context.Context, msg string, err error, kv ...any)
-}
-
 // Swarm interacts with Docker Swarm.
 type Swarm struct {
 	client Client
-	logger Logger
+	logger logger.Logger
 }
 
 // ErrServiceNotFound is returned when a swarm service does not exist.
 var ErrServiceNotFound = errors.New("swarm service not found")
 
 // New creates a Swarm.
-func New(client Client, logger Logger) *Swarm {
+func New(client Client, logger logger.Logger) *Swarm {
 	return &Swarm{client: client, logger: logger}
 }
 
-type idResponse struct {
+// IDResponse identifies a Docker resource created by an API call.
+type IDResponse struct {
+	// ID is the Docker resource ID.
 	ID string `json:"ID"`
 }

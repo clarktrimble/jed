@@ -21,7 +21,11 @@ type nopLogger struct{}
 
 func (nopLogger) Info(ctx context.Context, msg string, kv ...any)             {}
 func (nopLogger) Debug(ctx context.Context, msg string, kv ...any)            {}
+func (nopLogger) Trace(ctx context.Context, msg string, kv ...any)            {}
 func (nopLogger) Error(ctx context.Context, msg string, err error, kv ...any) {}
+func (nopLogger) WithFields(ctx context.Context, kv ...any) context.Context   { return ctx }
+func (nopLogger) SetLevel(ctx context.Context, level string) error            { return nil }
+func (nopLogger) GetLevel() string                                            { return "" }
 
 func loadTestData(name string) []byte {
 	data, err := os.ReadFile("../test/data/swarm/" + name)

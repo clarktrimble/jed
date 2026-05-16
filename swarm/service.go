@@ -138,7 +138,7 @@ func (d *Swarm) updateService(ctx context.Context, name string, version int, spe
 
 func (d *Swarm) createService(ctx context.Context, spec any) (string, error) {
 
-	var resp idResponse
+	var resp IDResponse
 	err := d.client.SendObject(ctx, "POST", "/v1.52/services/create", spec, &resp)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create service")

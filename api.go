@@ -15,18 +15,7 @@ type Router interface {
 }
 
 // Register registers Jed store API routes with rtr.
-//
-// Routes registered:
-//   - GET    /store/services         # list services
-//   - GET    /store/services/{name}  # get a service
-//   - PUT    /store/services/{name}  # set a service
-//   - DELETE /store/services/{name}  # delete a service
-//   - GET    /store/envs             # list envs
-//   - GET    /store/envs/{name}      # get env for a service
-//   - PUT    /store/envs/{name}      # set env for a service
-//   - DELETE /store/envs/{name}      # delete env for a service
-//
-// note: these comments are helpful for ai -> openapi spec
+// See paths.yaml for openapi snippet.
 func (j *Jed) Register(rtr Router) {
 	h := &apiHandlers{jed: j, logger: j.logger}
 	rtr.HandleFunc("GET /store/services", h.listServices)
@@ -41,7 +30,7 @@ func (j *Jed) Register(rtr Router) {
 
 type apiHandlers struct {
 	jed    *Jed
-	logger logger.Logger
+	logger logger.Logger // Todo: why not just use jed.logger as see in swarm/api.go ??
 }
 
 func (h *apiHandlers) listServices(w http.ResponseWriter, r *http.Request) {

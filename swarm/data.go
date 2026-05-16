@@ -10,15 +10,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Secret represents a swarm secret.
+// Secret represents a Docker Swarm secret.
 type Secret struct {
-	ID   string
+	// ID is the Docker secret ID.
+	ID string
+
+	// Name is the Docker secret name. Secrets created by CreateSecret are named {base}_v{N}.
 	Name string
 }
 
-// Config represents a swarm config.
+// Config represents a Docker Swarm config.
 type Config struct {
-	ID   string
+	// ID is the Docker config ID.
+	ID string
+
+	// Name is the Docker config name. Configs created by CreateConfig are named {base}_v{N}.
 	Name string
 }
 
@@ -82,7 +88,7 @@ func (d *Swarm) CreateSecret(ctx context.Context, name string, value []byte) (st
 		Data: base64.StdEncoding.EncodeToString(value),
 	}
 
-	var resp idResponse
+	var resp IDResponse
 	err = d.client.SendObject(ctx, "POST", "/v1.52/secrets/create", req, &resp)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create secret %q", versionedName)
@@ -126,7 +132,7 @@ func (d *Swarm) CreateConfig(ctx context.Context, name string, value []byte) (st
 		Data: base64.StdEncoding.EncodeToString(value),
 	}
 
-	var resp idResponse
+	var resp IDResponse
 	err = d.client.SendObject(ctx, "POST", "/v1.52/configs/create", req, &resp)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create config %q", versionedName)

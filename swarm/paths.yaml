@@ -1,0 +1,171 @@
+# OpenApi path definitions for endpoints registered by swarm/api.
+
+paths:
+  /swarm/secrets:
+    get:
+      summary: List secrets
+      description: Return all swarm secrets known to Docker.
+      operationId: listSwarmSecrets
+      tags:
+        - swarm
+      responses:
+        '200':
+          description: Secrets retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Secret'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /swarm/secrets/{name}:
+    post:
+      summary: Create secret
+      description: Create the next version of a swarm secret. The raw request body is used as the secret value.
+      operationId: createSwarmSecret
+      tags:
+        - swarm
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Secret base name
+          schema:
+            type: string
+          example: db_password
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Secret created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDResponse'
+        '400':
+          description: Failed to read request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /swarm/configs:
+    get:
+      summary: List configs
+      description: Return all swarm configs known to Docker.
+      operationId: listSwarmConfigs
+      tags:
+        - swarm
+      responses:
+        '200':
+          description: Configs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Config'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /swarm/configs/{name}:
+    post:
+      summary: Create config
+      description: Create the next version of a swarm config. The raw request body is used as the config data.
+      operationId: createSwarmConfig
+      tags:
+        - swarm
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Config base name
+          schema:
+            type: string
+          example: app_config
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Config created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDResponse'
+        '400':
+          description: Failed to read request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /swarm/configs/by_id/{id}:
+    delete:
+      summary: Delete config
+      description: Delete a swarm config by Docker config ID.
+      operationId: deleteSwarmConfig
+      tags:
+        - swarm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Docker config ID
+          schema:
+            type: string
+          example: cfg-abc-123
+      responses:
+        '200':
+          description: Config deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
