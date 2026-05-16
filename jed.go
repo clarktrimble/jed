@@ -14,6 +14,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DBSchemaVersion is the current persistent Jed store schema version.
+// Bump this when changing the store schema in a backwards-incompatible way.
+const DBSchemaVersion = "1"
+
 // Store persists services and environment variables.
 //
 // Implementations must be safe for concurrent use. The Store is the source

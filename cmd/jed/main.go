@@ -59,11 +59,12 @@ type args struct {
 	SetEnv *setEnvCmd `arg:"subcommand:set-env" help:"set env from .env file"`
 	DelEnv *delEnvCmd `arg:"subcommand:del-env" help:"delete env for a service"`
 
-	DB string `arg:"-d,--db" default:"jed.db" help:"path to bbolt database"`
+	DB              string `arg:"-d,--db" default:"jed.db" help:"path to bbolt database"`
+	SkipSchemaCheck bool   `arg:"--skip-schema-check" help:"open database without validating schema version"`
 }
 
 func (args) Version() string {
-	return fmt.Sprintf("jed %s (%s)", release, version)
+	return fmt.Sprintf("jed %s (%s), db schema %s", release, version, jed.DBSchemaVersion)
 }
 
 func main() {
@@ -76,7 +77,10 @@ func main() {
 	}
 
 	ctx := context.Background()
-	store, err := (&bbolt.Config{Path: args.DB}).New()
+	store, err := (&bbolt.Config{
+		Path:            args.DB,
+		SkipSchemaCheck: args.SkipSchemaCheck,
+	}).New()
 	fatal(err)
 	defer store.Close()
 

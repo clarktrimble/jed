@@ -102,12 +102,13 @@ type args struct {
 	CreateConfig  *createConfigCmd  `arg:"subcommand:create-config" help:"create a config"`
 	CreateNetwork *createNetworkCmd `arg:"subcommand:create-network" help:"create overlay network"`
 
-	Socket string `arg:"-s,--socket" default:"/var/run/docker.sock" help:"docker socket path"`
-	DB     string `arg:"-d,--db" default:"/data/jed.db" help:"path to jed store"`
+	Socket          string `arg:"-s,--socket" default:"/var/run/docker.sock" help:"docker socket path"`
+	DB              string `arg:"-d,--db" default:"/data/jed.db" help:"path to jed store"`
+	SkipSchemaCheck bool   `arg:"--skip-schema-check" help:"open database without validating schema version"`
 }
 
 func (args) Version() string {
-	return fmt.Sprintf("transship %s (%s)", release, version)
+	return fmt.Sprintf("transship %s (%s), db schema %s", release, version, jed.DBSchemaVersion)
 }
 
 func main() {
@@ -124,7 +125,10 @@ func main() {
 
 	switch {
 	case args.Deploy != nil:
-		store, err := (&bbolt.Config{Path: args.DB}).New()
+		store, err := (&bbolt.Config{
+			Path:            args.DB,
+			SkipSchemaCheck: args.SkipSchemaCheck,
+		}).New()
 		fatal(err)
 		defer store.Close()
 		deploy(ctx, deployer, store, args.Deploy.Name)

@@ -5,7 +5,8 @@
 ## Store
 
 ```text
--d, --db string   path to bbolt database (default "jed.db")
+-d, --db string          path to bbolt database (default "jed.db")
+--skip-schema-check      open database without validating schema version
 ```
 
 ## Commands

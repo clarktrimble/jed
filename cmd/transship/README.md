@@ -16,6 +16,7 @@ Deploy flow:
 ```text
 -d, --db string       path to jed store (default "/data/jed.db")
 -s, --socket string   docker socket path (default "/var/run/docker.sock")
+--skip-schema-check   open database without validating schema version
 ```
 
 ## Commands

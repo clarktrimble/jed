@@ -23,8 +23,10 @@ const (
 var DefaultOpenTimeout = 2 * time.Second
 
 var (
-	servicesBucket = []byte("services")
-	envsBucket     = []byte("envs")
+	servicesBucket   = []byte("services")
+	envsBucket       = []byte("envs")
+	metaBucket       = []byte("meta")
+	schemaVersionKey = []byte("schema_version")
 )
 
 // Todo: can store just handle name, bytes; unmarshalling into passed pointer?
@@ -36,6 +38,9 @@ type Config struct {
 
 	// Path is the path to the bbolt database.
 	Path string `json:"path" default:"/data/jed.db"`
+
+	// SkipSchemaCheck disables reading, writing, and validating DB schema version.
+	SkipSchemaCheck bool `json:"skip_schema_check" default:"false"`
 }
 
 // Store implements jed.Store interface on BoltDB.
@@ -59,10 +64,10 @@ func (cfg *Config) New() (str *Store, err error) {
 		timeout = cfg.Timeout
 	}
 
-	return open(path, timeout)
+	return open(path, timeout, cfg.SkipSchemaCheck)
 }
 
-func open(path string, timeout time.Duration) (str *Store, err error) {
+func open(path string, timeout time.Duration, skipSchemaCheck bool) (str *Store, err error) {
 	db, err := bbolt.Open(path, 0600, &bbolt.Options{Timeout: timeout})
 	if err != nil {
 		if errors.Is(err, bberrors.ErrTimeout) {
@@ -82,16 +87,44 @@ func open(path string, timeout time.Duration) (str *Store, err error) {
 		if err != nil {
 			return err
 		}
-		return nil
+		_, err = tx.CreateBucketIfNotExists(metaBucket)
+		if err != nil {
+			return err
+		}
+		if skipSchemaCheck {
+			return nil
+		}
+		return checkSchemaVersion(tx)
 	})
 	if err != nil {
-		err = errors.Wrapf(err, "failed to create buckets")
+		err = errors.Wrapf(err, "failed to initialize bbolt db")
 		db.Close()
 		return
 	}
 
 	str = &Store{db: db}
 	return
+}
+
+func checkSchemaVersion(tx *bbolt.Tx) error {
+	meta := tx.Bucket(metaBucket)
+	data := meta.Get(schemaVersionKey)
+	if data == nil {
+		if !storeIsEmpty(tx) {
+			return errors.New("bbolt db has no schema version; open with skip_schema_check to inspect or migrate")
+		}
+		return meta.Put(schemaVersionKey, []byte(jed.DBSchemaVersion))
+	}
+
+	stored := string(data)
+	if stored != jed.DBSchemaVersion {
+		return errors.Errorf("bbolt db schema version %q does not match current schema version %q", stored, jed.DBSchemaVersion)
+	}
+	return nil
+}
+
+func storeIsEmpty(tx *bbolt.Tx) bool {
+	return tx.Bucket(servicesBucket).Stats().KeyN == 0 && tx.Bucket(envsBucket).Stats().KeyN == 0
 }
 
 // Close closes the underlying database.

@@ -30,6 +30,41 @@ var _ = Describe("Bbolt Store", func() {
 		Expect(err).To(MatchError("bbolt config is nil"))
 	})
 
+	It("stamps an empty database with the schema version", func() {
+		f, err := os.CreateTemp("", "bbolt-schema-test-*.db")
+		Expect(err).NotTo(HaveOccurred())
+		dbPath := f.Name()
+		Expect(f.Close()).To(Succeed())
+		defer os.Remove(dbPath)
+
+		currentStore, err = (&bbolt.Config{Path: dbPath}).New()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(currentStore.Close()).To(Succeed())
+		currentStore = nil
+
+		currentStore, err = (&bbolt.Config{Path: dbPath}).New()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(currentStore.Close()).To(Succeed())
+		currentStore = nil
+	})
+
+	It("rejects legacy databases with data and no schema version", func() {
+		f, err := os.CreateTemp("", "bbolt-schema-test-*.db")
+		Expect(err).NotTo(HaveOccurred())
+		dbPath := f.Name()
+		Expect(f.Close()).To(Succeed())
+		defer os.Remove(dbPath)
+
+		currentStore, err = (&bbolt.Config{Path: dbPath, SkipSchemaCheck: true}).New()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(currentStore.SetService(context.Background(), jed.Service{Name: "web", Image: "nginx", Network: "svc-net"})).To(Succeed())
+		Expect(currentStore.Close()).To(Succeed())
+		currentStore = nil
+
+		_, err = (&bbolt.Config{Path: dbPath}).New()
+		Expect(err).To(MatchError(ContainSubstring("bbolt db has no schema version")))
+	})
+
 	It("times out instead of hanging when the database is locked", func() {
 		f, err := os.CreateTemp("", "bbolt-lock-test-*.db")
 		Expect(err).NotTo(HaveOccurred())
@@ -37,11 +72,11 @@ var _ = Describe("Bbolt Store", func() {
 		Expect(f.Close()).To(Succeed())
 		defer os.Remove(dbPath)
 
-		lockedStore, err := (&bbolt.Config{Path: dbPath}).New()
+		lockedStore, err := (&bbolt.Config{Path: dbPath, SkipSchemaCheck: true}).New()
 		Expect(err).NotTo(HaveOccurred())
 		defer lockedStore.Close()
 
-		_, err = (&bbolt.Config{Path: dbPath, Timeout: 10 * time.Millisecond}).New()
+		_, err = (&bbolt.Config{Path: dbPath, Timeout: 10 * time.Millisecond, SkipSchemaCheck: true}).New()
 		Expect(err).To(MatchError(ContainSubstring("timed out waiting for file lock")))
 		Expect(err).To(MatchError(ContainSubstring("another process has a lock?")))
 	})
@@ -56,7 +91,7 @@ var _ = Describe("Bbolt Store", func() {
 			dbPath = f.Name()
 			f.Close()
 
-			currentStore, err = (&bbolt.Config{Path: dbPath}).New()
+			currentStore, err = (&bbolt.Config{Path: dbPath, SkipSchemaCheck: true}).New()
 			return currentStore, err
 		},
 		func() {
