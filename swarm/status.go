@@ -15,9 +15,9 @@ const (
 	StatusRunning Status = "running"
 	// StatusStopped means a service has no desired or running tasks.
 	StatusStopped Status = "stopped"
-	// StatusPending means a service is deploying, updating, or stopping.
+	// StatusPending means a service is deploying, updating, stopping, or converging.
 	StatusPending Status = "pending"
-	// StatusError means a service update failed or task counts do not match desired state.
+	// StatusError means Docker reports that a service update or rollback failed.
 	StatusError Status = "error"
 )
 
@@ -58,8 +58,8 @@ func (d *Swarm) Statuses(ctx context.Context) (map[string]Status, error) {
 //
 // Returns status:
 //   - StatusStopped - DesiredTasks == 0 and no tasks running
-//   - StatusPending - transitioning: deploying or stopping
-//   - StatusError   - deploy failed (paused) or task count mismatch
+//   - StatusPending - transitioning, converging, deploying, or stopping
+//   - StatusError   - deploy or rollback failed (paused)
 //   - StatusRunning - healthy, all desired tasks running
 //
 // Note: Job mode services (replicated-job, global-job) would need different logic.
@@ -81,13 +81,13 @@ func computeStatus(ss ServiceStatus, us UpdateStatus) Status {
 		return StatusStopped
 	case ss.DesiredTasks == 0 && ss.RunningTasks > 0:
 		return StatusPending // stopping
-	case us.State == "updating":
-		return StatusPending // deploying
-	case us.State == "paused":
-		return StatusError // deploy failed
+	case us.State == "updating" || us.State == "rollback_started":
+		return StatusPending // deploying or rolling back
+	case us.State == "paused" || us.State == "rollback_paused":
+		return StatusError // deploy or rollback failed
 	case ss.RunningTasks == ss.DesiredTasks:
 		return StatusRunning
 	default:
-		return StatusError
+		return StatusPending // still converging
 	}
 }

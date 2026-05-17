@@ -122,9 +122,9 @@ var _ = Describe("Status", func() {
 				status, err = sw.Status(ctx, "myservice")
 			})
 
-			It("should return error", func() {
+			It("should return pending", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(status).To(Equal(swarm.StatusError))
+				Expect(status).To(Equal(swarm.StatusPending))
 			})
 		})
 
@@ -158,9 +158,9 @@ var _ = Describe("Status", func() {
 				status, err = sw.Status(ctx, "myservice")
 			})
 
-			It("should return error", func() {
+			It("should return pending", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(status).To(Equal(swarm.StatusError))
+				Expect(status).To(Equal(swarm.StatusPending))
 			})
 		})
 	})
