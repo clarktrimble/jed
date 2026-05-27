@@ -20,9 +20,10 @@ var _ = Describe("Jed", func() {
 				Image:   "local/app:v1",
 				Network: "svc-net",
 				Command: []string{"--host={{VHOST}}"},
+				User:    "1000:{{DOCKER_GID}}",
 			}
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{}}
-			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
+			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "DOCKER_GID": "967"}}
 
 			j, err := jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
 			Expect(err).NotTo(HaveOccurred())
@@ -30,6 +31,7 @@ var _ = Describe("Jed", func() {
 			spec, err := j.Spec(ctx, "app")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"--host=app.example.com"}))
+			Expect(spec.Service.User).To(Equal("1000:967"))
 		})
 
 		It("rejects a nil store", func() {

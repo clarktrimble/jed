@@ -3,7 +3,6 @@ package jed
 import (
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -167,6 +166,7 @@ func (services Services) Find(name string) (service Service, err error) {
 }
 
 // Validate checks that the service has valid configuration.
+// Todo: consider pre/post substitution validation.
 func (service Service) Validate() error {
 	var issues []string
 
@@ -180,7 +180,7 @@ func (service Service) Validate() error {
 		issues = append(issues, "network is required")
 	}
 	if service.User != "" && !validUser(service.User) {
-		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values", service.User))
+		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values or {{VAR}} templates", service.User))
 	}
 	if service.Restart != "" && service.Restart != RestartNone && service.Restart != RestartOnFailure && service.Restart != RestartAny {
 		issues = append(issues, fmt.Sprintf("restart %q must be one of %q, %q, or %q", service.Restart, RestartNone, RestartOnFailure, RestartAny))
@@ -205,9 +205,52 @@ func (service Service) Validate() error {
 // unexported
 
 func validUser(user string) bool {
-	parts := strings.SplitN(user, ":", 2)
+	parts := strings.Split(user, ":")
+	if len(parts) > 2 {
+		return false
+	}
 	for _, p := range parts {
-		if _, err := strconv.Atoi(p); err != nil {
+		if !validUserPart(p) {
+			return false
+		}
+	}
+	return true
+}
+
+func validUserPart(part string) bool {
+	if part == "" {
+		return false
+	}
+	if validNumericID(part) {
+		return true
+	}
+	return validTemplateVar(part)
+}
+
+func validNumericID(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validTemplateVar(s string) bool {
+	if !strings.HasPrefix(s, "{{") || !strings.HasSuffix(s, "}}") {
+		return false
+	}
+	name := strings.TrimSuffix(strings.TrimPrefix(s, "{{"), "}}")
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r >= 'A' && r <= 'Z':
+		case r >= 'a' && r <= 'z':
+		case r == '_':
+		case i > 0 && r >= '0' && r <= '9':
+		default:
 			return false
 		}
 	}

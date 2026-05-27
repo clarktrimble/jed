@@ -79,5 +79,19 @@ var _ = Describe("Service", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("restart"))
 		})
+
+		It("allows numeric and templated user values before render", func() {
+			for _, user := range []string{"1000", "1000:967", "1000:{{DOCKER_GID}}", "{{DOCKER_UID}}:{{DOCKER_GID}}", "{{DOCKER_USER}}"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", User: user}
+				Expect(svc.Validate()).To(Succeed(), user)
+			}
+		})
+
+		It("rejects malformed user templates", func() {
+			for _, user := range []string{"1000:{{DOCKER_GID", "1000:{{}}", "1000:{{DOCKER-GID}}", "1000:docker", "1000:", ":967", "1:2:3", "-1", "+1"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", User: user}
+				Expect(svc.Validate()).NotTo(Succeed(), user)
+			}
+		})
 	})
 })
