@@ -273,6 +273,101 @@ var _ = Describe("Swarm Client", func() {
 		})
 	})
 
+	Describe("DeleteSecret", func() {
+		var calledPath string
+
+		BeforeEach(func() {
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				calledPath = path
+				return nil
+			}
+		})
+
+		JustBeforeEach(func() {
+			err = sw.DeleteSecret(ctx, "secret-id-123")
+		})
+
+		It("should return without error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should call DELETE on correct path", func() {
+			Expect(calledPath).To(Equal("/v1.52/secrets/secret-id-123"))
+		})
+	})
+
+	Describe("SecretLatest", func() {
+		var (
+			id   string
+			name string
+		)
+
+		BeforeEach(func() {
+			testData := loadTestData("get-scrts.json")
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				return json.Unmarshal(testData, rcv)
+			}
+		})
+
+		Context("with multiple versions", func() {
+			JustBeforeEach(func() {
+				id, name, err = sw.SecretLatest(ctx, "bfc_api_key")
+			})
+
+			It("should return the highest version", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(name).To(Equal("bfc_api_key_v3"))
+				Expect(id).To(Equal("tdb7jg738n8qcva7t4cx2q6n5"))
+			})
+		})
+
+		Context("with no matching versions", func() {
+			JustBeforeEach(func() {
+				_, _, err = sw.SecretLatest(ctx, "nope")
+			})
+
+			It("should return an error", func() {
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("ConfigLatest", func() {
+		var (
+			id   string
+			name string
+		)
+
+		BeforeEach(func() {
+			testData := loadTestData("get-configs-versioned.json")
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				return json.Unmarshal(testData, rcv)
+			}
+		})
+
+		Context("with multiple versions", func() {
+			JustBeforeEach(func() {
+				id, name, err = sw.ConfigLatest(ctx, "app_config")
+			})
+
+			It("should return the highest version", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(name).To(Equal("app_config_v3"))
+				Expect(id).To(Equal("cfgdif01oyt3tybroyia0jzgr"))
+			})
+		})
+
+		Context("with no matching versions", func() {
+			JustBeforeEach(func() {
+				_, _, err = sw.ConfigLatest(ctx, "nope")
+			})
+
+			It("should return an error", func() {
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
 	Describe("CreateNetwork", func() {
 		var (
 			id          string

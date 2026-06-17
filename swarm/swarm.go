@@ -17,7 +17,7 @@
 //
 //   - Single replica only
 //   - Read-only root filesystem
-//   - Secrets mounted with UID/GID 1001, mode 0444
+//   - Secrets mounted with UID/GID from service.User (default 1001), mode 0400
 //   - Restart on-failure with 5s delay, max 3 attempts
 //   - Update order stop-first, rollback on failure
 //   - JSON file logging with 10MB rotation, 3 files
@@ -77,7 +77,6 @@ func (d *Swarm) SecretLatest(ctx context.Context, name string) (id, versionedNam
 
 // ConfigLatest returns the ID and versioned name of the latest config by base name.
 // Looks for configs matching {name}_v{N} and returns the highest version.
-// Todo: add test data with configs and test this
 func (d *Swarm) ConfigLatest(ctx context.Context, name string) (id, versionedName string, err error) {
 
 	configs, err := d.ListConfigs(ctx)

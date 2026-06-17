@@ -168,6 +168,17 @@ type dataCreate struct {
 	Data string `json:"Data"`
 }
 
+// DeleteSecret deletes a secret by ID.
+func (d *Swarm) DeleteSecret(ctx context.Context, id string) error {
+
+	err := d.client.SendObject(ctx, "DELETE", "/v1.52/secrets/"+id, nil, nil)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete secret %q", id)
+	}
+
+	return nil
+}
+
 // ListConfigs returns all configs.
 func (d *Swarm) ListConfigs(ctx context.Context) ([]Config, error) {
 

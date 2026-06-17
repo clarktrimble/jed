@@ -1,0 +1,62 @@
+[
+  {
+    "ID": "cfg7ekx6p3c5q22lzqgf3wv09",
+    "Version": {
+      "Index": 72
+    },
+    "CreatedAt": "2026-01-07T00:00:27.298893466Z",
+    "UpdatedAt": "2026-01-07T00:00:27.298893466Z",
+    "Spec": {
+      "Name": "app_config_v1",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "cfg47r28rnd7j842mm8ko9bu9k",
+    "Version": {
+      "Index": 19
+    },
+    "CreatedAt": "2026-01-06T23:21:43.268645106Z",
+    "UpdatedAt": "2026-01-06T23:21:43.268645106Z",
+    "Spec": {
+      "Name": "app_config",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "cfgdif01oyt3tybroyia0jzgr",
+    "Version": {
+      "Index": 71
+    },
+    "CreatedAt": "2026-01-07T00:00:07.610797127Z",
+    "UpdatedAt": "2026-01-07T00:00:07.610797127Z",
+    "Spec": {
+      "Name": "app_config_v3",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "cfg0c2ebsj1obtu79zxnnnmxaw",
+    "Version": {
+      "Index": 70
+    },
+    "CreatedAt": "2026-01-06T23:57:48.754980711Z",
+    "UpdatedAt": "2026-01-06T23:57:48.754980711Z",
+    "Spec": {
+      "Name": "app_config_v2",
+      "Labels": {}
+    }
+  },
+  {
+    "ID": "cfgbfsw4ct23w984m3hkwq3591",
+    "Version": {
+      "Index": 20
+    },
+    "CreatedAt": "2026-01-06T23:22:32.091965827Z",
+    "UpdatedAt": "2026-01-06T23:22:32.091965827Z",
+    "Spec": {
+      "Name": "other_config_v1",
+      "Labels": {}
+    }
+  }
+]
