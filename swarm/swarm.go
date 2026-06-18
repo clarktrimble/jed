@@ -174,7 +174,6 @@ type UpdateStatus struct {
 	CompletedAt time.Time `json:"CompletedAt"`
 }
 
-
 // unexported
 
 // namedItem is used by version helpers.
@@ -198,6 +197,21 @@ func configsToItems(configs []Config) []namedItem {
 	}
 	return items
 }
+
+// version membership is maintained by naming convention.
+// Swarm has no notion that bfc_api_key_v1/v2/v3 belong together, so these
+// helpers "discover" a secret's versions by listing EVERY secret in the
+// cluster and prefix-matching {base}_v{N} client-side.
+//
+// consider labels instead
+// CreateSecret/CreateConfig stamp e.g. "com.jed.secret=<name>" on the spec
+// (SecretSpec and ConfigSpec both carry a Labels map), then fetch a
+// secret's versions via Docker's filtered list rather than fetch-all:
+//
+//	GET /secrets?filters={"label":["com.jed.secret=bfc_api_key"]}
+//
+// Applies identically to configs.
+// Feel free to wring hands some more re label key. "jed.secret_name" etc.
 
 func findLatest(items []namedItem, baseName, resourceType string) (id, name string, err error) {
 	var bestID, bestName string
