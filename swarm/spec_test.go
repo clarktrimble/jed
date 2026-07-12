@@ -194,6 +194,34 @@ var _ = Describe("Spec", func() {
 		})
 	})
 
+	Describe("with groups", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Groups = []string{"967", "968"}
+		})
+
+		It("includes Groups in container spec", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
+			groups := containerSpec["Groups"].([]string)
+			Expect(groups).To(Equal([]string{"967", "968"}))
+		})
+	})
+
+	Describe("with no groups", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+		})
+
+		It("does not include Groups", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
+			Expect(containerSpec).NotTo(HaveKey("Groups"))
+		})
+	})
+
 	Describe("with publish_mode host", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil

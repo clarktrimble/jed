@@ -56,6 +56,7 @@ func cloneService(service Service) Service {
 	clone.Secrets = slices.Clone(service.Secrets)
 	clone.Configs = maps.Clone(service.Configs)
 	clone.Hosts = slices.Clone(service.Hosts)
+	clone.Groups = slices.Clone(service.Groups)
 	clone.About.Links = slices.Clone(service.About.Links)
 	clone.About.Notes = slices.Clone(service.About.Notes)
 

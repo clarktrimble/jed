@@ -2,6 +2,7 @@ package jed_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -91,6 +92,20 @@ var _ = Describe("Service", func() {
 			for _, user := range []string{"1000:{{DOCKER_GID", "1000:{{}}", "1000:{{DOCKER-GID}}", "1000:docker", "1000:", ":967", "1:2:3", "-1", "+1"} {
 				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", User: user}
 				Expect(svc.Validate()).NotTo(Succeed(), user)
+			}
+		})
+
+		It("allows numeric and templated groups before render", func() {
+			for _, groups := range [][]string{{"967"}, {"{{DOCKER_GID}}"}, {"967", "{{DOCKER_GID}}"}} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", Groups: groups}
+				Expect(svc.Validate()).To(Succeed(), fmt.Sprint(groups))
+			}
+		})
+
+		It("rejects malformed groups", func() {
+			for _, group := range []string{"", "967:968", "{{DOCKER_GID", "{{}}", "{{DOCKER-GID}}", "docker", "-1"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", Groups: []string{group}}
+				Expect(svc.Validate()).NotTo(Succeed(), group)
 			}
 		})
 	})

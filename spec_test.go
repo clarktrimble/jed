@@ -21,6 +21,7 @@ var _ = Describe("Jed", func() {
 				Network: "svc-net",
 				Command: []string{"--host={{VHOST}}"},
 				User:    "1000:{{DOCKER_GID}}",
+				Groups:  []string{"{{DOCKER_GID}}"},
 			}
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "DOCKER_GID": "967"}}
@@ -31,6 +32,7 @@ var _ = Describe("Jed", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"--host=app.example.com"}))
 			Expect(spec.Service.User).To(Equal("1000:967"))
+			Expect(spec.Service.Groups).To(Equal([]string{"967"}))
 		})
 	})
 

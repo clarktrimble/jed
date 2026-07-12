@@ -89,6 +89,10 @@ func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfi
 		containerSpec["Hosts"] = service.Hosts
 	}
 
+	if len(service.Groups) > 0 {
+		containerSpec["Groups"] = service.Groups
+	}
+
 	labels := map[string]string{}
 	if service.Traefik != nil {
 		labels = traefikLabels(service.Name, service.Traefik)

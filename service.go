@@ -141,8 +141,10 @@ type Service struct {
 	// PublishMode controls swarm port publishing: "host" for direct node binding,
 	// empty or "ingress" for load-balanced routing mesh (default).
 	PublishMode string `json:"publish_mode,omitempty"`
-	// User sets the container user (e.g., "1001", "1000:967"). Default is "1001".
+	// User sets the container user (e.g., "1000", "1000:967"). Default is "1000".
 	User string `json:"user,omitempty"`
+	// Groups lists supplementary group GIDs for the container (e.g., "967").
+	Groups []string `json:"groups,omitempty"`
 	// About holds user-facing descriptive information.
 	About About `json:"about"`
 	// Traefik enables traefik routing label generation.
@@ -181,6 +183,11 @@ func (service Service) Validate() error {
 	}
 	if service.User != "" && !validUser(service.User) {
 		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values or {{VAR}} templates", service.User))
+	}
+	for _, group := range service.Groups {
+		if !validUserPart(group) {
+			issues = append(issues, fmt.Sprintf("group %q must be a numeric gid or {{VAR}} template", group))
+		}
 	}
 	if service.Restart != "" && service.Restart != RestartNone && service.Restart != RestartOnFailure && service.Restart != RestartAny {
 		issues = append(issues, fmt.Sprintf("restart %q must be one of %q, %q, or %q", service.Restart, RestartNone, RestartOnFailure, RestartAny))
