@@ -2,6 +2,7 @@ package swarm_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -51,7 +52,7 @@ var _ = Describe("Spec", func() {
 
 	It("builds the swarm service spec without creating or updating", func() {
 		Expect(err).NotTo(HaveOccurred())
-		Expect(body["Name"]).To(Equal("reauth-acp"))
+		Expect(body.Name).To(Equal("reauth-acp"))
 
 		calls := client.SendObjectCalls()
 		Expect(calls).To(HaveLen(1))
@@ -62,39 +63,37 @@ var _ = Describe("Spec", func() {
 	It("includes service configuration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
-		taskTemplate := body["TaskTemplate"].(map[string]any)
-		containerSpec := taskTemplate["ContainerSpec"].(map[string]any)
-		Expect(containerSpec["Image"]).To(Equal("local/reauth-acp:a1b2c3d"))
+		taskTemplate := body.TaskTemplate
+		containerSpec := taskTemplate.ContainerSpec
+		Expect(containerSpec.Image).To(Equal("local/reauth-acp:a1b2c3d"))
 
-		envLines := containerSpec["Env"].([]string)
-		Expect(envLines).To(ContainElement("RTH_CLIENT_BASEURI=https://10.35.44.62"))
-		Expect(envLines).To(ContainElement("RTH_SERVER_PORT=3031"))
+		Expect(containerSpec.Env).To(ContainElement("RTH_CLIENT_BASEURI=https://10.35.44.62"))
+		Expect(containerSpec.Env).To(ContainElement("RTH_SERVER_PORT=3031"))
 
-		mounts := containerSpec["Mounts"].([]map[string]string)
+		mounts := containerSpec.Mounts
 		Expect(mounts).To(HaveLen(1))
-		Expect(mounts[0]["Source"]).To(Equal("svc-data"))
-		Expect(mounts[0]["Target"]).To(Equal("/data"))
+		Expect(mounts[0].Source).To(Equal("svc-data"))
+		Expect(mounts[0].Target).To(Equal("/data"))
 
-		endpointSpec := body["EndpointSpec"].(map[string]any)
-		ports := endpointSpec["Ports"].([]map[string]any)
+		ports := body.EndpointSpec.Ports
 		Expect(ports).To(HaveLen(1))
-		Expect(ports[0]["TargetPort"]).To(Equal(3031))
-		Expect(ports[0]["PublishedPort"]).To(Equal(8012))
-		Expect(ports[0]["Protocol"]).To(Equal("tcp"))
+		Expect(ports[0].TargetPort).To(Equal(3031))
+		Expect(ports[0].PublishedPort).To(Equal(8012))
+		Expect(ports[0].Protocol).To(Equal("tcp"))
 
-		networks := taskTemplate["Networks"].([]map[string]string)
+		networks := taskTemplate.Networks
 		Expect(networks).To(HaveLen(1))
-		Expect(networks[0]["Target"]).To(Equal("svc-net"))
+		Expect(networks[0].Target).To(Equal("svc-net"))
 	})
 
 	It("resolves latest swarm secrets", func() {
 		Expect(err).NotTo(HaveOccurred())
 
-		containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-		secrets := containerSpec["Secrets"].([]map[string]any)
+		containerSpec := body.TaskTemplate.ContainerSpec
+		secrets := containerSpec.Secrets
 		Expect(secrets).To(HaveLen(1))
-		Expect(secrets[0]["SecretID"]).To(Equal("sec-abc-123"))
-		Expect(secrets[0]["SecretName"]).To(Equal("aruba_client_secret_v2"))
+		Expect(secrets[0].SecretID).To(Equal("sec-abc-123"))
+		Expect(secrets[0].SecretName).To(Equal("aruba_client_secret_v2"))
 	})
 
 	Describe("with invalid service", func() {
@@ -120,8 +119,8 @@ var _ = Describe("Spec", func() {
 		It("does not include Secrets", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-			Expect(containerSpec).NotTo(HaveKey("Secrets"))
+			containerSpec := body.TaskTemplate.ContainerSpec
+			Expect(containerSpec.Secrets).To(BeEmpty())
 		})
 	})
 
@@ -134,8 +133,8 @@ var _ = Describe("Spec", func() {
 		It("disables restarts", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			restart := body["TaskTemplate"].(map[string]any)["RestartPolicy"].(map[string]any)
-			Expect(restart).To(Equal(map[string]any{"Condition": "none"}))
+			restart := body.TaskTemplate.RestartPolicy
+			Expect(restart).To(Equal(swarm.RestartPolicy{Condition: "none"}))
 		})
 	})
 
@@ -148,10 +147,10 @@ var _ = Describe("Spec", func() {
 		It("includes restart details", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			restart := body["TaskTemplate"].(map[string]any)["RestartPolicy"].(map[string]any)
-			Expect(restart["Condition"]).To(Equal("on-failure"))
-			Expect(restart["Delay"]).To(Equal(5000000000))
-			Expect(restart["MaxAttempts"]).To(Equal(1))
+			restart := body.TaskTemplate.RestartPolicy
+			Expect(restart.Condition).To(Equal("on-failure"))
+			Expect(restart.Delay).To(Equal(int64(5000000000)))
+			Expect(restart.MaxAttempts).To(Equal(1))
 		})
 	})
 
@@ -166,14 +165,13 @@ var _ = Describe("Spec", func() {
 		It("includes resolved configs", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-			configs := containerSpec["Configs"].([]map[string]any)
+			containerSpec := body.TaskTemplate.ContainerSpec
+			configs := containerSpec.Configs
 			Expect(configs).To(HaveLen(1))
-			Expect(configs[0]["ConfigID"]).To(Equal("cfg-abc-123"))
-			Expect(configs[0]["ConfigName"]).To(Equal("reauth_config_v3"))
+			Expect(configs[0].ConfigID).To(Equal("cfg-abc-123"))
+			Expect(configs[0].ConfigName).To(Equal("reauth_config_v3"))
 
-			file := configs[0]["File"].(map[string]any)
-			Expect(file["Name"]).To(Equal("/etc/reauth/config.yaml"))
+			Expect(configs[0].File.Name).To(Equal("/etc/reauth/config.yaml"))
 		})
 	})
 
@@ -186,8 +184,8 @@ var _ = Describe("Spec", func() {
 		It("includes Hosts in container spec", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-			hosts := containerSpec["Hosts"].([]string)
+			containerSpec := body.TaskTemplate.ContainerSpec
+			hosts := containerSpec.Hosts
 			Expect(hosts).To(HaveLen(2))
 			Expect(hosts).To(ContainElement("192.168.88.75 vilnius"))
 			Expect(hosts).To(ContainElement("10.0.0.1 gateway"))
@@ -203,8 +201,8 @@ var _ = Describe("Spec", func() {
 		It("includes Groups in container spec", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-			groups := containerSpec["Groups"].([]string)
+			containerSpec := body.TaskTemplate.ContainerSpec
+			groups := containerSpec.Groups
 			Expect(groups).To(Equal([]string{"967", "968"}))
 		})
 	})
@@ -217,8 +215,34 @@ var _ = Describe("Spec", func() {
 		It("does not include Groups", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
+			containerSpec := body.TaskTemplate.ContainerSpec
+			Expect(containerSpec.Groups).To(BeEmpty())
+		})
+	})
+
+	Describe("marshaled JSON wire format", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+		})
+
+		It("omits empty optional fields but keeps a zero replica count", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			raw, merr := json.Marshal(body)
+			Expect(merr).NotTo(HaveOccurred())
+
+			var decoded map[string]any
+			Expect(json.Unmarshal(raw, &decoded)).To(Succeed())
+
+			containerSpec := decoded["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
 			Expect(containerSpec).NotTo(HaveKey("Groups"))
+			Expect(containerSpec).NotTo(HaveKey("Secrets"))
+
+			// Replicas has no omitempty: a legitimate scaled-to-zero must survive
+			// the wire, so the key is present even when the value is 0.
+			replicated := decoded["Mode"].(map[string]any)["Replicated"].(map[string]any)
+			Expect(replicated).To(HaveKey("Replicas"))
+			Expect(replicated["Replicas"]).To(BeEquivalentTo(0))
 		})
 	})
 
@@ -231,10 +255,9 @@ var _ = Describe("Spec", func() {
 		It("includes PublishMode in port spec", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			endpointSpec := body["EndpointSpec"].(map[string]any)
-			ports := endpointSpec["Ports"].([]map[string]any)
+			ports := body.EndpointSpec.Ports
 			Expect(ports).To(HaveLen(1))
-			Expect(ports[0]["PublishMode"]).To(Equal("host"))
+			Expect(ports[0].PublishMode).To(Equal("host"))
 		})
 	})
 
@@ -247,8 +270,8 @@ var _ = Describe("Spec", func() {
 		It("uses custom user in container spec", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-			Expect(containerSpec["User"]).To(Equal("1000:967"))
+			containerSpec := body.TaskTemplate.ContainerSpec
+			Expect(containerSpec.User).To(Equal("1000:967"))
 		})
 	})
 
@@ -261,7 +284,7 @@ var _ = Describe("Spec", func() {
 		It("generates traefik labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			labels := body["Labels"].(map[string]string)
+			labels := body.Labels
 			Expect(labels["traefik.enable"]).To(Equal("true"))
 			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
 			Expect(labels["traefik.http.routers.reauth-acp.entrypoints"]).To(Equal("websecure"))
@@ -281,7 +304,7 @@ var _ = Describe("Spec", func() {
 		It("does not include strip middleware", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			labels := body["Labels"].(map[string]string)
+			labels := body.Labels
 			Expect(labels["traefik.enable"]).To(Equal("true"))
 			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
 			Expect(labels).NotTo(HaveKey("traefik.http.routers.reauth-acp.middlewares"))
@@ -302,7 +325,7 @@ var _ = Describe("Spec", func() {
 		It("merges labels with explicit winning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
-			labels := body["Labels"].(map[string]string)
+			labels := body.Labels
 			Expect(labels["custom.label"]).To(Equal("custom-value"))
 			Expect(labels["traefik.enable"]).To(Equal("false"))
 			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))

@@ -94,7 +94,7 @@ var _ = Describe("Deploy", func() {
 			Expect(createCall).NotTo(BeNil())
 
 			spec := createCall.Snd.(swarm.Spec)
-			Expect(spec["Name"]).To(Equal("reauth-acp"))
+			Expect(spec.Name).To(Equal("reauth-acp"))
 		})
 	})
 

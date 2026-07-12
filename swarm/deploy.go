@@ -46,10 +46,9 @@ func (d *Swarm) Deploy(ctx context.Context, spec jed.Spec) (id string, created b
 		return
 	}
 
-	if err = preserveForceUpdate(body, svcInfo.Spec); err != nil {
-		err = errors.Wrapf(err, "failed to preserve force update for %q", service.Name)
-		return
-	}
+	// carry Docker's current ForceUpdate forward so an unrelated update does not
+	// trigger a task roll
+	body.TaskTemplate.ForceUpdate = svcInfo.Spec.TaskTemplate.ForceUpdate
 
 	err = d.updateService(ctx, service.Name, svcInfo.Version.Index, body)
 	if err != nil {
@@ -71,20 +70,6 @@ func (d *Swarm) Restart(ctx context.Context, name string) error {
 	svcInfo.Spec.TaskTemplate.ForceUpdate++
 
 	return d.updateService(ctx, name, svcInfo.Version.Index, svcInfo.Spec)
-}
-
-func preserveForceUpdate(spec Spec, current ServiceSpec) error {
-	setForceUpdate(spec, current.TaskTemplate.ForceUpdate)
-	return nil
-}
-
-func setForceUpdate(spec Spec, value uint64) {
-	taskTemplate, ok := spec["TaskTemplate"].(map[string]any)
-	if !ok {
-		taskTemplate = map[string]any{}
-		spec["TaskTemplate"] = taskTemplate
-	}
-	taskTemplate["ForceUpdate"] = value
 }
 
 type resolvedSecret struct {

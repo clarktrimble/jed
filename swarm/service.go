@@ -30,7 +30,11 @@ type ServiceInfo struct {
 	UpdatedAt     time.Time       `json:"UpdatedAt"`
 }
 
-// ServiceSpec is Docker's user-modifiable swarm service configuration.
+// ServiceSpec is Docker's user-modifiable swarm service configuration as read
+// back from Docker (inbound). It is deliberately kept separate from the typed
+// outbound Spec in spec.go: substructures Jed does not inspect stay as
+// json.RawMessage so Restart can round-trip the current spec verbatim (only
+// bumping ForceUpdate) without modeling Docker's full schema.
 type ServiceSpec struct {
 	Name           string            `json:"Name,omitempty"`
 	Labels         map[string]string `json:"Labels,omitempty"`
