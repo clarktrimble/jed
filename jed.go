@@ -124,8 +124,26 @@ func (j *Jed) Scale(ctx context.Context, name string, count int) error {
 	return nil
 }
 
-// Spec loads service, env, and current render vars from the store and returns a rendered spec.
+// Spec loads the service, its env, and the current render vars from the store
+// and returns a rendered spec.
 func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
+	env, err := j.store.GetEnv(ctx, name)
+	if err != nil {
+		return Spec{}, errors.Wrapf(err, "failed to get env %q from store", name)
+	}
+
+	return j.spec(ctx, name, env)
+}
+
+// SpecWithEnv renders name's spec using the provided service env instead of the
+// stored one. The env is not merged with the stored env and is not saved; it is
+// used only to render this spec, e.g. to preflight a submitted env before saving.
+func (j *Jed) SpecWithEnv(ctx context.Context, name string, env Env) (Spec, error) {
+	return j.spec(ctx, name, env)
+}
+
+// spec renders name's service using env as the service env and the stored render vars.
+func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 	svc, err := j.store.GetService(ctx, name)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to get service %q from store", name)
@@ -135,7 +153,8 @@ func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 		svc.User = j.defaultUid
 	}
 
-	if err := svc.Validate(); err != nil {
+	err = svc.Validate()
+	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to validate service %q", name)
 	}
 
@@ -144,12 +163,7 @@ func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 		return Spec{}, errors.Wrapf(err, "failed to get vars env %q from store", j.varsEnvName)
 	}
 
-	env, err := j.store.GetEnv(ctx, name)
-	if err != nil {
-		return Spec{}, errors.Wrapf(err, "failed to get env %q from store", name)
-	}
-
-	spec, err := Render(svc, env, varsEnv.Vars)
+	spec, err := render(svc, env, varsEnv.Vars)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to render spec for service %q", name)
 	}

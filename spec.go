@@ -16,22 +16,28 @@ type Spec struct {
 	Env Env `json:"env"`
 }
 
-// Render renders all string values in service and env using template variables.
-// Service values render with vars and env.Vars; env.Vars win on key collisions.
-// Env values render with vars only, so env vars do not template each other.
-// Render vars are not added to Env.
-func Render(service Service, env Env, vars map[string]string) (Spec, error) {
-	tplVars := make(map[string]string, len(vars)+len(env.Vars))
-	maps.Copy(tplVars, vars)
-	maps.Copy(tplVars, env.Vars)
+// render substitutes {{VAR}} placeholders in all string values of service and env,
+// returning a rendered Spec. The global vars are not copied into the rendered Env.
+// An error is returned from expandStrings iff a value contains a {{name}} placeholder
+// (opening and closing braces) whose name has no matching var; an unmatched {{ is left as-is.
+func render(service Service, env Env, globalVars map[string]string) (Spec, error) {
+
+	// service strings draw on the global vars plus the service's own env (env wins)
+	serviceVars := make(map[string]string, len(globalVars)+len(env.Vars))
+	maps.Copy(serviceVars, globalVars)
+	maps.Copy(serviceVars, env.Vars)
 
 	renderedService := cloneService(service)
-	if err := expandStrings(reflect.ValueOf(&renderedService).Elem(), tplVars); err != nil {
+
+	err := expandStrings(reflect.ValueOf(&renderedService).Elem(), serviceVars)
+	if err != nil {
 		return Spec{}, err
 	}
 
+	// env values draw on the global vars only, so env vars can't template each other
 	renderedEnv := cloneEnv(env)
-	if err := expandStrings(reflect.ValueOf(&renderedEnv).Elem(), vars); err != nil {
+	err = expandStrings(reflect.ValueOf(&renderedEnv).Elem(), globalVars)
+	if err != nil {
 		return Spec{}, err
 	}
 
