@@ -2,7 +2,6 @@ package jed_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -23,9 +22,7 @@ var _ = Describe("API", func() {
 	)
 
 	BeforeEach(func() {
-		var err error
-		j, err = jed.New(context.Background(), memo.New(), "_vars", loggertest.NewLoggerMock())
-		Expect(err).NotTo(HaveOccurred())
+		j = (&jed.Config{VarsEnvName: "_vars"}).New(memo.New(), loggertest.NewLoggerMock())
 
 		rtr = http.NewServeMux()
 		j.Register(rtr)

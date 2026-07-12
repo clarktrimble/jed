@@ -161,18 +161,14 @@ func newDeployer(socket string) *swarm.Swarm {
 	lgrCfg := sabot.Config{MaxLen: 999}
 	lgr := lgrCfg.New(os.Stderr)
 
-	deployer, err := (&swarm.Config{Socket: socket}).New(lgr)
-	fatal(err)
-
-	return deployer
+	return (&swarm.Config{Socket: socket}).New(lgr)
 }
 
 func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name string) {
 	lgrCfg := sabot.Config{MaxLen: 999}
 	lgr := lgrCfg.New(os.Stderr)
 
-	j, err := jed.New(ctx, store, "_global", lgr)
-	fatal(err)
+	j := (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000"}).New(store, lgr)
 
 	spec, err := j.Spec(ctx, name)
 	fatal(err)

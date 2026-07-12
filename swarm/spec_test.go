@@ -224,19 +224,6 @@ var _ = Describe("Spec", func() {
 		})
 	})
 
-	Describe("with default user", func() {
-		BeforeEach(func() {
-			svc.Secrets = nil
-		})
-
-		It("uses default user 1001", func() {
-			Expect(err).NotTo(HaveOccurred())
-
-			containerSpec := body["TaskTemplate"].(map[string]any)["ContainerSpec"].(map[string]any)
-			Expect(containerSpec["User"]).To(Equal("1001:1001"))
-		})
-	})
-
 	Describe("with traefik config and strip", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil

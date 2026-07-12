@@ -56,9 +56,6 @@ func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfi
 	}
 
 	uid := service.User
-	if uid == "" {
-		uid = "1001"
-	}
 	gid := uid
 	if i := strings.IndexByte(uid, ':'); i >= 0 {
 		gid = uid[i+1:]

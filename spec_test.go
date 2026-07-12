@@ -25,39 +25,21 @@ var _ = Describe("Jed", func() {
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "DOCKER_GID": "967"}}
 
-			j, err := jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
-			Expect(err).NotTo(HaveOccurred())
+			j := (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
 
 			spec, err := j.Spec(ctx, "app")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"--host=app.example.com"}))
 			Expect(spec.Service.User).To(Equal("1000:967"))
 		})
-
-		It("rejects a nil store", func() {
-			_, err := jed.New(context.Background(), nil, "_global", loggertest.NewLoggerMock())
-			Expect(err).To(MatchError("jed has nil store"))
-		})
-
-		It("rejects a nil logger", func() {
-			_, err := jed.New(context.Background(), newFakeStore(), "_global", nil)
-			Expect(err).To(MatchError("jed has nil logger"))
-		})
 	})
 
 	Describe("Store", func() {
 		It("returns the underlying store", func() {
-			ctx := context.Background()
 			store := newFakeStore()
 
-			j, err := jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
-			Expect(err).NotTo(HaveOccurred())
+			j := (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
 			Expect(j.Store()).To(BeIdenticalTo(store))
-		})
-
-		It("returns nil for a nil Jed", func() {
-			var j *jed.Jed
-			Expect(j.Store()).To(BeNil())
 		})
 	})
 
@@ -66,7 +48,6 @@ var _ = Describe("Jed", func() {
 			ctx   context.Context
 			store *fakeStore
 			j     *jed.Jed
-			err   error
 		)
 
 		BeforeEach(func() {
@@ -78,8 +59,7 @@ var _ = Describe("Jed", func() {
 				Network:  "svc-net",
 				Replicas: 1,
 			}
-			j, err = jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
-			Expect(err).NotTo(HaveOccurred())
+			j = (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
 		})
 
 		It("updates the stored replica count", func() {
@@ -129,8 +109,7 @@ var _ = Describe("Jed", func() {
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "8080"}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
 
-			j, err = jed.New(ctx, store, "_global", loggertest.NewLoggerMock())
-			Expect(err).NotTo(HaveOccurred())
+			j = (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
 		})
 
 		JustBeforeEach(func() {
@@ -162,6 +141,30 @@ var _ = Describe("Jed", func() {
 			It("fails validation", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to validate service"))
+			})
+		})
+
+		When("a default uid is configured", func() {
+			BeforeEach(func() {
+				j = (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000"}).New(store, loggertest.NewLoggerMock())
+			})
+
+			It("applies the default uid when the service omits user", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.Service.User).To(Equal("1000"))
+			})
+
+			When("the service sets its own user", func() {
+				BeforeEach(func() {
+					svc := store.services["app"]
+					svc.User = "1500:1600"
+					store.services["app"] = svc
+				})
+
+				It("keeps the service user", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.Service.User).To(Equal("1500:1600"))
+				})
 			})
 		})
 	})

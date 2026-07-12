@@ -72,46 +72,41 @@ type Env struct {
 	Vars map[string]string `json:"vars"`
 }
 
+// Config controls Jed creation. Fields are populated by launch (envconfig)
+// from their default tags; New does not apply defaults.
+type Config struct {
+	// VarsEnvName is the store env whose vars are available to all specs during render.
+	VarsEnvName string `json:"vars_env_name" default:"_global"`
+	// DefaultUid is the container user (uid or uid:gid) applied when a service omits user.
+	DefaultUid string `json:"default_uid" default:"1000"`
+}
+
 // Jed loads stored service state and renders runtime-neutral specs.
 type Jed struct {
 	store       Store
 	varsEnvName string
+	defaultUid  string
 	logger      logger.Logger
 }
 
-// New creates a Jed that uses render vars from varsEnvName.
-func New(ctx context.Context, store Store, varsEnvName string, lgr logger.Logger) (*Jed, error) {
-	if store == nil {
-		return nil, errors.New("jed has nil store")
-	}
-	if lgr == nil {
-		return nil, errors.New("jed has nil logger")
-	}
+// New creates Jed from Config.
+func (cfg *Config) New(store Store, lgr logger.Logger) *Jed {
 
-	if _, err := store.GetEnv(ctx, varsEnvName); err != nil {
-		return nil, errors.Wrapf(err, "failed to get vars env %q from store", varsEnvName)
+	return &Jed{
+		store:       store,
+		varsEnvName: cfg.VarsEnvName,
+		defaultUid:  cfg.DefaultUid,
+		logger:      lgr,
 	}
-
-	return &Jed{store: store, varsEnvName: varsEnvName, logger: lgr}, nil
 }
 
 // Store returns the underlying store.
 func (j *Jed) Store() Store {
-	if j == nil {
-		return nil
-	}
 	return j.store
 }
 
 // Scale updates the stored replica count for service name.
 func (j *Jed) Scale(ctx context.Context, name string, count int) error {
-	if j == nil {
-		return errors.New("nil jed")
-	}
-	if j.store == nil {
-		return errors.New("jed has nil store")
-	}
-
 	svc, err := j.store.GetService(ctx, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get service %q from store", name)
@@ -131,16 +126,13 @@ func (j *Jed) Scale(ctx context.Context, name string, count int) error {
 
 // Spec loads service, env, and current render vars from the store and returns a rendered spec.
 func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
-	if j == nil {
-		return Spec{}, errors.New("nil jed")
-	}
-	if j.store == nil {
-		return Spec{}, errors.New("jed has nil store")
-	}
-
 	svc, err := j.store.GetService(ctx, name)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to get service %q from store", name)
+	}
+
+	if svc.User == "" {
+		svc.User = j.defaultUid
 	}
 
 	if err := svc.Validate(); err != nil {
