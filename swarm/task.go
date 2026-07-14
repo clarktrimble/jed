@@ -64,8 +64,9 @@ func (d *Swarm) TaskLogs(ctx context.Context, taskID, tail string) ([]byte, erro
 }
 
 type taskResponse struct {
-	ID     string `json:"ID"`
-	Status struct {
+	ID        string `json:"ID"`
+	ServiceID string `json:"ServiceID"`
+	Status    struct {
 		State     string `json:"State"`
 		Err       string `json:"Err"`
 		Timestamp string `json:"Timestamp"`
