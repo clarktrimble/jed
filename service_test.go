@@ -37,12 +37,14 @@ var _ = Describe("Service", func() {
 	})
 
 	Describe("JSON", func() {
-		It("uses lower-case field names for name and image", func() {
-			data, err := json.Marshal(jed.Service{Name: "app", Image: "app:v1", Network: "svc-net"})
+		It("uses lower-case field names for name, enabled, and image", func() {
+			data, err := json.Marshal(jed.Service{Name: "app", Enabled: true, Image: "app:v1", Network: "svc-net"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(data)).To(ContainSubstring(`"name":"app"`))
+			Expect(string(data)).To(ContainSubstring(`"enabled":true`))
 			Expect(string(data)).To(ContainSubstring(`"image":"app:v1"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Name"`))
+			Expect(string(data)).NotTo(ContainSubstring(`"Enabled"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Image"`))
 		})
 
@@ -67,6 +69,13 @@ var _ = Describe("Service", func() {
 			Expect(err.Error()).To(ContainSubstring("image is required"))
 			Expect(err.Error()).To(ContainSubstring("name is required"))
 			Expect(err.Error()).To(ContainSubstring("network is required"))
+		})
+
+		It("rejects disabled services with replicas", func() {
+			svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", Replicas: 1}
+			err := svc.Validate()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("disabled service cannot have replicas"))
 		})
 
 		It("rejects invalid restart policy", func() {

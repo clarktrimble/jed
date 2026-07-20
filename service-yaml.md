@@ -40,6 +40,7 @@ resources:
 |-------|----------|-------------|
 | `name` | yes | Service name |
 | `image` | yes | Docker image with tag |
+| `about` | no | User-facing description, links, and notes |
 | `network` | yes | Docker network name |
 | `command` | no | Override container command |
 | `labels` | no | Container labels |
@@ -53,8 +54,12 @@ resources:
 | `publish_mode` | no | Port publish mode: `host` for direct binding; default is ingress |
 | `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1001` |
 | `traefik` | no | Traefik routing config; generates labels automatically |
+| `enabled` | no | Whether the service is allowed to run; typically enabled by UI |
 | `replicas` | no | Number of service instances; default is `0` (stopped) |
-| `about` | no | User-facing description, links, and notes |
+
+## Enabled and Replicas
+
+A service must be enabled before it can have running replicas. To disable a service, scale it to `0` first.
 
 ## Template Expansion
 

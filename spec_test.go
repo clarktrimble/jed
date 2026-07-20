@@ -57,6 +57,7 @@ var _ = Describe("Jed", func() {
 			store = newFakeStore()
 			store.services["app"] = jed.Service{
 				Name:     "app",
+				Enabled:  true,
 				Image:    "local/app:v1",
 				Network:  "svc-net",
 				Replicas: 1,
@@ -83,8 +84,80 @@ var _ = Describe("Jed", func() {
 			Expect(store.services["app"].Replicas).To(Equal(1))
 		})
 
+		It("rejects scaling disabled services above zero", func() {
+			store.services["app"] = jed.Service{
+				Name:     "app",
+				Image:    "local/app:v1",
+				Network:  "svc-net",
+				Replicas: 0,
+			}
+
+			err := j.Scale(ctx, "app", 1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("disabled service cannot have replicas"))
+			Expect(store.services["app"].Replicas).To(Equal(0))
+		})
+
 		It("returns store lookup errors", func() {
 			err := j.Scale(ctx, "missing", 2)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to get service"))
+		})
+	})
+
+	Describe("Enable and Disable", func() {
+		var (
+			ctx   context.Context
+			store *fakeStore
+			j     *jed.Jed
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			store = newFakeStore()
+			store.services["app"] = jed.Service{
+				Name:     "app",
+				Enabled:  true,
+				Image:    "local/app:v1",
+				Network:  "svc-net",
+				Replicas: 2,
+			}
+			j = (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
+		})
+
+		It("enables the stored service", func() {
+			store.services["app"] = jed.Service{Name: "app", Image: "local/app:v1", Network: "svc-net"}
+
+			err := j.Enable(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.services["app"].Enabled).To(BeTrue())
+		})
+
+		It("disables a stopped stored service", func() {
+			store.services["app"] = jed.Service{
+				Name:     "app",
+				Enabled:  true,
+				Image:    "local/app:v1",
+				Network:  "svc-net",
+				Replicas: 0,
+			}
+
+			err := j.Disable(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.services["app"].Enabled).To(BeFalse())
+			Expect(store.services["app"].Replicas).To(Equal(0))
+		})
+
+		It("rejects disabling a service with replicas", func() {
+			err := j.Disable(ctx, "app")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("disabled service cannot have replicas"))
+			Expect(store.services["app"].Enabled).To(BeTrue())
+			Expect(store.services["app"].Replicas).To(Equal(2))
+		})
+
+		It("returns store lookup errors", func() {
+			err := j.Disable(ctx, "missing")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to get service"))
 		})

@@ -112,6 +112,13 @@ type About struct {
 	Notes []Note `json:"notes,omitempty"`
 }
 
+// Todo: work on "Service"
+//   Ports and Hosts are vestigial?
+//   Network is always the same
+//   Restart is weird
+//   Enabled and Replicas belong elsewhere
+//   Etc.
+
 // Service is a service's configuration.
 type Service struct {
 	// Name is the service name (e.g., "postgres").
@@ -149,6 +156,8 @@ type Service struct {
 	About About `json:"about"`
 	// Traefik enables traefik routing label generation.
 	Traefik *Traefik `json:"traefik,omitempty"`
+	// Enabled controls whether the service is allowed to run.
+	Enabled bool `json:"enabled"`
 	// Replicas is the number of service instances to run.
 	Replicas int `json:"replicas,omitempty"`
 }
@@ -194,6 +203,9 @@ func (service Service) Validate() error {
 	}
 	if service.Replicas < 0 {
 		issues = append(issues, "replicas cannot be negative")
+	}
+	if !service.Enabled && service.Replicas != 0 {
+		issues = append(issues, "disabled service cannot have replicas")
 	}
 	for _, link := range service.About.Links {
 		err := link.Validate()

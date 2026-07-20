@@ -105,6 +105,50 @@ func (j *Jed) Store() Store {
 	return j.store
 }
 
+// Enable marks service name as enabled in the store.
+func (j *Jed) Enable(ctx context.Context, name string) error {
+	svc, err := j.store.GetService(ctx, name)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get service %q from store", name)
+	}
+
+	svc.Enabled = true
+
+	err = svc.Validate()
+	if err != nil {
+		return errors.Wrapf(err, "failed to validate service %q", name)
+	}
+
+	err = j.store.SetService(ctx, svc)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set service %q in store", name)
+	}
+
+	return nil
+}
+
+// Disable marks service name as disabled in the store.
+func (j *Jed) Disable(ctx context.Context, name string) error {
+	svc, err := j.store.GetService(ctx, name)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get service %q from store", name)
+	}
+
+	svc.Enabled = false
+
+	err = svc.Validate()
+	if err != nil {
+		return errors.Wrapf(err, "failed to validate service %q", name)
+	}
+
+	err = j.store.SetService(ctx, svc)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set service %q in store", name)
+	}
+
+	return nil
+}
+
 // Scale updates the stored replica count for service name.
 func (j *Jed) Scale(ctx context.Context, name string, count int) error {
 	svc, err := j.store.GetService(ctx, name)
@@ -113,11 +157,14 @@ func (j *Jed) Scale(ctx context.Context, name string, count int) error {
 	}
 
 	svc.Replicas = count
-	if err := svc.Validate(); err != nil {
+
+	err = svc.Validate()
+	if err != nil {
 		return errors.Wrapf(err, "failed to validate service %q", name)
 	}
 
-	if err := j.store.SetService(ctx, svc); err != nil {
+	err = j.store.SetService(ctx, svc)
+	if err != nil {
 		return errors.Wrapf(err, "failed to set service %q in store", name)
 	}
 

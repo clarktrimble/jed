@@ -46,6 +46,8 @@ Tradeoff: callers cannot distinguish “no env exists” from “empty env exist
 
 The store does not enforce referential integrity. Env can exist without a matching service, and deleting a service does not inherently delete env unless a caller chooses to do both. This keeps the store simple and flexible, but stricter applications must enforce their own policy.
 
+`Jed.Enable(ctx, name)` and `Jed.Disable(ctx, name)` toggle whether a service is allowed to run; disabled services must have zero replicas.
+
 `Jed.Scale(ctx, name, count)` updates the stored replica count for callers that manage desired scale separately from service YAML editing. It changes desired state only; runtimes still apply the new count on a later deploy.
 
 ## Rendering Decisions
