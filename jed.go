@@ -16,7 +16,7 @@ import (
 
 // DBSchemaVersion is the current persistent Jed store schema version.
 // Bump this when changing the store schema in a backwards-incompatible way.
-const DBSchemaVersion = "3"
+const DBSchemaVersion = "4"
 
 // Store persists services and environment variables.
 //
@@ -121,85 +121,74 @@ func (j *Jed) Store() Store {
 	return j.store
 }
 
-// Enable marks service name as enabled in the store.
-func (j *Jed) Enable(ctx context.Context, name string) error {
-	svc, err := j.singleService(ctx, name)
+// Enable records image as the enabled image for service name.
+func (j *Jed) Enable(ctx context.Context, name, image string) (err error) {
+	intent := Intent{Name: name, Image: image}
+
+	err = intent.Validate()
 	if err != nil {
-		return errors.Wrapf(err, "failed to get service %q from store", name)
+		return
 	}
 
-	svc.Enabled = true
-
-	err = svc.Validate()
+	_, err = j.store.GetService(ctx, name, image)
 	if err != nil {
-		return errors.Wrapf(err, "failed to validate service %q", name)
+		return
 	}
 
-	err = j.store.SetService(ctx, svc)
-	if err != nil {
-		return errors.Wrapf(err, "failed to set service %q in store", name)
+	existing, err := j.store.GetIntent(ctx, name)
+	if err == nil {
+		if existing.Image == image {
+			return
+		}
+		if existing.Replicas != 0 {
+			return errors.Errorf("service %q has %d replicas for image %q", name, existing.Replicas, existing.Image)
+		}
+	} else {
+		var notFound NotFoundError
+		if !errors.As(err, &notFound) {
+			return
+		}
 	}
 
-	return nil
+	err = j.store.SetIntent(ctx, intent)
+	return
 }
 
-// Disable marks service name as disabled in the store.
-func (j *Jed) Disable(ctx context.Context, name string) error {
-	svc, err := j.singleService(ctx, name)
+// Disable removes the enabled intent for service name.
+func (j *Jed) Disable(ctx context.Context, name string) (err error) {
+	intent, err := j.store.GetIntent(ctx, name)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get service %q from store", name)
+		var notFound NotFoundError
+		if errors.As(err, &notFound) {
+			return nil
+		}
+		return
 	}
 
-	svc.Enabled = false
-
-	err = svc.Validate()
-	if err != nil {
-		return errors.Wrapf(err, "failed to validate service %q", name)
+	if intent.Replicas != 0 {
+		return errors.Errorf("service %q has %d replicas for image %q", name, intent.Replicas, intent.Image)
 	}
 
-	err = j.store.SetService(ctx, svc)
-	if err != nil {
-		return errors.Wrapf(err, "failed to set service %q in store", name)
-	}
-
-	return nil
+	err = j.store.DelIntent(ctx, name)
+	return
 }
 
-// Scale updates the stored replica count for service name.
-func (j *Jed) Scale(ctx context.Context, name string, count int) error {
-	svc, err := j.singleService(ctx, name)
+// Scale updates the enabled intent replica count for service name.
+func (j *Jed) Scale(ctx context.Context, name string, count int) (err error) {
+	intent, err := j.store.GetIntent(ctx, name)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get service %q from store", name)
+		return
 	}
 
-	svc.Replicas = count
+	intent.Replicas = count
 
-	err = svc.Validate()
+	err = intent.Validate()
 	if err != nil {
-		return errors.Wrapf(err, "failed to validate service %q", name)
+		return
 	}
 
-	err = j.store.SetService(ctx, svc)
-	if err != nil {
-		return errors.Wrapf(err, "failed to set service %q in store", name)
-	}
-
-	return nil
-}
-
-// Todo: make sure this gets cleaned up
-func (j *Jed) singleService(ctx context.Context, name string) (Service, error) {
-	services, err := j.store.Services(ctx, name)
-	if err != nil {
-		return Service{}, err
-	}
-	if len(services) == 0 {
-		return Service{}, NotFoundError{Kind: "service", Name: name}
-	}
-	if len(services) > 1 {
-		return Service{}, errors.Errorf("service %q has multiple images", name)
-	}
-	return services[0], nil
+	err = j.store.SetIntent(ctx, intent)
+	return
 }
 
 // Spec loads the service, its env, and the current render vars from the store
@@ -220,11 +209,16 @@ func (j *Jed) SpecWithEnv(ctx context.Context, name string, env Env) (Spec, erro
 	return j.spec(ctx, name, env)
 }
 
-// spec renders name's service using env as the service env and the stored render vars.
+// spec renders name's enabled service using env as the service env and the stored render vars.
 func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
-	svc, err := j.singleService(ctx, name)
+	intent, err := j.store.GetIntent(ctx, name)
 	if err != nil {
-		return Spec{}, errors.Wrapf(err, "failed to get service %q from store", name)
+		return Spec{}, err
+	}
+
+	svc, err := j.store.GetService(ctx, name, intent.Image)
+	if err != nil {
+		return Spec{}, err
 	}
 
 	if svc.User == "" {
@@ -245,6 +239,7 @@ func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to render spec for service %q", name)
 	}
+	spec.Intent = intent
 
 	return spec, nil
 }

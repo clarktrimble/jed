@@ -116,7 +116,6 @@ type About struct {
 //   Ports and Hosts are vestigial?
 //   Network is always the same
 //   Restart is weird
-//   Enabled and Replicas belong elsewhere
 //   Etc.
 
 // Service is a service's configuration.
@@ -156,10 +155,6 @@ type Service struct {
 	About About `json:"about"`
 	// Traefik enables traefik routing label generation.
 	Traefik *Traefik `json:"traefik,omitempty"`
-	// Enabled controls whether the service is allowed to run.
-	Enabled bool `json:"enabled"`
-	// Replicas is the number of service instances to run.
-	Replicas int `json:"replicas,omitempty"`
 }
 
 // Services is a slice of services.
@@ -210,12 +205,6 @@ func (service Service) Validate() error {
 	}
 	if service.Restart != "" && service.Restart != RestartNone && service.Restart != RestartOnFailure && service.Restart != RestartAny {
 		issues = append(issues, fmt.Sprintf("restart %q must be one of %q, %q, or %q", service.Restart, RestartNone, RestartOnFailure, RestartAny))
-	}
-	if service.Replicas < 0 {
-		issues = append(issues, "replicas cannot be negative")
-	}
-	if !service.Enabled && service.Replicas != 0 {
-		issues = append(issues, "disabled service cannot have replicas")
 	}
 	for _, link := range service.About.Links {
 		err := link.Validate()

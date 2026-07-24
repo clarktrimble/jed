@@ -29,11 +29,10 @@ func (s *fakeStore) GetService(ctx context.Context, name, image string) (jed.Ser
 }
 
 func (s *fakeStore) SetService(ctx context.Context, svc jed.Service) error {
+	s.services[svc.Name+"\x00"+svc.Image] = svc
 	if _, ok := s.services[svc.Name]; ok {
 		s.services[svc.Name] = svc
-		return nil
 	}
-	s.services[svc.Name+"\x00"+svc.Image] = svc
 	return nil
 }
 

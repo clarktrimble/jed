@@ -20,6 +20,7 @@ var _ = Describe("Spec", func() {
 		ctx      context.Context
 		svc      jed.Service
 		env      jed.Env
+		intent   jed.Intent
 		body     swarm.Spec
 		err      error
 	)
@@ -42,12 +43,13 @@ var _ = Describe("Spec", func() {
 				"RTH_SERVER_PORT":    "3031",
 			},
 		}
+		intent = jed.Intent{Name: "reauth-acp", Image: "local/reauth-acp:a1b2c3d"}
 		client = newSpecMock()
 		deployer = swarm.New(client, nopLogger{})
 	})
 
 	JustBeforeEach(func() {
-		body, err = deployer.Spec(ctx, jed.Spec{Service: svc, Env: env})
+		body, err = deployer.Spec(ctx, jed.Spec{Service: svc, Env: env, Intent: intent})
 	})
 
 	It("builds the swarm service spec without creating or updating", func() {
@@ -84,6 +86,14 @@ var _ = Describe("Spec", func() {
 		networks := taskTemplate.Networks
 		Expect(networks).To(HaveLen(1))
 		Expect(networks[0].Target).To(Equal("svc-net"))
+	})
+
+	It("uses intent replicas", func() {
+		intent.Replicas = 2
+
+		body, err = deployer.Spec(ctx, jed.Spec{Service: svc, Env: env, Intent: intent})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(body.Mode.Replicated.Replicas).To(Equal(2))
 	})
 
 	It("resolves latest swarm secrets", func() {

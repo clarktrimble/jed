@@ -4,11 +4,12 @@ Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 
 ## Concepts
 
-- `jed.Service` is editable service configuration. Any string value may contain `{{VAR}}` templates.
+- `jed.Service` is editable service configuration for one runnable image. Any string value may contain `{{VAR}}` templates.
+- `jed.Intent` is desired state for a logical service: selected image plus replica count. Missing intent means disabled.
 - `jed.Env` is the container/runtime environment for a service. Env values may template render vars.
-- `jed.Spec` is rendered, runtime-neutral intended state: `Service + Env` after template expansion.
-- `jed.Store` persists services and envs.
-- `jed.Jed` loads stored state, renders specs by service name, and updates selected stored state such as replica counts.
+- `jed.Spec` is rendered, runtime-neutral intended state: `Service + Env + Intent` after template expansion.
+- `jed.Store` persists services, envs, and intents.
+- `jed.Jed` loads stored state, renders specs by service name, and updates intent state.
 
 Runtime packages consume Jed model values:
 
@@ -25,9 +26,12 @@ if err != nil {
 
 sw := swarm.New(dockerClient, logger)
 
-// Load render vars from a named env, then render the named service from the store.
-j, err := jed.New(ctx, store, "_global", logger)
-if err != nil {
+// Select the image to run, scale it, then render the named service from the store.
+j := (&jed.Config{VarsEnvName: "_global"}).New(store, logger)
+if err := j.Enable(ctx, "postgres", "postgres:16"); err != nil {
+    // handle error
+}
+if err := j.Scale(ctx, "postgres", 1); err != nil {
     // handle error
 }
 

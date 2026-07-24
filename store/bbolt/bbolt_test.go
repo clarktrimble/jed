@@ -79,11 +79,11 @@ var _ = Describe("Bbolt Store", func() {
 		Expect(currentStore.Close()).To(Succeed())
 		currentStore = nil
 
-		err = stampSchemaVersion(dbPath, "2")
+		err = stampSchemaVersion(dbPath, "3")
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = (&bbolt.Config{Path: dbPath}).New()
-		Expect(err).To(MatchError(ContainSubstring("bbolt db schema version \"2\" does not match current schema version \"3\"")))
+		Expect(err).To(MatchError(ContainSubstring("bbolt db schema version \"3\" does not match current schema version \"4\"")))
 	})
 
 	It("times out instead of hanging when the database is locked", func() {

@@ -26,6 +26,7 @@ func (j *Jed) Register(rtr Router) {
 	rtr.HandleFunc("GET /store/envs/{name}", h.getEnv)
 	rtr.HandleFunc("PUT /store/envs/{name}", h.setEnv)
 	rtr.HandleFunc("DELETE /store/envs/{name}", h.delEnv)
+	// Todo: add /store/intents routes when the HTTP store API needs intent parity.
 }
 
 type apiHandlers struct {

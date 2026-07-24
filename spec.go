@@ -14,6 +14,8 @@ type Spec struct {
 	Service Service `json:"service"`
 	// Env is the service environment used to render the spec.
 	Env Env `json:"env"`
+	// Intent is the selected image and desired replica count used to render the spec.
+	Intent Intent `json:"intent"`
 }
 
 // render substitutes {{VAR}} placeholders in all string values of service and env,

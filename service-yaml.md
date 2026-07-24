@@ -8,7 +8,6 @@ Define a `jed.Service` for deployment.
 name: reauth-acp
 image: local/reauth-acp:3c070f2
 network: svc-net
-replicas: 1
 
 restart: on-failure
 
@@ -54,16 +53,10 @@ resources:
 | `publish_mode` | no | Port publish mode: `host` for direct binding; default is ingress |
 | `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1001` |
 | `traefik` | no | Traefik routing config; generates labels automatically |
-| `enabled` | no | Whether the service is allowed to run; typically enabled by UI |
-| `replicas` | no | Number of service instances; default is `0` (stopped) |
-
-## Enabled and Replicas
-
-A service must be enabled before it can have running replicas. To disable a service, scale it to `0` first.
 
 ## Template Expansion
 
-Any string value in a service definition may contain `{{VAR}}` placeholders. They are rendered by `jed.Render` / `jed.Jed.Spec` before runtime deploy.
+Any string value in a service definition may contain `{{VAR}}` placeholders. They are rendered by `jed.Jed.Spec` before runtime deploy.
 
 ```yaml
 command:

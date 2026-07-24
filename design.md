@@ -23,11 +23,11 @@ The standalone runtime lives in `container`, making it a peer of `swarm` while k
 
 ## Desired State vs Rendered Specs
 
-`jed.Service` is editable and persisted desired state. It describes what should run: image, command, ports, volumes, network, labels, secrets, configs, resources, user, replicas, and related metadata. Any string value in the service may contain templates.
+`jed.Service` is editable and persisted service definition. It describes what can run: image, command, ports, volumes, network, labels, secrets, configs, resources, user, and related metadata. Any string value in the service may contain templates.
 
 `jed.Env` holds container/runtime environment variables separately from the service definition.
 
-`jed.Spec` is rendered intended state: a `Service` and `Env` after Jed-level template expansion. It is still runtime-neutral.
+`jed.Spec` is rendered intended state: a `Service`, `Env`, and `Intent` after Jed-level template expansion. It is still runtime-neutral.
 
 Why separate raw desired state from rendered runtime input?
 
@@ -38,7 +38,7 @@ Why separate raw desired state from rendered runtime input?
 
 ## Store Decisions
 
-`jed.Store` persists service definitions and environment variable sets. It is an interface so production can use `store/bbolt`, tests and embedded users can use `store/memo`, and store behavior can be checked with `store.RunStoreContractTests`.
+`jed.Store` persists service definitions, environment variable sets, and intents. Service definitions are keyed by logical service name and image, so one logical service can have multiple runnable image definitions. It is an interface so production can use `store/bbolt`, tests and embedded users can use `store/memo`, and store behavior can be checked with `store.RunStoreContractTests`.
 
 `Store.GetEnv` returns an empty `Env` with an initialized `Vars` map when no env has been stored for a service. A service with no environment variables is valid, and deploy code does not need to special-case missing env. Store failures remain distinguishable as errors.
 
@@ -46,18 +46,15 @@ Tradeoff: callers cannot distinguish “no env exists” from “empty env exist
 
 The store does not enforce referential integrity. Env can exist without a matching service, and deleting a service does not inherently delete env unless a caller chooses to do both. This keeps the store simple and flexible, but stricter applications must enforce their own policy.
 
-`Jed.Enable(ctx, name)` and `Jed.Disable(ctx, name)` toggle whether a service is allowed to run; disabled services must have zero replicas.
+`jed.Intent` is persisted desired state for a logical service. It records the selected service image and desired replica count; no intent means disabled.
 
-`Jed.Scale(ctx, name, count)` updates the stored replica count for callers that manage desired scale separately from service YAML editing. It changes desired state only; runtimes still apply the new count on a later deploy.
+`Jed.Enable(ctx, name, image)` records the active image intent, `Jed.Disable(ctx, name)` removes it, and `Jed.Scale(ctx, name, count)` updates the intent replica count. These change desired state only; runtimes still apply the new count on a later deploy.
 
 ## Rendering Decisions
 
-There are two rendering entry points:
+The primary rendering entry point is `j.Spec(ctx, name)`, which loads the current intent, selected service image, env, and render vars from a store and renders by logical service name.
 
-- `jed.Render(service, env, vars)` renders raw values supplied by the caller.
-- `jed.New(ctx, store, varsEnvName, logger)` plus `j.Spec(ctx, name)` loads from a store and renders by service name.
-
-`jed.New(ctx, store, varsEnvName, logger)` records the named env to use for render vars, and `j.Spec(ctx, name)` reloads that env when rendering so store edits are visible to existing `Jed` values. The env name is explicit. `_global` is a `cmd/transship` CLI convention, not a magic library default.
+`Config.New(store, logger)` records the named env to use for render vars, and `j.Spec(ctx, name)` reloads that env when rendering so store edits are visible to existing `Jed` values. The env name is explicit. `_global` is a `cmd/transship` CLI convention, not a magic library default.
 
 Rendering rules:
 

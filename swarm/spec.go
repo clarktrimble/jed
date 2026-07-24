@@ -235,7 +235,7 @@ func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfi
 		},
 		Mode: Mode{
 			Replicated: Replicated{
-				Replicas: service.Replicas,
+				Replicas: jspec.Intent.Replicas,
 			},
 		},
 		UpdateConfig: UpdateConfig{

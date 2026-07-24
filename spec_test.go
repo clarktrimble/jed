@@ -15,14 +15,16 @@ var _ = Describe("Jed", func() {
 		It("loads render vars from the named env", func() {
 			ctx := context.Background()
 			store := newFakeStore()
-			store.services["app"] = jed.Service{
+			err := store.SetService(ctx, jed.Service{
 				Name:    "app",
 				Image:   "local/app:v1",
 				Network: "svc-net",
 				Command: []string{"--host={{VHOST}}"},
 				User:    "1000:{{DOCKER_GID}}",
 				Groups:  []string{"{{DOCKER_GID}}"},
-			}
+			})
+			Expect(err).NotTo(HaveOccurred())
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1"}
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "DOCKER_GID": "967"}}
 
@@ -55,53 +57,33 @@ var _ = Describe("Jed", func() {
 		BeforeEach(func() {
 			ctx = context.Background()
 			store = newFakeStore()
-			store.services["app"] = jed.Service{
-				Name:     "app",
-				Enabled:  true,
-				Image:    "local/app:v1",
-				Network:  "svc-net",
-				Replicas: 1,
-			}
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 1}
 			j = (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
 		})
 
-		It("updates the stored replica count", func() {
+		It("updates the stored intent replica count", func() {
 			err := j.Scale(ctx, "app", 3)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(store.services["app"].Replicas).To(Equal(3))
+			Expect(store.intents["app"].Replicas).To(Equal(3))
 		})
 
 		It("allows scaling to zero", func() {
 			err := j.Scale(ctx, "app", 0)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(store.services["app"].Replicas).To(Equal(0))
+			Expect(store.intents["app"].Replicas).To(Equal(0))
 		})
 
 		It("rejects negative replica counts", func() {
 			err := j.Scale(ctx, "app", -1)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("replicas cannot be negative"))
-			Expect(store.services["app"].Replicas).To(Equal(1))
+			Expect(store.intents["app"].Replicas).To(Equal(1))
 		})
 
-		It("rejects scaling disabled services above zero", func() {
-			store.services["app"] = jed.Service{
-				Name:     "app",
-				Image:    "local/app:v1",
-				Network:  "svc-net",
-				Replicas: 0,
-			}
-
-			err := j.Scale(ctx, "app", 1)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("disabled service cannot have replicas"))
-			Expect(store.services["app"].Replicas).To(Equal(0))
-		})
-
-		It("returns store lookup errors", func() {
+		It("returns missing intent errors", func() {
 			err := j.Scale(ctx, "missing", 2)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to get service"))
+			Expect(err.Error()).To(ContainSubstring("intent not found"))
 		})
 	})
 
@@ -116,50 +98,79 @@ var _ = Describe("Jed", func() {
 			ctx = context.Background()
 			store = newFakeStore()
 			store.services["app"] = jed.Service{
-				Name:     "app",
-				Enabled:  true,
-				Image:    "local/app:v1",
-				Network:  "svc-net",
-				Replicas: 2,
+				Name:    "app",
+				Image:   "local/app:v1",
+				Network: "svc-net",
 			}
 			j = (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
 		})
 
-		It("enables the stored service", func() {
-			store.services["app"] = jed.Service{Name: "app", Image: "local/app:v1", Network: "svc-net"}
-
-			err := j.Enable(ctx, "app")
+		It("sets the stored intent", func() {
+			err := store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v1", Network: "svc-net"})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(store.services["app"].Enabled).To(BeTrue())
+
+			err = j.Enable(ctx, "app", "local/app:v1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.intents["app"]).To(Equal(jed.Intent{Name: "app", Image: "local/app:v1"}))
 		})
 
-		It("disables a stopped stored service", func() {
-			store.services["app"] = jed.Service{
-				Name:     "app",
-				Enabled:  true,
-				Image:    "local/app:v1",
-				Network:  "svc-net",
-				Replicas: 0,
-			}
-
-			err := j.Disable(ctx, "app")
+		It("is idempotent when the existing intent has the same image", func() {
+			err := store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v1", Network: "svc-net"})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(store.services["app"].Enabled).To(BeFalse())
-			Expect(store.services["app"].Replicas).To(Equal(0))
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}
+
+			err = j.Enable(ctx, "app", "local/app:v1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.intents["app"]).To(Equal(jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}))
 		})
 
-		It("rejects disabling a service with replicas", func() {
-			err := j.Disable(ctx, "app")
+		It("switches image when the existing intent is stopped", func() {
+			err := store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v2", Network: "svc-net"})
+			Expect(err).NotTo(HaveOccurred())
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1"}
+
+			err = j.Enable(ctx, "app", "local/app:v2")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.intents["app"]).To(Equal(jed.Intent{Name: "app", Image: "local/app:v2"}))
+		})
+
+		It("rejects switching image when the existing intent has replicas", func() {
+			err := store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v2", Network: "svc-net"})
+			Expect(err).NotTo(HaveOccurred())
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}
+
+			err = j.Enable(ctx, "app", "local/app:v2")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("disabled service cannot have replicas"))
-			Expect(store.services["app"].Enabled).To(BeTrue())
-			Expect(store.services["app"].Replicas).To(Equal(2))
+			Expect(err.Error()).To(ContainSubstring("has 2 replicas"))
+			Expect(store.intents["app"]).To(Equal(jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}))
 		})
 
-		It("returns store lookup errors", func() {
+		It("returns service lookup errors", func() {
+			err := j.Enable(ctx, "missing", "local/app:v1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("service not found"))
+		})
+
+		It("removes a stopped stored intent", func() {
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1"}
+
+			err := j.Disable(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.intents).NotTo(HaveKey("app"))
+		})
+
+		It("is idempotent when the service has no intent", func() {
 			err := j.Disable(ctx, "missing")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("rejects disabling an intent with replicas", func() {
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}
+
+			err := j.Disable(ctx, "app")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to get service"))
+			Expect(err.Error()).To(ContainSubstring("has 2 replicas"))
+			Expect(store.intents["app"]).To(Equal(jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}))
 		})
 	})
 
@@ -175,12 +186,14 @@ var _ = Describe("Jed", func() {
 		BeforeEach(func() {
 			ctx = context.Background()
 			store = newFakeStore()
-			store.services["app"] = jed.Service{
+			err = store.SetService(ctx, jed.Service{
 				Name:    "app",
 				Image:   "local/app:v1",
 				Network: "svc-net",
 				Command: []string{"serve", "--host={{VHOST}}", "--port={{PORT}}"},
-			}
+			})
+			Expect(err).NotTo(HaveOccurred())
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}
 			store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "8080"}}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
 
@@ -191,9 +204,11 @@ var _ = Describe("Jed", func() {
 			spec, err = j.Spec(ctx, "app")
 		})
 
-		It("loads service and env and returns a rendered spec", func() {
+		It("loads the intent, service, and env and returns a rendered spec", func() {
 			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Intent).To(Equal(jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}))
 			Expect(spec.Service.Name).To(Equal("app"))
+			Expect(spec.Service.Image).To(Equal("local/app:v1"))
 			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=app.example.com", "--port=8080"}))
 			Expect(spec.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
 			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
@@ -210,12 +225,24 @@ var _ = Describe("Jed", func() {
 
 		When("the service is invalid", func() {
 			BeforeEach(func() {
-				store.services["app"] = jed.Service{Name: "app", Image: "local/app:v1"}
+				err = store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v1"})
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("fails validation", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to validate service"))
+			})
+		})
+
+		When("the service has no intent", func() {
+			BeforeEach(func() {
+				delete(store.intents, "app")
+			})
+
+			It("returns the missing intent error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("intent not found"))
 			})
 		})
 
@@ -231,9 +258,11 @@ var _ = Describe("Jed", func() {
 
 			When("the service sets its own user", func() {
 				BeforeEach(func() {
-					svc := store.services["app"]
+					svc, err := store.GetService(ctx, "app", "local/app:v1")
+					Expect(err).NotTo(HaveOccurred())
 					svc.User = "1500:1600"
-					store.services["app"] = svc
+					err = store.SetService(ctx, svc)
+					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("keeps the service user", func() {
@@ -276,7 +305,9 @@ var _ = Describe("Jed", func() {
 		})
 
 		JustBeforeEach(func() {
-			store.services["app"] = svc
+			err = store.SetService(ctx, svc)
+			Expect(err).NotTo(HaveOccurred())
+			store.intents["app"] = jed.Intent{Name: "app", Image: svc.Image, Replicas: 2}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: vars}
 			spec, err = j.SpecWithEnv(ctx, "app", env)
 		})

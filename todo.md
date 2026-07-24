@@ -9,6 +9,10 @@
 - Todo: add a store/data migration path, perhaps explicit `jed export > services.yaml` and `jed import services.yaml` commands
 - Todo: add focused coverage where it buys confidence, e.g. `internal/dockerlog`, swarm restart `any`, and cmd smoke-ish behavior
 - Todo: cut back on nil checks, lets rely on New instead
+- Todo: add store HTTP routes for intents if/when the HTTP API needs parity
+- Todo: add CLI intent commands only if the CLI becomes active again
+- Todo: consider a UI-friendly enabled-service view that joins Intent with the selected Service
+- Todo: finish removing/rewriting stale docs around old service-level desired state as they surface
 
 ## better group support
 
