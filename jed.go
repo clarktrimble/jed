@@ -16,25 +16,28 @@ import (
 
 // DBSchemaVersion is the current persistent Jed store schema version.
 // Bump this when changing the store schema in a backwards-incompatible way.
-const DBSchemaVersion = "2"
+const DBSchemaVersion = "3"
 
 // Store persists services and environment variables.
 //
 // Implementations must be safe for concurrent use. The Store is the source
 // of truth for all service definitions and environment variables.
 type Store interface {
-	// GetService retrieves a service definition by name.
+	// GetService retrieves a service definition by name and image.
 	// Returns NotFoundError if the service does not exist.
-	GetService(ctx context.Context, name string) (Service, error)
+	GetService(ctx context.Context, name, image string) (Service, error)
 
 	// SetService creates or updates a service definition.
 	SetService(ctx context.Context, svc Service) error
 
-	// DelService removes a service definition by name.
-	DelService(ctx context.Context, name string) error
+	// DelService removes a service definition by name and image.
+	DelService(ctx context.Context, name, image string) error
 
-	// Services returns all service definitions.
-	Services(ctx context.Context) ([]Service, error)
+	// Services returns all service definitions for name.
+	Services(ctx context.Context, name string) ([]Service, error)
+
+	// AllServices returns all service definitions.
+	AllServices(ctx context.Context) ([]Service, error)
 
 	// GetEnv retrieves environment variables for a service.
 	// Returns an empty Env with initialized Vars map when the service has no
@@ -120,7 +123,7 @@ func (j *Jed) Store() Store {
 
 // Enable marks service name as enabled in the store.
 func (j *Jed) Enable(ctx context.Context, name string) error {
-	svc, err := j.store.GetService(ctx, name)
+	svc, err := j.singleService(ctx, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get service %q from store", name)
 	}
@@ -142,7 +145,7 @@ func (j *Jed) Enable(ctx context.Context, name string) error {
 
 // Disable marks service name as disabled in the store.
 func (j *Jed) Disable(ctx context.Context, name string) error {
-	svc, err := j.store.GetService(ctx, name)
+	svc, err := j.singleService(ctx, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get service %q from store", name)
 	}
@@ -164,7 +167,7 @@ func (j *Jed) Disable(ctx context.Context, name string) error {
 
 // Scale updates the stored replica count for service name.
 func (j *Jed) Scale(ctx context.Context, name string, count int) error {
-	svc, err := j.store.GetService(ctx, name)
+	svc, err := j.singleService(ctx, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get service %q from store", name)
 	}
@@ -182,6 +185,21 @@ func (j *Jed) Scale(ctx context.Context, name string, count int) error {
 	}
 
 	return nil
+}
+
+// Todo: make sure this gets cleaned up
+func (j *Jed) singleService(ctx context.Context, name string) (Service, error) {
+	services, err := j.store.Services(ctx, name)
+	if err != nil {
+		return Service{}, err
+	}
+	if len(services) == 0 {
+		return Service{}, NotFoundError{Kind: "service", Name: name}
+	}
+	if len(services) > 1 {
+		return Service{}, errors.Errorf("service %q has multiple images", name)
+	}
+	return services[0], nil
 }
 
 // Spec loads the service, its env, and the current render vars from the store
@@ -204,7 +222,7 @@ func (j *Jed) SpecWithEnv(ctx context.Context, name string, env Env) (Spec, erro
 
 // spec renders name's service using env as the service env and the stored render vars.
 func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
-	svc, err := j.store.GetService(ctx, name)
+	svc, err := j.singleService(ctx, name)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to get service %q from store", name)
 	}

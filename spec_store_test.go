@@ -20,25 +20,39 @@ func newFakeStore() *fakeStore {
 	}
 }
 
-func (s *fakeStore) GetService(ctx context.Context, name string) (jed.Service, error) {
-	svc, ok := s.services[name]
+func (s *fakeStore) GetService(ctx context.Context, name, image string) (jed.Service, error) {
+	svc, ok := s.services[name+"\x00"+image]
 	if !ok {
-		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name}
+		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name + "@" + image}
 	}
 	return svc, nil
 }
 
 func (s *fakeStore) SetService(ctx context.Context, svc jed.Service) error {
-	s.services[svc.Name] = svc
+	if _, ok := s.services[svc.Name]; ok {
+		s.services[svc.Name] = svc
+		return nil
+	}
+	s.services[svc.Name+"\x00"+svc.Image] = svc
 	return nil
 }
 
-func (s *fakeStore) DelService(ctx context.Context, name string) error {
-	delete(s.services, name)
+func (s *fakeStore) DelService(ctx context.Context, name, image string) error {
+	delete(s.services, name+"\x00"+image)
 	return nil
 }
 
-func (s *fakeStore) Services(ctx context.Context) ([]jed.Service, error) {
+func (s *fakeStore) Services(ctx context.Context, name string) ([]jed.Service, error) {
+	services := make([]jed.Service, 0, len(s.services))
+	for _, svc := range s.services {
+		if svc.Name == name {
+			services = append(services, svc)
+		}
+	}
+	return services, nil
+}
+
+func (s *fakeStore) AllServices(ctx context.Context) ([]jed.Service, error) {
 	services := make([]jed.Service, 0, len(s.services))
 	for _, svc := range s.services {
 		services = append(services, svc)

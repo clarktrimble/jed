@@ -71,7 +71,7 @@ func RunStoreContractTests(
 				It("should store and retrieve the service", func() {
 					Expect(err).NotTo(HaveOccurred())
 
-					retrievedService, err = store.GetService(ctx, "postgres")
+					retrievedService, err = store.GetService(ctx, "postgres", "postgres:14")
 					Expect(err).NotTo(HaveOccurred())
 					Expect(retrievedService.Name).To(Equal("postgres"))
 					Expect(retrievedService.Image).To(Equal("postgres:14"))
@@ -81,13 +81,13 @@ func RunStoreContractTests(
 
 			When("getting a non-existent service", func() {
 				It("should return NotFoundError", func() {
-					_, err = store.GetService(ctx, "nonexistent")
+					_, err = store.GetService(ctx, "nonexistent", "postgres:14")
 					Expect(err).To(HaveOccurred())
 
 					var notFound jed.NotFoundError
 					Expect(errors.As(err, &notFound)).To(BeTrue())
 					Expect(notFound.Kind).To(Equal("service"))
-					Expect(notFound.Name).To(Equal("nonexistent"))
+					Expect(notFound.Name).To(Equal("nonexistent@postgres:14"))
 				})
 			})
 		})
@@ -96,7 +96,40 @@ func RunStoreContractTests(
 			var services []jed.Service
 
 			JustBeforeEach(func() {
-				services, err = store.Services(ctx)
+				services, err = store.Services(ctx, "postgres")
+			})
+
+			When("no services exist", func() {
+				It("should return empty slice", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(services).To(BeEmpty())
+				})
+			})
+
+			When("multiple services exist for the same name", func() {
+				BeforeEach(func() {
+					err = store.SetService(ctx, jed.Service{Name: "postgres", Image: "postgres:14"})
+					Expect(err).NotTo(HaveOccurred())
+					err = store.SetService(ctx, jed.Service{Name: "postgres", Image: "postgres:15"})
+					Expect(err).NotTo(HaveOccurred())
+					err = store.SetService(ctx, jed.Service{Name: "redis", Image: "redis:7"})
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return services with the requested name", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(services).To(HaveLen(2))
+					images := []string{services[0].Image, services[1].Image}
+					Expect(images).To(ContainElements("postgres:14", "postgres:15"))
+				})
+			})
+		})
+
+		Describe("AllServices", func() {
+			var services []jed.Service
+
+			JustBeforeEach(func() {
+				services, err = store.AllServices(ctx)
 			})
 
 			When("no services exist", func() {
@@ -132,14 +165,14 @@ func RunStoreContractTests(
 			})
 
 			JustBeforeEach(func() {
-				err = store.DelService(ctx, "postgres")
+				err = store.DelService(ctx, "postgres", "postgres:14")
 			})
 
 			When("deleting an existing service", func() {
 				It("should remove the service", func() {
 					Expect(err).NotTo(HaveOccurred())
 
-					_, err = store.GetService(ctx, "postgres")
+					_, err = store.GetService(ctx, "postgres", "postgres:14")
 					Expect(err).To(HaveOccurred())
 				})
 			})

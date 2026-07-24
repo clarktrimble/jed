@@ -37,7 +37,15 @@ func (h *apiHandlers) listServices(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	rp := respond.New(w, h.logger)
 
-	services, err := h.jed.store.Services(ctx)
+	// Todo: name in query is bust?
+	name := r.URL.Query().Get("name")
+	var services []Service
+	var err error
+	if name == "" {
+		services, err = h.jed.store.AllServices(ctx)
+	} else {
+		services, err = h.jed.store.Services(ctx, name)
+	}
 	if err != nil {
 		rp.NotOk(ctx, http.StatusInternalServerError, err)
 		return
@@ -49,7 +57,9 @@ func (h *apiHandlers) getService(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	rp := respond.New(w, h.logger)
 
-	service, err := h.jed.store.GetService(ctx, r.PathValue("name"))
+	// Todo: image in query is bust?
+	image := r.URL.Query().Get("image")
+	service, err := h.jed.store.GetService(ctx, r.PathValue("name"), image)
 	if err != nil {
 		var notFound NotFoundError
 		if errors.As(err, &notFound) {
@@ -94,7 +104,10 @@ func (h *apiHandlers) delService(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	rp := respond.New(w, h.logger)
 
-	if err := h.jed.store.DelService(ctx, r.PathValue("name")); err != nil {
+	// Todo: image in query is bust?
+	image := r.URL.Query().Get("image")
+	err := h.jed.store.DelService(ctx, r.PathValue("name"), image)
+	if err != nil {
 		rp.NotOk(ctx, http.StatusInternalServerError, err)
 		return
 	}

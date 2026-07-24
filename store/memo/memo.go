@@ -31,15 +31,15 @@ func New() *Store {
 	}
 }
 
-// GetService retrieves a service definition by name.
+// GetService retrieves a service definition by name and image.
 // Note: shallow copy!!
-func (s *Store) GetService(ctx context.Context, name string) (jed.Service, error) {
+func (s *Store) GetService(ctx context.Context, name, image string) (jed.Service, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	svc, ok := s.svcs[name]
+	svc, ok := s.svcs[serviceKey(name, image)]
 	if !ok {
-		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name}
+		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: serviceName(name, image)}
 	}
 	return svc, nil
 }
@@ -49,22 +49,37 @@ func (s *Store) SetService(ctx context.Context, svc jed.Service) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.svcs[svc.Name] = svc
+	s.svcs[serviceKey(svc.Name, svc.Image)] = svc
 	return nil
 }
 
-// DelService removes a service definition.
-func (s *Store) DelService(ctx context.Context, name string) error {
+// DelService removes a service definition by name and image.
+func (s *Store) DelService(ctx context.Context, name, image string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	delete(s.svcs, name)
+	delete(s.svcs, serviceKey(name, image))
 	return nil
 }
 
-// Services retrieves all service definitions.
+// Services retrieves all service definitions for name.
 // Note: shallow copy!!
-func (s *Store) Services(ctx context.Context) ([]jed.Service, error) {
+func (s *Store) Services(ctx context.Context, name string) ([]jed.Service, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var services []jed.Service
+	for _, svc := range s.svcs {
+		if svc.Name == name {
+			services = append(services, svc)
+		}
+	}
+	return services, nil
+}
+
+// AllServices retrieves all service definitions.
+// Note: shallow copy!!
+func (s *Store) AllServices(ctx context.Context) ([]jed.Service, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -163,4 +178,12 @@ func (s *Store) Intents(ctx context.Context) ([]jed.Intent, error) {
 	defer s.mu.RUnlock()
 
 	return slices.Collect(maps.Values(s.intents)), nil
+}
+
+func serviceKey(name, image string) string {
+	return name + "\x00" + image
+}
+
+func serviceName(name, image string) string {
+	return name + "@" + image
 }

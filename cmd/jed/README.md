@@ -21,12 +21,12 @@ Service definitions:
 
 ```sh
 jed ls-svc
-jed get-svc NAME
+jed get-svc NAME IMAGE
 jed set-svc SERVICE.yaml
-jed del-svc NAME
+jed del-svc NAME IMAGE
 ```
 
-`set-svc` parses YAML into `jed.Service`, validates it, and stores it by the service's `name` field. See [../../service-yaml.md](../../service-yaml.md) for the YAML format.
+`set-svc` parses YAML into `jed.Service`, validates it, and stores it by service `name` and `image`. See [../../service-yaml.md](../../service-yaml.md) for the YAML format.
 
 Environment definitions:
 

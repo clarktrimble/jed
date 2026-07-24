@@ -36,6 +36,21 @@ var _ = Describe("Service", func() {
 		})
 	})
 
+	Describe("Services.ByName", func() {
+		It("groups services by logical service name", func() {
+			services := jed.Services{
+				{Name: "postgres", Image: "postgres:15"},
+				{Name: "postgres", Image: "postgres:16"},
+				{Name: "redis", Image: "redis:7"},
+			}
+
+			byName := services.ByName()
+			Expect(byName).To(HaveKey("postgres"))
+			Expect(byName["postgres"]).To(HaveLen(2))
+			Expect(byName["redis"]).To(ConsistOf(jed.Service{Name: "redis", Image: "redis:7"}))
+		})
+	})
+
 	Describe("JSON", func() {
 		It("uses lower-case field names for name, enabled, and image", func() {
 			data, err := json.Marshal(jed.Service{Name: "app", Enabled: true, Image: "app:v1", Network: "svc-net"})

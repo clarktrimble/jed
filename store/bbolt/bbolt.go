@@ -137,14 +137,14 @@ func (str *Store) Close() error {
 	return str.db.Close()
 }
 
-// GetService retrieves a service definition by name.
-func (str *Store) GetService(ctx context.Context, name string) (service jed.Service, err error) {
+// GetService retrieves a service definition by name and image.
+func (str *Store) GetService(ctx context.Context, name, image string) (service jed.Service, err error) {
 
 	err = str.db.View(func(tx *bbolt.Tx) error {
 		bkt := tx.Bucket(servicesBucket)
-		data := bkt.Get([]byte(name))
+		data := bkt.Get(serviceKey(name, image))
 		if data == nil {
-			return jed.NotFoundError{Kind: "service", Name: name}
+			return jed.NotFoundError{Kind: "service", Name: serviceName(name, image)}
 		}
 		err := json.Unmarshal(data, &service)
 		err = errors.Wrapf(err, "failed to decode service")
@@ -164,26 +164,47 @@ func (str *Store) SetService(ctx context.Context, service jed.Service) (err erro
 
 	err = str.db.Update(func(tx *bbolt.Tx) error {
 		bkt := tx.Bucket(servicesBucket)
-		return bkt.Put([]byte(service.Name), data)
+		return bkt.Put(serviceKey(service.Name, service.Image), data)
 	})
 
 	return
 }
 
-// DelService removes a service definition by name.
-func (str *Store) DelService(ctx context.Context, name string) (err error) {
+// DelService removes a service definition by name and image.
+func (str *Store) DelService(ctx context.Context, name, image string) (err error) {
 	// Todo: check key existence before delete, bbolt is silent on missing keys.
 
 	err = str.db.Update(func(tx *bbolt.Tx) error {
 		bkt := tx.Bucket(servicesBucket)
-		return bkt.Delete([]byte(name))
+		return bkt.Delete(serviceKey(name, image))
 	})
 
 	return
 }
 
-// Services returns all service definitions.
-func (str *Store) Services(ctx context.Context) (services []jed.Service, err error) {
+// Services returns all service definitions for name.
+func (str *Store) Services(ctx context.Context, name string) (services []jed.Service, err error) {
+
+	err = str.db.View(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(servicesBucket)
+		return bkt.ForEach(func(key, val []byte) error {
+			var svc jed.Service
+			err := json.Unmarshal(val, &svc)
+			if err != nil {
+				return errors.Wrapf(err, "failed to decode service")
+			}
+			if svc.Name == name {
+				services = append(services, svc)
+			}
+			return nil
+		})
+	})
+	err = errors.Wrapf(err, "failed to list services")
+	return
+}
+
+// AllServices returns all service definitions.
+func (str *Store) AllServices(ctx context.Context) (services []jed.Service, err error) {
 
 	err = str.db.View(func(tx *bbolt.Tx) error {
 		bkt := tx.Bucket(servicesBucket)
@@ -329,4 +350,12 @@ func (str *Store) Intents(ctx context.Context) (intents []jed.Intent, err error)
 	})
 	err = errors.Wrapf(err, "failed to list intents")
 	return
+}
+
+func serviceKey(name, image string) []byte {
+	return []byte(name + "\x00" + image)
+}
+
+func serviceName(name, image string) string {
+	return name + "@" + image
 }

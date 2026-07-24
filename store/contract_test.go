@@ -31,25 +31,35 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (m *mockStore) GetService(ctx context.Context, name string) (jed.Service, error) {
-	svc, ok := m.services[name]
+func (m *mockStore) GetService(ctx context.Context, name, image string) (jed.Service, error) {
+	svc, ok := m.services[name+"\x00"+image]
 	if !ok {
-		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name}
+		return jed.Service{}, jed.NotFoundError{Kind: "service", Name: name + "@" + image}
 	}
 	return svc, nil
 }
 
 func (m *mockStore) SetService(ctx context.Context, svc jed.Service) error {
-	m.services[svc.Name] = svc
+	m.services[svc.Name+"\x00"+svc.Image] = svc
 	return nil
 }
 
-func (m *mockStore) DelService(ctx context.Context, name string) error {
-	delete(m.services, name)
+func (m *mockStore) DelService(ctx context.Context, name, image string) error {
+	delete(m.services, name+"\x00"+image)
 	return nil
 }
 
-func (m *mockStore) Services(ctx context.Context) ([]jed.Service, error) {
+func (m *mockStore) Services(ctx context.Context, name string) ([]jed.Service, error) {
+	result := make([]jed.Service, 0, len(m.services))
+	for _, svc := range m.services {
+		if svc.Name == name {
+			result = append(result, svc)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockStore) AllServices(ctx context.Context) ([]jed.Service, error) {
 	result := make([]jed.Service, 0, len(m.services))
 	for _, svc := range m.services {
 		result = append(result, svc)

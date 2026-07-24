@@ -163,6 +163,7 @@ type Service struct {
 }
 
 // Services is a slice of services.
+// Todo: check that we use this where applicable.
 type Services []Service
 
 // Find finds a service by name.
@@ -174,6 +175,15 @@ func (services Services) Find(name string) (service Service, err error) {
 	}
 	err = errors.Errorf("service %s not found", name)
 	return
+}
+
+// ByName groups services by logical service name.
+func (services Services) ByName() map[string]Services {
+	byName := make(map[string]Services)
+	for _, service := range services {
+		byName[service.Name] = append(byName[service.Name], service)
+	}
+	return byName
 }
 
 // Validate checks that the service has valid configuration.

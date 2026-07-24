@@ -23,7 +23,8 @@ var (
 type lsSvcCmd struct{}
 
 type getSvcCmd struct {
-	Name string `arg:"positional,required" help:"service name"`
+	Name  string `arg:"positional,required" help:"service name"`
+	Image string `arg:"positional,required" help:"service image"`
 }
 
 type setSvcCmd struct {
@@ -31,7 +32,8 @@ type setSvcCmd struct {
 }
 
 type delSvcCmd struct {
-	Name string `arg:"positional,required" help:"service name"`
+	Name  string `arg:"positional,required" help:"service name"`
+	Image string `arg:"positional,required" help:"service image"`
 }
 
 type lsEnvCmd struct{}
@@ -88,11 +90,11 @@ func main() {
 	case args.LsSvc != nil:
 		lsSvc(ctx, store)
 	case args.GetSvc != nil:
-		getSvc(ctx, store, args.GetSvc.Name)
+		getSvc(ctx, store, args.GetSvc.Name, args.GetSvc.Image)
 	case args.SetSvc != nil:
 		setSvc(ctx, store, args.SetSvc.File)
 	case args.DelSvc != nil:
-		delSvc(ctx, store, args.DelSvc.Name)
+		delSvc(ctx, store, args.DelSvc.Name, args.DelSvc.Image)
 	case args.LsEnv != nil:
 		lsEnv(ctx, store)
 	case args.GetEnv != nil:
@@ -105,7 +107,7 @@ func main() {
 }
 
 func lsSvc(ctx context.Context, store *bbolt.Store) {
-	services, err := store.Services(ctx)
+	services, err := store.AllServices(ctx)
 	fatal(err)
 
 	for _, svc := range services {
@@ -113,8 +115,8 @@ func lsSvc(ctx context.Context, store *bbolt.Store) {
 	}
 }
 
-func getSvc(ctx context.Context, store *bbolt.Store, name string) {
-	svc, err := store.GetService(ctx, name)
+func getSvc(ctx context.Context, store *bbolt.Store, name, image string) {
+	svc, err := store.GetService(ctx, name, image)
 	fatal(err)
 
 	data, err := yaml.Marshal(svc)
@@ -140,14 +142,14 @@ func setSvc(ctx context.Context, store *bbolt.Store, file string) {
 	fmt.Printf("set service %s\n", svc.Name)
 }
 
-func delSvc(ctx context.Context, store *bbolt.Store, name string) {
-	_, err := store.GetService(ctx, name)
+func delSvc(ctx context.Context, store *bbolt.Store, name, image string) {
+	_, err := store.GetService(ctx, name, image)
 	fatal(err)
 
-	err = store.DelService(ctx, name)
+	err = store.DelService(ctx, name, image)
 	fatal(err)
 
-	fmt.Printf("deleted service %s\n", name)
+	fmt.Printf("deleted service %s %s\n", name, image)
 }
 
 func lsEnv(ctx context.Context, store *bbolt.Store) {

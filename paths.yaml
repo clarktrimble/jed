@@ -4,10 +4,18 @@ paths:
   /store/services:
     get:
       summary: List services
-      description: Return all stored service definitions.
+      description: Return all stored service definitions, optionally filtered by logical service name.
       operationId: listServices
       tags:
         - store
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Logical service name to filter by
+          schema:
+            type: string
+          example: web
       responses:
         '200':
           description: Services retrieved successfully
@@ -27,7 +35,7 @@ paths:
   /store/services/{name}:
     get:
       summary: Get service
-      description: Retrieve a stored service definition by name.
+      description: Retrieve a stored service definition by name and image.
       operationId: getService
       tags:
         - store
@@ -39,6 +47,13 @@ paths:
           schema:
             type: string
           example: web
+        - name: image
+          in: query
+          required: true
+          description: Service image
+          schema:
+            type: string
+          example: nginx:latest
       responses:
         '200':
           description: Service retrieved successfully
@@ -105,7 +120,7 @@ paths:
                 $ref: '#/components/schemas/Error'
     delete:
       summary: Delete service
-      description: Delete a stored service definition by name.
+      description: Delete a stored service definition by name and image.
       operationId: delService
       tags:
         - store
@@ -117,6 +132,13 @@ paths:
           schema:
             type: string
           example: web
+        - name: image
+          in: query
+          required: true
+          description: Service image
+          schema:
+            type: string
+          example: nginx:latest
       responses:
         '200':
           description: Service deleted successfully

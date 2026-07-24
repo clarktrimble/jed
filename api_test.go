@@ -41,7 +41,7 @@ var _ = Describe("API", func() {
 			res = doJSON(rtr, http.MethodPut, "/store/services/web", service)
 			Expect(res).To(HaveHTTPStatus(http.StatusOK))
 
-			res = doRequest(rtr, http.MethodGet, "/store/services/web", nil)
+			res = doRequest(rtr, http.MethodGet, "/store/services/web?image=nginx:latest", nil)
 			Expect(res).To(HaveHTTPStatus(http.StatusOK))
 			var got jed.Service
 			decodeJSON(res, &got)
@@ -54,10 +54,10 @@ var _ = Describe("API", func() {
 			decodeJSON(res, &services)
 			Expect(services).To(ConsistOf(HaveField("Name", "web")))
 
-			res = doRequest(rtr, http.MethodDelete, "/store/services/web", nil)
+			res = doRequest(rtr, http.MethodDelete, "/store/services/web?image=nginx:latest", nil)
 			Expect(res).To(HaveHTTPStatus(http.StatusOK))
 
-			res = doRequest(rtr, http.MethodGet, "/store/services/web", nil)
+			res = doRequest(rtr, http.MethodGet, "/store/services/web?image=nginx:latest", nil)
 			Expect(res).To(HaveHTTPStatus(http.StatusNotFound))
 		})
 

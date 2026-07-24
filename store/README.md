@@ -4,7 +4,7 @@ The `store` package provides contract tests for `jed.Store` implementations. Imp
 
 The interface itself lives in `jed.Store`. See `go doc jed.Store`.
 
-Stores persist service definitions, envs, and intents. An intent records the selected image and desired replica count for an enabled logical service; a missing intent means disabled.
+Stores persist service definitions, envs, and intents. Service definitions are keyed by logical service name and image, so one service name may have multiple image definitions. An intent records the selected image and desired replica count for an enabled logical service; a missing intent means disabled.
 
 ## Packages
 
