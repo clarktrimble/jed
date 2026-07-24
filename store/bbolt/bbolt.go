@@ -25,6 +25,7 @@ var DefaultOpenTimeout = 2 * time.Second
 var (
 	servicesBucket   = []byte("services")
 	envsBucket       = []byte("envs")
+	intentsBucket    = []byte("intents")
 	metaBucket       = []byte("meta")
 	schemaVersionKey = []byte("schema_version")
 )
@@ -87,6 +88,10 @@ func open(path string, timeout time.Duration, skipSchemaCheck bool) (str *Store,
 		if err != nil {
 			return err
 		}
+		_, err = tx.CreateBucketIfNotExists(intentsBucket)
+		if err != nil {
+			return err
+		}
 		_, err = tx.CreateBucketIfNotExists(metaBucket)
 		if err != nil {
 			return err
@@ -124,7 +129,7 @@ func checkSchemaVersion(tx *bbolt.Tx) error {
 }
 
 func storeIsEmpty(tx *bbolt.Tx) bool {
-	return tx.Bucket(servicesBucket).Stats().KeyN == 0 && tx.Bucket(envsBucket).Stats().KeyN == 0
+	return tx.Bucket(servicesBucket).Stats().KeyN == 0 && tx.Bucket(envsBucket).Stats().KeyN == 0 && tx.Bucket(intentsBucket).Stats().KeyN == 0
 }
 
 // Close closes the underlying database.
@@ -260,5 +265,68 @@ func (str *Store) Envs(ctx context.Context) (envs []jed.Env, err error) {
 		})
 	})
 	err = errors.Wrapf(err, "failed to list envs")
+	return
+}
+
+// GetIntent retrieves the desired active image and replica count by service name.
+func (str *Store) GetIntent(ctx context.Context, name string) (intent jed.Intent, err error) {
+
+	err = str.db.View(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(intentsBucket)
+		data := bkt.Get([]byte(name))
+		if data == nil {
+			return jed.NotFoundError{Kind: "intent", Name: name}
+		}
+		err := json.Unmarshal(data, &intent)
+		err = errors.Wrapf(err, "failed to decode intent")
+		return err
+	})
+	return
+}
+
+// SetIntent creates or updates the desired active image and replica count.
+func (str *Store) SetIntent(ctx context.Context, intent jed.Intent) (err error) {
+
+	data, err := json.Marshal(intent)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to encode intent")
+		return
+	}
+
+	err = str.db.Update(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(intentsBucket)
+		return bkt.Put([]byte(intent.Name), data)
+	})
+
+	return
+}
+
+// DelIntent removes the desired active image and replica count by service name.
+func (str *Store) DelIntent(ctx context.Context, name string) (err error) {
+
+	err = str.db.Update(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(intentsBucket)
+		return bkt.Delete([]byte(name))
+	})
+
+	return
+}
+
+// Intents returns all desired active images and replica counts.
+func (str *Store) Intents(ctx context.Context) (intents []jed.Intent, err error) {
+
+	err = str.db.View(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(intentsBucket)
+		return bkt.ForEach(func(key, val []byte) error {
+			var intent jed.Intent
+			err := json.Unmarshal(val, &intent)
+			if err != nil {
+				return errors.Wrapf(err, "failed to decode intent")
+			}
+			intents = append(intents, intent)
+			return nil
+		})
+	})
+	err = errors.Wrapf(err, "failed to list intents")
 	return
 }

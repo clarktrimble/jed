@@ -30,6 +30,7 @@ func RunStoreContractTests(
 			err     error
 			service jed.Service
 			env     jed.Env
+			intent  jed.Intent
 		)
 
 		BeforeEach(func() {
@@ -242,6 +243,95 @@ func RunStoreContractTests(
 					retrievedEnv, err := store.GetEnv(ctx, "postgres")
 					Expect(err).NotTo(HaveOccurred())
 					Expect(retrievedEnv.Vars).To(BeEmpty())
+				})
+			})
+		})
+
+		Describe("SetIntent and GetIntent", func() {
+			var retrievedIntent jed.Intent
+
+			BeforeEach(func() {
+				intent = jed.Intent{Name: "postgres", Image: "postgres:14", Replicas: 1}
+			})
+
+			JustBeforeEach(func() {
+				err = store.SetIntent(ctx, intent)
+			})
+
+			When("intent is set successfully", func() {
+				It("should store and retrieve the intent", func() {
+					Expect(err).NotTo(HaveOccurred())
+
+					retrievedIntent, err = store.GetIntent(ctx, "postgres")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(retrievedIntent.Name).To(Equal("postgres"))
+					Expect(retrievedIntent.Image).To(Equal("postgres:14"))
+					Expect(retrievedIntent.Replicas).To(Equal(1))
+				})
+			})
+
+			When("getting a non-existent intent", func() {
+				It("should return NotFoundError", func() {
+					_, err = store.GetIntent(ctx, "nonexistent")
+					Expect(err).To(HaveOccurred())
+
+					var notFound jed.NotFoundError
+					Expect(errors.As(err, &notFound)).To(BeTrue())
+					Expect(notFound.Kind).To(Equal("intent"))
+					Expect(notFound.Name).To(Equal("nonexistent"))
+				})
+			})
+		})
+
+		Describe("Intents", func() {
+			var intents []jed.Intent
+
+			JustBeforeEach(func() {
+				intents, err = store.Intents(ctx)
+			})
+
+			When("no intents exist", func() {
+				It("should return empty slice", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(intents).To(BeEmpty())
+				})
+			})
+
+			When("multiple intents exist", func() {
+				BeforeEach(func() {
+					err = store.SetIntent(ctx, jed.Intent{Name: "postgres", Image: "postgres:14", Replicas: 1})
+					Expect(err).NotTo(HaveOccurred())
+					err = store.SetIntent(ctx, jed.Intent{Name: "redis", Image: "redis:7"})
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return all intents", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(intents).To(HaveLen(2))
+					names := []string{intents[0].Name, intents[1].Name}
+					Expect(names).To(ContainElements("postgres", "redis"))
+				})
+			})
+		})
+
+		Describe("DelIntent", func() {
+
+			BeforeEach(func() {
+				intent = jed.Intent{Name: "postgres", Image: "postgres:14"}
+				err = store.SetIntent(ctx, intent)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			JustBeforeEach(func() {
+				err = store.DelIntent(ctx, "postgres")
+			})
+
+			When("deleting an existing intent", func() {
+				It("should remove the intent", func() {
+					Expect(err).NotTo(HaveOccurred())
+
+					_, err = store.GetIntent(ctx, "postgres")
+					Expect(err).To(HaveOccurred())
 				})
 			})
 		})

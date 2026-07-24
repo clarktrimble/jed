@@ -20,12 +20,14 @@ func TestStoreContract(t *testing.T) {
 type mockStore struct {
 	services map[string]jed.Service
 	envs     map[string]jed.Env
+	intents  map[string]jed.Intent
 }
 
 func newMockStore() *mockStore {
 	return &mockStore{
 		services: make(map[string]jed.Service),
 		envs:     make(map[string]jed.Env),
+		intents:  make(map[string]jed.Intent),
 	}
 }
 
@@ -77,6 +79,32 @@ func (m *mockStore) Envs(ctx context.Context) ([]jed.Env, error) {
 	result := make([]jed.Env, 0, len(m.envs))
 	for _, env := range m.envs {
 		result = append(result, env)
+	}
+	return result, nil
+}
+
+func (m *mockStore) GetIntent(ctx context.Context, name string) (jed.Intent, error) {
+	intent, ok := m.intents[name]
+	if !ok {
+		return jed.Intent{}, jed.NotFoundError{Kind: "intent", Name: name}
+	}
+	return intent, nil
+}
+
+func (m *mockStore) SetIntent(ctx context.Context, intent jed.Intent) error {
+	m.intents[intent.Name] = intent
+	return nil
+}
+
+func (m *mockStore) DelIntent(ctx context.Context, name string) error {
+	delete(m.intents, name)
+	return nil
+}
+
+func (m *mockStore) Intents(ctx context.Context) ([]jed.Intent, error) {
+	result := make([]jed.Intent, 0, len(m.intents))
+	for _, intent := range m.intents {
+		result = append(result, intent)
 	}
 	return result, nil
 }

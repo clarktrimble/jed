@@ -16,16 +16,18 @@ import (
 // Store implements jed.Store interface using in-memory storage.
 // Safe for concurrent use.
 type Store struct {
-	mu   sync.RWMutex
-	svcs map[string]jed.Service
-	envs map[string]jed.Env
+	mu      sync.RWMutex
+	svcs    map[string]jed.Service
+	envs    map[string]jed.Env
+	intents map[string]jed.Intent
 }
 
 // New creates a new empty in-memory store.
 func New() *Store {
 	return &Store{
-		svcs: make(map[string]jed.Service),
-		envs: make(map[string]jed.Env),
+		svcs:    make(map[string]jed.Service),
+		envs:    make(map[string]jed.Env),
+		intents: make(map[string]jed.Intent),
 	}
 }
 
@@ -123,4 +125,42 @@ func (s *Store) Envs(ctx context.Context) ([]jed.Env, error) {
 		})
 	}
 	return envs, nil
+}
+
+// GetIntent retrieves the desired active image and replica count by service name.
+func (s *Store) GetIntent(ctx context.Context, name string) (jed.Intent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	intent, ok := s.intents[name]
+	if !ok {
+		return jed.Intent{}, jed.NotFoundError{Kind: "intent", Name: name}
+	}
+	return intent, nil
+}
+
+// SetIntent persists the desired active image and replica count.
+func (s *Store) SetIntent(ctx context.Context, intent jed.Intent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.intents[intent.Name] = intent
+	return nil
+}
+
+// DelIntent removes the desired active image and replica count by service name.
+func (s *Store) DelIntent(ctx context.Context, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.intents, name)
+	return nil
+}
+
+// Intents retrieves all desired active images and replica counts.
+func (s *Store) Intents(ctx context.Context) ([]jed.Intent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return slices.Collect(maps.Values(s.intents)), nil
 }

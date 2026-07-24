@@ -16,7 +16,7 @@ import (
 
 // DBSchemaVersion is the current persistent Jed store schema version.
 // Bump this when changing the store schema in a backwards-incompatible way.
-const DBSchemaVersion = "1"
+const DBSchemaVersion = "2"
 
 // Store persists services and environment variables.
 //
@@ -49,6 +49,19 @@ type Store interface {
 
 	// Envs returns all environment variable sets for all services.
 	Envs(ctx context.Context) ([]Env, error)
+
+	// GetIntent retrieves the desired active image and replica count by service name.
+	// Returns NotFoundError if the service has no intent and is therefore disabled.
+	GetIntent(ctx context.Context, name string) (Intent, error)
+
+	// SetIntent creates or updates the desired active image and replica count.
+	SetIntent(ctx context.Context, intent Intent) error
+
+	// DelIntent removes the desired active image and replica count by service name.
+	DelIntent(ctx context.Context, name string) error
+
+	// Intents returns all desired active images and replica counts.
+	Intents(ctx context.Context) ([]Intent, error)
 }
 
 // NotFoundError reports a missing stored object.

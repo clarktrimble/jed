@@ -9,12 +9,14 @@ import (
 type fakeStore struct {
 	services map[string]jed.Service
 	envs     map[string]jed.Env
+	intents  map[string]jed.Intent
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
 		services: map[string]jed.Service{},
 		envs:     map[string]jed.Env{},
+		intents:  map[string]jed.Intent{},
 	}
 }
 
@@ -68,4 +70,30 @@ func (s *fakeStore) Envs(ctx context.Context) ([]jed.Env, error) {
 		envs = append(envs, env)
 	}
 	return envs, nil
+}
+
+func (s *fakeStore) GetIntent(ctx context.Context, name string) (jed.Intent, error) {
+	intent, ok := s.intents[name]
+	if !ok {
+		return jed.Intent{}, jed.NotFoundError{Kind: "intent", Name: name}
+	}
+	return intent, nil
+}
+
+func (s *fakeStore) SetIntent(ctx context.Context, intent jed.Intent) error {
+	s.intents[intent.Name] = intent
+	return nil
+}
+
+func (s *fakeStore) DelIntent(ctx context.Context, name string) error {
+	delete(s.intents, name)
+	return nil
+}
+
+func (s *fakeStore) Intents(ctx context.Context) ([]jed.Intent, error) {
+	intents := make([]jed.Intent, 0, len(s.intents))
+	for _, intent := range s.intents {
+		intents = append(intents, intent)
+	}
+	return intents, nil
 }
