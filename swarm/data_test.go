@@ -53,9 +53,12 @@ var _ = Describe("Data", func() {
 
 	Describe("ListConfigs", func() {
 		BeforeEach(func() {
-			testData := loadTestData("get-configs.json")
 			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
-				return json.Unmarshal(testData, rcv)
+				mockResponse([]secretItem{{
+					ID:   "cfg-123",
+					Spec: specName{Name: "app_config_v1", Data: []byte("setting: true")},
+				}}, rcv)
+				return nil
 			}
 		})
 
@@ -67,8 +70,12 @@ var _ = Describe("Data", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should handle empty list", func() {
-			Expect(configs).To(HaveLen(0))
+		It("should parse config data", func() {
+			Expect(configs).To(Equal([]swarm.ConfigResource{{
+				ID:   "cfg-123",
+				Name: "app_config_v1",
+				Data: []byte("setting: true"),
+			}}))
 		})
 	})
 
@@ -118,15 +125,23 @@ var _ = Describe("Data", func() {
 	})
 
 	Describe("CreateConfig", func() {
-		var sentName string
+		var (
+			sentName string
+			postCnt  int
+		)
 
 		BeforeEach(func() {
-			testData := loadTestData("get-configs.json")
+			sentName = ""
+			postCnt = 0
 			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 				if method == "GET" && strings.Contains(path, "/configs") {
-					return json.Unmarshal(testData, rcv)
+					mockResponse([]secretItem{{
+						ID:   "old-config-id",
+						Spec: specName{Name: "my_config_v1", Data: []byte("old data")},
+					}}, rcv)
 				}
 				if method == "POST" && strings.Contains(path, "/configs/create") {
+					postCnt++
 					data, _ := json.Marshal(snd)
 					var req map[string]string
 					Expect(json.Unmarshal(data, &req)).To(Succeed())
@@ -149,8 +164,37 @@ var _ = Describe("Data", func() {
 			Expect(id).To(Equal("new-config-id"))
 		})
 
-		It("should start at v1 when no existing versions", func() {
-			Expect(sentName).To(Equal("my_config_v1"))
+		It("should use next version number", func() {
+			Expect(sentName).To(Equal("my_config_v2"))
+		})
+
+		It("should create a config when the latest data differs", func() {
+			Expect(postCnt).To(Equal(1))
+		})
+
+		Context("when the latest data matches", func() {
+			BeforeEach(func() {
+				client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+					if method == "GET" && strings.Contains(path, "/configs") {
+						mockResponse([]secretItem{{
+							ID:   "matching-config-id",
+							Spec: specName{Name: "my_config_v1", Data: []byte("config data")},
+						}}, rcv)
+					}
+					if method == "POST" && strings.Contains(path, "/configs/create") {
+						postCnt++
+					}
+					return nil
+				}
+			})
+
+			It("should return the existing ID", func() {
+				Expect(id).To(Equal("matching-config-id"))
+			})
+
+			It("should skip create", func() {
+				Expect(postCnt).To(Equal(0))
+			})
 		})
 	})
 

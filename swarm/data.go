@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/pkg/errors"
 )
+
+// ErrNotFound marks swarm resources that could not be found.
+var ErrNotFound = errors.New("not found")
 
 // SecretResource represents a Docker Swarm secret resource.
 type SecretResource struct {
@@ -26,6 +30,9 @@ type ConfigResource struct {
 
 	// Name is the Docker config name. Configs created by CreateConfig are named {base}_v{N}.
 	Name string
+
+	// Data is the Docker config data.
+	Data []byte
 }
 
 // SecretLatest returns the ID and versioned name of the latest secret by base name.
@@ -40,17 +47,20 @@ func (d *Swarm) SecretLatest(ctx context.Context, name string) (id, versionedNam
 	return findLatest(secretsToItems(secrets), name, "secret")
 }
 
-// ConfigLatest returns the ID and versioned name of the latest config by base name.
+// GetLatestConfig returns the latest config resource by base name.
 // Looks for configs matching {name}_v{N} and returns the highest version.
-func (d *Swarm) ConfigLatest(ctx context.Context, name string) (id, versionedName string, err error) {
-	// Todo: add test data with configs and test this.
-
+func (d *Swarm) GetLatestConfig(ctx context.Context, name string) (ConfigResource, error) {
 	configs, err := d.ListConfigs(ctx)
 	if err != nil {
-		return "", "", err
+		return ConfigResource{}, err
 	}
 
-	return findLatest(configsToItems(configs), name, "config")
+	latest, ok := findLatestConfig(configs, name)
+	if !ok {
+		return ConfigResource{}, notFoundError("config", name)
+	}
+
+	return latest, nil
 }
 
 // ListSecrets returns all secrets.
@@ -111,6 +121,7 @@ func (d *Swarm) ListConfigs(ctx context.Context) ([]ConfigResource, error) {
 		result[i] = ConfigResource{
 			ID:   c.ID,
 			Name: c.Spec.Name,
+			Data: c.Spec.Data,
 		}
 	}
 
@@ -126,10 +137,17 @@ func (d *Swarm) CreateConfig(ctx context.Context, name string, value []byte) (st
 		return "", err
 	}
 
+	encodedData := base64.StdEncoding.EncodeToString(value)
+	latest, ok := findLatestConfig(configs, name)
+	if ok && bytes.Equal(latest.Data, value) {
+		d.logger.Info(ctx, "skipping creation of identical config", "name", name, "version", latest.Name, "id", latest.ID)
+		return latest.ID, nil
+	}
+
 	versionedName := fmt.Sprintf("%s_v%d", name, findNextVersion(configsToItems(configs), name))
 	req := dataCreate{
 		Name: versionedName,
-		Data: base64.StdEncoding.EncodeToString(value),
+		Data: encodedData,
 	}
 
 	var resp IDResponse
@@ -156,6 +174,7 @@ type namedResource struct {
 	ID   string `json:"ID"`
 	Spec struct {
 		Name string `json:"Name"`
+		Data []byte `json:"Data"`
 	} `json:"Spec"`
 }
 
@@ -181,13 +200,38 @@ func secretsToItems(secrets []SecretResource) []namedItem {
 func configsToItems(configs []ConfigResource) []namedItem {
 	items := make([]namedItem, len(configs))
 	for i, c := range configs {
-		items[i] = namedItem(c)
+		items[i] = namedItem{ID: c.ID, Name: c.Name}
 	}
 	return items
 }
 
 func findLatest(items []namedItem, baseName, resourceType string) (id, name string, err error) {
-	var bestID, bestName string
+	latest, ok := findLatestItem(items, baseName)
+	if !ok {
+		return "", "", notFoundError(resourceType, baseName)
+	}
+
+	return latest.ID, latest.Name, nil
+}
+
+func findLatestConfig(configs []ConfigResource, baseName string) (ConfigResource, bool) {
+	items := configsToItems(configs)
+	latest, ok := findLatestItem(items, baseName)
+	if !ok {
+		return ConfigResource{}, false
+	}
+
+	for _, c := range configs {
+		if c.ID == latest.ID {
+			return c, true
+		}
+	}
+
+	return ConfigResource{}, false
+}
+
+func findLatestItem(items []namedItem, baseName string) (namedItem, bool) {
+	var best namedItem
 	var bestVersion int
 
 	prefix := baseName + "_v"
@@ -197,17 +241,16 @@ func findLatest(items []namedItem, baseName, resourceType string) (id, name stri
 			v, err := strconv.Atoi(vStr)
 			if err == nil && v > bestVersion {
 				bestVersion = v
-				bestID = item.ID
-				bestName = item.Name
+				best = item
 			}
 		}
 	}
 
-	if bestID == "" {
-		return "", "", errors.Errorf("%s %q not found (no %s_v* versions)", resourceType, baseName, baseName)
-	}
+	return best, best.ID != ""
+}
 
-	return bestID, bestName, nil
+func notFoundError(resourceType, baseName string) error {
+	return errors.Wrapf(ErrNotFound, "%s %q not found (no %s_v* versions)", resourceType, baseName, baseName)
 }
 
 func findNextVersion(items []namedItem, baseName string) int {

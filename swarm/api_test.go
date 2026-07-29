@@ -73,7 +73,7 @@ var _ = Describe("API", func() {
 		client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
 			Expect(method).To(Equal(http.MethodGet))
 			Expect(path).To(Equal("/v1.52/configs"))
-			mockResponse([]secretItem{{ID: "cfg-123", Spec: specName{Name: "app_config_v1"}}}, rcv)
+			mockResponse([]secretItem{{ID: "cfg-123", Spec: specName{Name: "app_config_v1", Data: []byte("setting: true")}}}, rcv)
 			return nil
 		}
 
@@ -82,7 +82,38 @@ var _ = Describe("API", func() {
 
 		var got []swarm.ConfigResource
 		decodeJSON(res, &got)
-		Expect(got).To(Equal([]swarm.ConfigResource{{ID: "cfg-123", Name: "app_config_v1"}}))
+		Expect(got).To(Equal([]swarm.ConfigResource{{ID: "cfg-123", Name: "app_config_v1", Data: []byte("setting: true")}}))
+	})
+
+	It("gets the latest config by base name", func() {
+		client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+			Expect(method).To(Equal(http.MethodGet))
+			Expect(path).To(Equal("/v1.52/configs"))
+			mockResponse([]secretItem{
+				{ID: "cfg-1", Spec: specName{Name: "app_config_v1", Data: []byte("old")}},
+				{ID: "cfg-2", Spec: specName{Name: "app_config_v2", Data: []byte("new")}},
+			}, rcv)
+			return nil
+		}
+
+		res = doRequest(rtr, http.MethodGet, "/swarm/configs/app_config", nil)
+		Expect(res).To(HaveHTTPStatus(http.StatusOK))
+
+		var got swarm.ConfigResource
+		decodeJSON(res, &got)
+		Expect(got).To(Equal(swarm.ConfigResource{ID: "cfg-2", Name: "app_config_v2", Data: []byte("new")}))
+	})
+
+	It("returns not found for a missing latest config", func() {
+		client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+			Expect(method).To(Equal(http.MethodGet))
+			Expect(path).To(Equal("/v1.52/configs"))
+			mockResponse([]secretItem{}, rcv)
+			return nil
+		}
+
+		res = doRequest(rtr, http.MethodGet, "/swarm/configs/app_config", nil)
+		Expect(res).To(HaveHTTPStatus(http.StatusNotFound))
 	})
 
 	It("creates configs from the request body", func() {

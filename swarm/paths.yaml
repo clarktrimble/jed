@@ -93,6 +93,34 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /swarm/configs/{name}:
+    get:
+      summary: Get latest config
+      description: Return the latest version of a swarm config by base name, including base64-encoded config data.
+      operationId: getSwarmConfig
+      tags:
+        - swarm
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Config base name
+          schema:
+            type: string
+          example: app_config
+      responses:
+        '200':
+          description: Config retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResource'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
     post:
       summary: Create config
       description: Create the next version of a swarm config. The raw request body is used as the config data.

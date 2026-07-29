@@ -105,13 +105,13 @@ func (d *Swarm) resolveConfigs(ctx context.Context, configs map[string]string) (
 
 	resolved := make([]resolvedConfig, 0, len(configs))
 	for baseName, target := range configs {
-		id, versionedName, err := d.ConfigLatest(ctx, baseName)
+		config, err := d.GetLatestConfig(ctx, baseName)
 		if err != nil {
 			return nil, err
 		}
 		resolved = append(resolved, resolvedConfig{
-			id:     id,
-			name:   versionedName,
+			id:     config.ID,
+			name:   config.Name,
 			target: target,
 		})
 	}

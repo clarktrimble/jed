@@ -40,6 +40,7 @@ type secretItem struct {
 
 type specName struct {
 	Name string `json:"Name"`
+	Data []byte `json:"Data,omitempty"`
 }
 
 func mockResponse(obj, rcv any) {
