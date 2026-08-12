@@ -125,10 +125,15 @@ var _ = Describe("Service", func() {
 		})
 
 		It("rejects local volumes that are not absolute container paths below root", func() {
-			for _, volume := range []string{"data", "", "/"} {
+			for _, volume := range []string{"data", "", "/", "/.", "/data/.", "/data/..", "/foo/../data"} {
 				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", LocalVolumes: []string{volume}}
 				Expect(svc.Validate()).NotTo(Succeed(), volume)
 			}
+		})
+
+		It("allows templated local volumes before render", func() {
+			svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", LocalVolumes: []string{"{{VOL_PATH}}"}}
+			Expect(svc.Validate()).To(Succeed())
 		})
 	})
 })

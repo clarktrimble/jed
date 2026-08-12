@@ -3,7 +3,6 @@ package jed
 import (
 	"fmt"
 	"maps"
-	"path"
 	"reflect"
 	"slices"
 	"strings"
@@ -77,11 +76,6 @@ func cloneEnv(env Env) Env {
 		Name: env.Name,
 		Vars: maps.Clone(env.Vars),
 	}
-}
-
-func localVolumeHostPath(localRoot, serviceName, containerPath string) string {
-	flat := strings.ReplaceAll(strings.TrimPrefix(path.Clean(containerPath), "/"), "/", "_")
-	return path.Join(localRoot, serviceName, "_"+flat)
 }
 
 // expandStrings walks Go values directly rather than marshal/replace/unmarshal.

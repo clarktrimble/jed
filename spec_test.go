@@ -263,6 +263,49 @@ var _ = Describe("Jed", func() {
 				Expect(spec.Service.LocalVolumes).To(BeNil())
 			})
 
+			When("a local volume has a trailing slash", func() {
+				BeforeEach(func() {
+					svc, err := store.GetService(ctx, "app", "local/app:v1")
+					Expect(err).NotTo(HaveOccurred())
+					svc.LocalVolumes = []string{"/data/"}
+					err = store.SetService(ctx, svc)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("uses the cleaned target", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.Service.Volumes).To(HaveKeyWithValue("/opt/bastille/app/_data", "/data"))
+				})
+			})
+
+			When("the whole local volume path is templated", func() {
+				BeforeEach(func() {
+					svc, err := store.GetService(ctx, "app", "local/app:v1")
+					Expect(err).NotTo(HaveOccurred())
+					svc.LocalVolumes = []string{"{{VOL_PATH}}"}
+					err = store.SetService(ctx, svc)
+					Expect(err).NotTo(HaveOccurred())
+					store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "LOCAL_ROOT": "/opt/bastille", "VOL_PATH": "/qkview-history"}}
+				})
+
+				It("validates and resolves after render", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.Service.Volumes).To(HaveKeyWithValue("/opt/bastille/app/_qkview-history", "/qkview-history"))
+				})
+			})
+
+			When("LOCAL_ROOT is not safe", func() {
+				BeforeEach(func() {
+					store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "LOCAL_ROOT": "/opt/../bastille"}}
+				})
+
+				It("returns an error", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("LOCAL_ROOT"))
+					Expect(err.Error()).To(ContainSubstring("cannot contain . or .."))
+				})
+			})
+
 			When("LOCAL_ROOT is missing", func() {
 				BeforeEach(func() {
 					store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
@@ -271,6 +314,22 @@ var _ = Describe("Jed", func() {
 				It("returns an error", func() {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("LOCAL_ROOT is required"))
+				})
+			})
+
+			When("a rendered local volume contains a dot segment", func() {
+				BeforeEach(func() {
+					svc, err := store.GetService(ctx, "app", "local/app:v1")
+					Expect(err).NotTo(HaveOccurred())
+					svc.LocalVolumes = []string{"/{{VOL_PATH}}"}
+					err = store.SetService(ctx, svc)
+					Expect(err).NotTo(HaveOccurred())
+					store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "LOCAL_ROOT": "/opt/bastille", "VOL_PATH": "foo/../data"}}
+				})
+
+				It("returns an error", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("cannot contain . or .."))
 				})
 			})
 		})

@@ -3,7 +3,6 @@ package jed
 import (
 	"fmt"
 	"net/url"
-	"path"
 	"strings"
 	"time"
 
@@ -207,6 +206,9 @@ func (service Service) Validate() error {
 		}
 	}
 	for _, volume := range service.LocalVolumes {
+		if strings.HasPrefix(volume, "{{") { // allow full-path templates; rendered values are validated in Spec
+			continue
+		}
 		err := validateLocalVolume(volume)
 		if err != nil {
 			issues = append(issues, err.Error())
@@ -232,10 +234,8 @@ func (service Service) Validate() error {
 // unexported
 
 func validateLocalVolume(volume string) error {
-	if !path.IsAbs(volume) || path.Clean(volume) == "/" {
-		return fmt.Errorf("local volume %q must be an absolute container path below /", volume)
-	}
-	return nil
+	_, err := cleanLocalPath("local volume", volume)
+	return err
 }
 
 func validUser(user string) bool {

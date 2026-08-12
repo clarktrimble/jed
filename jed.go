@@ -262,11 +262,9 @@ func (j *Jed) resolveLocalVolumes(ctx context.Context, service *Service, localRo
 		service.Volumes = map[string]string{}
 	}
 
-	for _, target := range service.LocalVolumes {
+	for _, rawTarget := range service.LocalVolumes {
 
-		// Todo: consider revalidating Spec before returning
-		// A-and "{{VOL_PATH}}" will fail even if VOL_PATH=/data
-		err := validateLocalVolume(target)
+		host, target, err := localVolumeMount(localRoot, service.Name, rawTarget)
 		if err != nil {
 			return err
 		}
@@ -276,7 +274,7 @@ func (j *Jed) resolveLocalVolumes(ctx context.Context, service *Service, localRo
 			continue
 		}
 
-		service.Volumes[localVolumeHostPath(localRoot, service.Name, target)] = target
+		service.Volumes[host] = target
 	}
 
 	service.LocalVolumes = nil
