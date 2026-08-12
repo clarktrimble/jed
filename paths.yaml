@@ -1,6 +1,49 @@
 # OpenApi path definitions for endpoints registered by jed/api.
 
 paths:
+  /store/export:
+    get:
+      summary: Export store data
+      description: Return all stored service definitions, environment variable sets, and intents.
+      operationId: exportStore
+      tags:
+        - store
+      responses:
+        '200':
+          description: Store data exported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - schema
+                  - services
+                  - envs
+                  - intents
+                properties:
+                  schema:
+                    type: string
+                    description: Jed store schema version
+                    example: "4"
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  envs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Env'
+                  intents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Intent'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /store/services:
     get:
       summary: List services

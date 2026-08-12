@@ -2,6 +2,7 @@ package jed_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,56 @@ var _ = Describe("API", func() {
 
 		rtr = http.NewServeMux()
 		j.Register(rtr)
+	})
+
+	Describe("export route", func() {
+		It("exports all stored data in deterministic order", func() {
+			ctx := context.Background()
+			store := j.Store()
+			Expect(store.SetService(ctx, jed.Service{Name: "web", Image: "nginx:latest"})).To(Succeed())
+			Expect(store.SetService(ctx, jed.Service{Name: "db", Image: "postgres:16"})).To(Succeed())
+			Expect(store.SetService(ctx, jed.Service{Name: "web", Image: "alpine:latest"})).To(Succeed())
+			Expect(store.SetEnv(ctx, jed.Env{Name: "web", Vars: map[string]string{"PORT": "8080"}})).To(Succeed())
+			Expect(store.SetEnv(ctx, jed.Env{Name: "_global", Vars: map[string]string{"DOMAIN": "example.com"}})).To(Succeed())
+			Expect(store.SetIntent(ctx, jed.Intent{Name: "web", Image: "nginx:latest", Replicas: 2})).To(Succeed())
+			Expect(store.SetIntent(ctx, jed.Intent{Name: "db", Image: "postgres:16"})).To(Succeed())
+
+			res = doRequest(rtr, http.MethodGet, "/store/export", nil)
+			Expect(res).To(HaveHTTPStatus(http.StatusOK))
+
+			var got struct {
+				Schema   string        `json:"schema"`
+				Services []jed.Service `json:"services"`
+				Envs     []jed.Env     `json:"envs"`
+				Intents  []jed.Intent  `json:"intents"`
+			}
+			decodeJSON(res, &got)
+			Expect(got.Schema).To(Equal(jed.DBSchemaVersion))
+			Expect(got.Services).To(Equal([]jed.Service{
+				{Name: "db", Image: "postgres:16"},
+				{Name: "web", Image: "alpine:latest"},
+				{Name: "web", Image: "nginx:latest"},
+			}))
+			Expect(got.Envs).To(Equal([]jed.Env{
+				{Name: "_global", Vars: map[string]string{"DOMAIN": "example.com"}},
+				{Name: "web", Vars: map[string]string{"PORT": "8080"}},
+			}))
+			Expect(got.Intents).To(Equal([]jed.Intent{
+				{Name: "db", Image: "postgres:16"},
+				{Name: "web", Image: "nginx:latest", Replicas: 2},
+			}))
+		})
+
+		It("exports empty arrays for an empty store", func() {
+			res = doRequest(rtr, http.MethodGet, "/store/export", nil)
+			Expect(res).To(HaveHTTPStatus(http.StatusOK))
+
+			var got map[string]json.RawMessage
+			decodeJSON(res, &got)
+			Expect(string(got["services"])).To(Equal("[]"))
+			Expect(string(got["envs"])).To(Equal("[]"))
+			Expect(string(got["intents"])).To(Equal("[]"))
+		})
 	})
 
 	Describe("service routes", func() {

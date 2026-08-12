@@ -3,6 +3,7 @@ package jed
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	"github.com/clarktrimble/delish/respond"
 	"github.com/clarktrimble/jed/logger"
@@ -18,6 +19,7 @@ type Router interface {
 // See paths.yaml for openapi snippet.
 func (j *Jed) Register(rtr Router) {
 	h := &apiHandlers{jed: j, logger: j.logger}
+	rtr.HandleFunc("GET /store/export", h.exportStore)
 	rtr.HandleFunc("GET /store/services", h.listServices)
 	rtr.HandleFunc("GET /store/services/{name}", h.getService)
 	rtr.HandleFunc("PUT /store/services/{name}", h.setService)
@@ -32,6 +34,65 @@ func (j *Jed) Register(rtr Router) {
 type apiHandlers struct {
 	jed    *Jed
 	logger logger.Logger // Todo: why not just use jed.logger as see in swarm/api.go ??
+}
+
+type storeExport struct {
+	Schema   string    `json:"schema"`
+	Services []Service `json:"services"`
+	Envs     []Env     `json:"envs"`
+	Intents  []Intent  `json:"intents"`
+}
+
+func (h *apiHandlers) exportStore(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	rp := respond.New(w, h.logger)
+
+	services, err := h.jed.store.AllServices(ctx)
+	if err != nil {
+		rp.NotOk(ctx, http.StatusInternalServerError, err)
+		return
+	}
+	envs, err := h.jed.store.Envs(ctx)
+	if err != nil {
+		rp.NotOk(ctx, http.StatusInternalServerError, err)
+		return
+	}
+	intents, err := h.jed.store.Intents(ctx)
+	if err != nil {
+		rp.NotOk(ctx, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Todo: consider requiring non-nil empty slices in the Store contract tests instead.
+	if services == nil {
+		services = []Service{}
+	}
+	if envs == nil {
+		envs = []Env{}
+	}
+	if intents == nil {
+		intents = []Intent{}
+	}
+
+	sort.Slice(services, func(i, j int) bool {
+		if services[i].Name == services[j].Name {
+			return services[i].Image < services[j].Image
+		}
+		return services[i].Name < services[j].Name
+	})
+	sort.Slice(envs, func(i, j int) bool {
+		return envs[i].Name < envs[j].Name
+	})
+	sort.Slice(intents, func(i, j int) bool {
+		return intents[i].Name < intents[j].Name
+	})
+
+	rp.WriteObject(ctx, storeExport{
+		Schema:   DBSchemaVersion,
+		Services: services,
+		Envs:     envs,
+		Intents:  intents,
+	})
 }
 
 func (h *apiHandlers) listServices(w http.ResponseWriter, r *http.Request) {
