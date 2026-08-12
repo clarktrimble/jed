@@ -3,6 +3,7 @@ package jed
 import (
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -132,6 +133,8 @@ type Service struct {
 	Labels map[string]string `json:"labels"`
 	// Volumes maps host paths to container paths.
 	Volumes map[string]string `json:"volumes"`
+	// LocalVolumes lists container paths backed by convention-derived local bind mounts.
+	LocalVolumes []string `json:"local_volumes,omitempty"`
 	// Network is the Docker network name.
 	Network string `json:"network"`
 	// Restart specifies restart behavior. Empty means no restart.
@@ -203,6 +206,12 @@ func (service Service) Validate() error {
 			issues = append(issues, fmt.Sprintf("group %q must be a numeric gid or {{VAR}} template", group))
 		}
 	}
+	for _, volume := range service.LocalVolumes {
+		err := validateLocalVolume(volume)
+		if err != nil {
+			issues = append(issues, err.Error())
+		}
+	}
 	if service.Restart != "" && service.Restart != RestartNone && service.Restart != RestartOnFailure && service.Restart != RestartAny {
 		issues = append(issues, fmt.Sprintf("restart %q must be one of %q, %q, or %q", service.Restart, RestartNone, RestartOnFailure, RestartAny))
 	}
@@ -221,6 +230,13 @@ func (service Service) Validate() error {
 }
 
 // unexported
+
+func validateLocalVolume(volume string) error {
+	if !path.IsAbs(volume) || path.Clean(volume) == "/" {
+		return fmt.Errorf("local volume %q must be an absolute container path below /", volume)
+	}
+	return nil
+}
 
 func validUser(user string) bool {
 	parts := strings.Split(user, ":")

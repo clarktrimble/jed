@@ -17,6 +17,9 @@ ports:
 volumes:
   svc-data: /data
 
+local_volumes:
+  - /qkview-history
+
 secrets:
   - aruba_client_secret
 
@@ -45,6 +48,7 @@ resources:
 | `labels` | no | Container labels |
 | `ports` | no | Container port to host port mapping |
 | `volumes` | no | Named volume or host path to container path |
+| `local_volumes` | no | Container paths backed by convention-derived local bind mounts from `LOCAL_ROOT` |
 | `secrets` | no | Swarm secret base names; latest version resolved at deploy |
 | `configs` | no | Swarm config base names mapped to target mount paths |
 | `hosts` | no | Extra `/etc/hosts` entries |
@@ -112,6 +116,17 @@ volumes:
   svc-data: /data          # named volume
   /host/path: /container   # bind mount
 ```
+
+`local_volumes` lists absolute container paths whose host-side bind paths are derived from the global `LOCAL_ROOT` render var, service name, and a flattened container path:
+
+```yaml
+local_volumes:
+  - /qkview-history        # ${LOCAL_ROOT}/qkview/_qkview-history:/qkview-history
+  - /qkview-sites          # ${LOCAL_ROOT}/qkview/_qkview-sites:/qkview-sites
+  - /var/lib/app           # ${LOCAL_ROOT}/qkview/_var_lib_app:/var/lib/app
+```
+
+If an explicit `volumes` entry already mounts the same container path, the explicit volume wins and Jed logs an error.
 
 ## Secrets
 

@@ -123,5 +123,12 @@ var _ = Describe("Service", func() {
 				Expect(svc.Validate()).NotTo(Succeed(), group)
 			}
 		})
+
+		It("rejects local volumes that are not absolute container paths below root", func() {
+			for _, volume := range []string{"data", "", "/"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", LocalVolumes: []string{volume}}
+				Expect(svc.Validate()).NotTo(Succeed(), volume)
+			}
+		})
 	})
 })

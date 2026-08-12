@@ -239,7 +239,56 @@ func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to render spec for service %q", name)
 	}
+
+	err = j.resolveLocalVolumes(ctx, &spec.Service, varsEnv.Vars["LOCAL_ROOT"])
+	if err != nil {
+		return Spec{}, errors.Wrapf(err, "failed to resolve local volumes for service %q", name)
+	}
 	spec.Intent = intent
 
 	return spec, nil
+}
+
+func (j *Jed) resolveLocalVolumes(ctx context.Context, service *Service, localRoot string) error {
+
+	if len(service.LocalVolumes) == 0 {
+		return nil
+	}
+	if localRoot == "" {
+		return errors.New("LOCAL_ROOT is required when service has local volumes")
+	}
+
+	if service.Volumes == nil {
+		service.Volumes = map[string]string{}
+	}
+
+	for _, target := range service.LocalVolumes {
+
+		// Todo: consider revalidating Spec before returning
+		// A-and "{{VOL_PATH}}" will fail even if VOL_PATH=/data
+		err := validateLocalVolume(target)
+		if err != nil {
+			return err
+		}
+
+		if volumeTargetExists(service.Volumes, target) {
+			j.logger.Error(ctx, "local volume conflicts with explicit volume; using explicit volume", errors.Errorf("local volume target %q already mounted", target), "service", service.Name, "target", target)
+			continue
+		}
+
+		service.Volumes[localVolumeHostPath(localRoot, service.Name, target)] = target
+	}
+
+	service.LocalVolumes = nil
+
+	return nil
+}
+
+func volumeTargetExists(volumes map[string]string, target string) bool {
+	for _, existingTarget := range volumes {
+		if existingTarget == target {
+			return true
+		}
+	}
+	return false
 }

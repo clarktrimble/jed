@@ -246,6 +246,60 @@ var _ = Describe("Jed", func() {
 			})
 		})
 
+		When("the service has local volumes", func() {
+			BeforeEach(func() {
+				svc, err := store.GetService(ctx, "app", "local/app:v1")
+				Expect(err).NotTo(HaveOccurred())
+				svc.LocalVolumes = []string{"/qkview-history", "/var/lib/app"}
+				err = store.SetService(ctx, svc)
+				Expect(err).NotTo(HaveOccurred())
+				store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "LOCAL_ROOT": "/opt/bastille"}}
+			})
+
+			It("adds convention-derived bind mounts to volumes and clears local volumes", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.Service.Volumes).To(HaveKeyWithValue("/opt/bastille/app/_qkview-history", "/qkview-history"))
+				Expect(spec.Service.Volumes).To(HaveKeyWithValue("/opt/bastille/app/_var_lib_app", "/var/lib/app"))
+				Expect(spec.Service.LocalVolumes).To(BeNil())
+			})
+
+			When("LOCAL_ROOT is missing", func() {
+				BeforeEach(func() {
+					store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com"}}
+				})
+
+				It("returns an error", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("LOCAL_ROOT is required"))
+				})
+			})
+		})
+
+		When("a local volume conflicts with an explicit volume", func() {
+			var lgr *loggertest.LoggerMock
+
+			BeforeEach(func() {
+				svc, err := store.GetService(ctx, "app", "local/app:v1")
+				Expect(err).NotTo(HaveOccurred())
+				svc.Volumes = map[string]string{"/explicit/path": "/qkview-history"}
+				svc.LocalVolumes = []string{"/qkview-history"}
+				err = store.SetService(ctx, svc)
+				Expect(err).NotTo(HaveOccurred())
+				store.envs["_global"] = jed.Env{Name: "_global", Vars: map[string]string{"VHOST": "app.example.com", "LOCAL_ROOT": "/opt/bastille"}}
+
+				lgr = loggertest.NewLoggerMock()
+				j = (&jed.Config{VarsEnvName: "_global"}).New(store, lgr)
+			})
+
+			It("keeps the explicit volume, clears local volumes, and logs an error", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.Service.Volumes).To(HaveKeyWithValue("/explicit/path", "/qkview-history"))
+				Expect(spec.Service.Volumes).NotTo(HaveKey("/opt/bastille/app/_qkview-history"))
+				Expect(spec.Service.LocalVolumes).To(BeNil())
+				Expect(lgr.ErrorCalls()).To(HaveLen(1))
+			})
+		})
+
 		When("a default uid is configured", func() {
 			BeforeEach(func() {
 				j = (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000"}).New(store, loggertest.NewLoggerMock())
