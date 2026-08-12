@@ -44,6 +44,87 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /store/import:
+    put:
+      summary: Import store data
+      description: Import exported store data into an empty store. The import is rejected if the store already contains services, envs, or intents.
+      operationId: importStore
+      tags:
+        - store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - schema
+                - services
+                - envs
+                - intents
+              properties:
+                schema:
+                  type: string
+                  description: Jed store schema version
+                  example: "4"
+                services:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Service'
+                envs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Env'
+                intents:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Intent'
+      responses:
+        '200':
+          description: Store data imported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - services
+                  - envs
+                  - intents
+                properties:
+                  services:
+                    type: integer
+                    description: Number of services imported
+                  envs:
+                    type: integer
+                    description: Number of envs imported
+                  intents:
+                    type: integer
+                    description: Number of intents imported
+        '400':
+          description: Invalid JSON request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Store is not empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Schema mismatch or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /store/services:
     get:
       summary: List services

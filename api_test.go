@@ -79,6 +79,85 @@ var _ = Describe("API", func() {
 		})
 	})
 
+	Describe("import route", func() {
+		It("imports into an empty store and verifies intent service references", func() {
+			payload := map[string]any{
+				"schema": jed.DBSchemaVersion,
+				"services": []jed.Service{
+					{Name: "web", Image: "nginx:latest", Network: "backend", Ports: map[string]string{}, Labels: map[string]string{}, Volumes: map[string]string{}},
+				},
+				"envs": []jed.Env{
+					{Name: "web"},
+				},
+				"intents": []jed.Intent{
+					{Name: "web", Image: "nginx:latest", Replicas: 2},
+				},
+			}
+
+			res = doJSON(rtr, http.MethodPut, "/store/import", payload)
+			Expect(res).To(HaveHTTPStatus(http.StatusOK))
+
+			var summary map[string]int
+			decodeJSON(res, &summary)
+			Expect(summary).To(Equal(map[string]int{"services": 1, "envs": 1, "intents": 1}))
+
+			ctx := context.Background()
+			service, err := j.Store().GetService(ctx, "web", "nginx:latest")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(service.Network).To(Equal("backend"))
+			env, err := j.Store().GetEnv(ctx, "web")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(env.Vars).To(BeEmpty())
+			intent, err := j.Store().GetIntent(ctx, "web")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(intent.Replicas).To(Equal(2))
+		})
+
+		It("rejects import into a non-empty store", func() {
+			ctx := context.Background()
+			Expect(j.Store().SetEnv(ctx, jed.Env{Name: "web", Vars: map[string]string{}})).To(Succeed())
+
+			res = doJSON(rtr, http.MethodPut, "/store/import", map[string]any{
+				"schema":   jed.DBSchemaVersion,
+				"services": []jed.Service{},
+				"envs":     []jed.Env{},
+				"intents":  []jed.Intent{},
+			})
+			Expect(res).To(HaveHTTPStatus(http.StatusConflict))
+		})
+
+		It("rejects schema mismatches", func() {
+			res = doJSON(rtr, http.MethodPut, "/store/import", map[string]any{
+				"schema":   "old",
+				"services": []jed.Service{},
+				"envs":     []jed.Env{},
+				"intents":  []jed.Intent{},
+			})
+			Expect(res).To(HaveHTTPStatus(http.StatusUnprocessableEntity))
+		})
+
+		It("rejects intents without a matching imported service image", func() {
+			res = doJSON(rtr, http.MethodPut, "/store/import", map[string]any{
+				"schema":   jed.DBSchemaVersion,
+				"services": []jed.Service{},
+				"envs":     []jed.Env{},
+				"intents":  []jed.Intent{{Name: "web", Image: "nginx:latest"}},
+			})
+			Expect(res).To(HaveHTTPStatus(http.StatusUnprocessableEntity))
+		})
+
+		It("rejects duplicate service keys", func() {
+			service := jed.Service{Name: "web", Image: "nginx:latest", Network: "backend", Ports: map[string]string{}, Labels: map[string]string{}, Volumes: map[string]string{}}
+			res = doJSON(rtr, http.MethodPut, "/store/import", map[string]any{
+				"schema":   jed.DBSchemaVersion,
+				"services": []jed.Service{service, service},
+				"envs":     []jed.Env{},
+				"intents":  []jed.Intent{},
+			})
+			Expect(res).To(HaveHTTPStatus(http.StatusUnprocessableEntity))
+		})
+	})
+
 	Describe("service routes", func() {
 		It("sets, gets, lists, and deletes services", func() {
 			service := jed.Service{

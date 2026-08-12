@@ -1,6 +1,7 @@
 package jed
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -20,6 +21,7 @@ type Router interface {
 func (j *Jed) Register(rtr Router) {
 	h := &apiHandlers{jed: j, logger: j.logger}
 	rtr.HandleFunc("GET /store/export", h.exportStore)
+	rtr.HandleFunc("PUT /store/import", h.importStore)
 	rtr.HandleFunc("GET /store/services", h.listServices)
 	rtr.HandleFunc("GET /store/services/{name}", h.getService)
 	rtr.HandleFunc("PUT /store/services/{name}", h.setService)
@@ -41,6 +43,12 @@ type storeExport struct {
 	Services []Service `json:"services"`
 	Envs     []Env     `json:"envs"`
 	Intents  []Intent  `json:"intents"`
+}
+
+type storeImportResponse struct {
+	Services int `json:"services"`
+	Envs     int `json:"envs"`
+	Intents  int `json:"intents"`
 }
 
 func (h *apiHandlers) exportStore(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +101,121 @@ func (h *apiHandlers) exportStore(w http.ResponseWriter, r *http.Request) {
 		Envs:     envs,
 		Intents:  intents,
 	})
+}
+
+func (h *apiHandlers) importStore(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	rp := respond.New(w, h.logger)
+
+	var payload storeExport
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		rp.NotOk(ctx, http.StatusBadRequest, errors.Wrap(err, "failed to decode store import"))
+		return
+	}
+	if payload.Schema != DBSchemaVersion {
+		rp.NotOk(ctx, http.StatusUnprocessableEntity, errors.Errorf("store import schema %q does not match current schema %q", payload.Schema, DBSchemaVersion))
+		return
+	}
+
+	empty, err := h.storeIsEmpty(ctx)
+	if err != nil {
+		rp.NotOk(ctx, http.StatusInternalServerError, err)
+		return
+	}
+	if !empty {
+		rp.NotOk(ctx, http.StatusConflict, errors.New("store is not empty"))
+		return
+	}
+
+	serviceKeys := map[string]struct{}{}
+	for _, service := range payload.Services {
+		if err := service.Validate(); err != nil {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, err)
+			return
+		}
+		key := serviceName(service.Name, service.Image)
+		if _, exists := serviceKeys[key]; exists {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, errors.Errorf("duplicate service %q", key))
+			return
+		}
+		serviceKeys[key] = struct{}{}
+	}
+	envNames := map[string]struct{}{}
+	for _, env := range payload.Envs {
+		if env.Name == "" {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, errors.New("env name is required"))
+			return
+		}
+		if _, exists := envNames[env.Name]; exists {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, errors.Errorf("duplicate env %q", env.Name))
+			return
+		}
+		envNames[env.Name] = struct{}{}
+	}
+	intentNames := map[string]struct{}{}
+	for _, intent := range payload.Intents {
+		if err := intent.Validate(); err != nil {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, err)
+			return
+		}
+		if _, exists := intentNames[intent.Name]; exists {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, errors.Errorf("duplicate intent %q", intent.Name))
+			return
+		}
+		intentNames[intent.Name] = struct{}{}
+		if _, ok := serviceKeys[serviceName(intent.Name, intent.Image)]; !ok {
+			rp.NotOk(ctx, http.StatusUnprocessableEntity, errors.Errorf("intent %q references missing service image %q", intent.Name, intent.Image))
+			return
+		}
+	}
+
+	for _, service := range payload.Services {
+		if err := h.jed.store.SetService(ctx, service); err != nil {
+			rp.NotOk(ctx, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	for _, env := range payload.Envs {
+		if env.Vars == nil {
+			env.Vars = map[string]string{}
+		}
+		if err := h.jed.store.SetEnv(ctx, env); err != nil {
+			rp.NotOk(ctx, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	for _, intent := range payload.Intents {
+		if err := h.jed.store.SetIntent(ctx, intent); err != nil {
+			rp.NotOk(ctx, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	rp.WriteObject(ctx, storeImportResponse{
+		Services: len(payload.Services),
+		Envs:     len(payload.Envs),
+		Intents:  len(payload.Intents),
+	})
+}
+
+func (h *apiHandlers) storeIsEmpty(ctx context.Context) (bool, error) {
+	services, err := h.jed.store.AllServices(ctx)
+	if err != nil {
+		return false, err
+	}
+	envs, err := h.jed.store.Envs(ctx)
+	if err != nil {
+		return false, err
+	}
+	intents, err := h.jed.store.Intents(ctx)
+	if err != nil {
+		return false, err
+	}
+	return len(services) == 0 && len(envs) == 0 && len(intents) == 0, nil
+}
+
+func serviceName(name, image string) string {
+	return name + "@" + image
 }
 
 func (h *apiHandlers) listServices(w http.ResponseWriter, r *http.Request) {
