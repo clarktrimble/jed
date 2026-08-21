@@ -21,9 +21,8 @@ Store a `jed.Service` for each image the user may choose:
 
 ```go
 svc := jed.Service{
-    Name:    "postgres",
-    Image:   "postgres:16",
-    Network: "svc-net",
+    Name:  "postgres",
+    Image: "postgres:16",
 }
 
 err := store.SetService(ctx, svc)

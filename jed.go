@@ -95,24 +95,28 @@ type Config struct {
 	VarsEnvName string `json:"vars_env_name" default:"_global"`
 	// DefaultUid is the container user (uid or uid:gid) applied when a service omits user.
 	DefaultUid string `json:"default_uid" default:"1000"`
+	// DefaultNetwork is the swarm network applied when a service omits network.
+	DefaultNetwork string `json:"default_network" default:"svc-net"`
 }
 
 // Jed loads stored service state and renders runtime-neutral specs.
 type Jed struct {
-	store       Store
-	varsEnvName string
-	defaultUid  string
-	logger      logger.Logger
+	store          Store
+	varsEnvName    string
+	defaultUid     string
+	defaultNetwork string
+	logger         logger.Logger
 }
 
 // New creates Jed from Config.
 func (cfg *Config) New(store Store, lgr logger.Logger) *Jed {
 
 	return &Jed{
-		store:       store,
-		varsEnvName: cfg.VarsEnvName,
-		defaultUid:  cfg.DefaultUid,
-		logger:      lgr,
+		store:          store,
+		varsEnvName:    cfg.VarsEnvName,
+		defaultUid:     cfg.DefaultUid,
+		defaultNetwork: cfg.DefaultNetwork,
+		logger:         lgr,
 	}
 }
 
@@ -223,6 +227,9 @@ func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 
 	if svc.User == "" {
 		svc.User = j.defaultUid
+	}
+	if svc.Network == "" {
+		svc.Network = j.defaultNetwork
 	}
 
 	err = svc.Validate()

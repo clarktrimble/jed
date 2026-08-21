@@ -81,7 +81,6 @@ var _ = Describe("Service", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("image is required"))
 			Expect(err.Error()).To(ContainSubstring("name is required"))
-			Expect(err.Error()).To(ContainSubstring("network is required"))
 		})
 
 		It("rejects invalid restart policy", func() {

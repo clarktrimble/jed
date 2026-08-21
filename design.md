@@ -23,7 +23,7 @@ The standalone runtime lives in `container`, making it a peer of `swarm` while k
 
 ## Desired State vs Rendered Specs
 
-`jed.Service` is editable and persisted service definition. It describes what can run: image, command, ports, volumes, network, labels, secrets, configs, resources, user, and related metadata. Any string value in the service may contain templates.
+`jed.Service` is editable and persisted service definition. It describes what can run: image, command, ports, volumes, labels, secrets, configs, resources, user, and related metadata. Any string value in the service may contain templates.
 
 `jed.Env` holds container/runtime environment variables separately from the service definition.
 

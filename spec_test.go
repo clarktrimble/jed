@@ -223,15 +223,31 @@ var _ = Describe("Jed", func() {
 			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=updated.example.com", "--port=8080"}))
 		})
 
+		It("applies service defaults", func() {
+			svc, err := store.GetService(ctx, "app", "local/app:v1")
+			Expect(err).NotTo(HaveOccurred())
+			svc.Network = ""
+			svc.User = ""
+			err = store.SetService(ctx, svc)
+			Expect(err).NotTo(HaveOccurred())
+
+			j = (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000", DefaultNetwork: "svc-net"}).New(store, loggertest.NewLoggerMock())
+			spec, err = j.Spec(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.User).To(Equal("1000"))
+			Expect(spec.Service.Network).To(Equal("svc-net"))
+		})
+
 		When("the service is invalid", func() {
 			BeforeEach(func() {
-				err = store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v1"})
+				err = store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v1", Restart: "sometimes"})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("fails validation", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to validate service"))
+				Expect(err.Error()).To(ContainSubstring("restart"))
 			})
 		})
 

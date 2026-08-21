@@ -7,7 +7,6 @@ Define a `jed.Service` for deployment.
 ```yaml
 name: reauth-acp
 image: local/reauth-acp:3c070f2
-network: svc-net
 
 restart: on-failure
 
@@ -43,7 +42,7 @@ resources:
 | `name` | yes | Service name |
 | `image` | yes | Docker image with tag |
 | `about` | no | User-facing description, links, and notes |
-| `network` | yes | Docker network name |
+| `network` | no | Swarm network name; defaulted to `svc-net` |
 | `command` | no | Override container command |
 | `labels` | no | Container labels |
 | `ports` | no | Container port to host port mapping |

@@ -108,7 +108,7 @@ var _ = Describe("Spec", func() {
 
 	Describe("with invalid service", func() {
 		BeforeEach(func() {
-			svc.Network = ""
+			svc.Restart = "sometimes"
 			client = &ClientMock{}
 			deployer = swarm.New(client, nopLogger{})
 		})
@@ -116,7 +116,7 @@ var _ = Describe("Spec", func() {
 		It("fails before calling Docker", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to validate service"))
-			Expect(err.Error()).To(ContainSubstring("network is required"))
+			Expect(err.Error()).To(ContainSubstring("restart"))
 			Expect(client.SendObjectCalls()).To(BeEmpty())
 		})
 	})

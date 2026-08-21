@@ -134,8 +134,8 @@ type Service struct {
 	Volumes map[string]string `json:"volumes"`
 	// LocalVolumes lists container paths backed by convention-derived local bind mounts.
 	LocalVolumes []string `json:"local_volumes,omitempty"`
-	// Network is the Docker network name.
-	Network string `json:"network"`
+	// Network is the swarm network name. Jed applies DefaultNetwork when omitted.
+	Network string `json:"network,omitempty"`
 	// Restart specifies restart behavior. Empty means no restart.
 	Restart string `json:"restart,omitempty"`
 	// Secrets lists swarm secret base names to mount (e.g., "s3_secret_key").
@@ -193,9 +193,6 @@ func (service Service) Validate() error {
 	}
 	if service.Name == "" {
 		issues = append(issues, "name is required")
-	}
-	if service.Network == "" {
-		issues = append(issues, "network is required")
 	}
 	if service.User != "" && !validUser(service.User) {
 		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values or {{VAR}} templates", service.User))

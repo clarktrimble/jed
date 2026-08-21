@@ -168,7 +168,7 @@ func deploy(ctx context.Context, deployer *swarm.Swarm, store *bbolt.Store, name
 	lgrCfg := sabot.Config{MaxLen: 999}
 	lgr := lgrCfg.New(os.Stderr)
 
-	j := (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000"}).New(store, lgr)
+	j := (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000", DefaultNetwork: "svc-net"}).New(store, lgr)
 
 	spec, err := j.Spec(ctx, name)
 	fatal(err)
