@@ -1,0 +1,10 @@
+{
+  "architecture": "amd64",
+  "os": "linux",
+  "config": {
+    "Labels": {
+      "org.bastille.bip.service.env.path": "/service.env",
+      "org.bastille.bip.service.spec.path": "/service.yml"
+    }
+  }
+}

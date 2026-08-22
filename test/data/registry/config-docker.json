@@ -1,0 +1,31 @@
+{
+  "architecture": "amd64",
+  "config": {
+    "User": "appuser",
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Entrypoint": [
+      "/main"
+    ],
+    "WorkingDir": "/"
+  },
+  "created": "2026-05-15T23:18:25.188277242Z",
+  "history": [
+    {
+      "created": "2026-04-25T15:04:55.900456299Z",
+      "created_by": "WORKDIR /",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    }
+  ],
+  "os": "linux",
+  "rootfs": {
+    "type": "layers",
+    "diff_ids": [
+      "sha256:56c95745a672beca1cd318f849287b8a77ae9d6e4495e7a6fa80f2ecbc25281e",
+      "sha256:b0fb18ffc30b54a2259a23d44512eec692a9e246900912009c1971aef90b3cbe",
+      "sha256:62fe873e0843808f962d410e6926fe4f2ae69bf378dbcf3cd788d08d3a6f8239"
+    ]
+  }
+}

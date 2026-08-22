@@ -1,0 +1,265 @@
+➜  jed git:(main) ✗ export REG=https://registry.bastille.cloud
+➜  jed git:(main) ✗ export ACCEPT='application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json'
+➜  jed git:(main) ✗ curl -fsS "$REG/v2/_catalog" | jq
+{
+  "repositories": [
+    "bastille-display-integration",
+    "fwd-filesystem",
+    "montage",
+    "tag-phosphorous-fs",
+    "tag-phosphorous-s3",
+    "zonechange"
+  ]
+}
+➜  jed git:(main) ✗ export REPO=montage
+➜  jed git:(main) ✗ curl -fsS "$REG/v2/$REPO/tags/list" | jq
+{
+  "name": "montage",
+  "tags": [
+    "469ba2d",
+    "91e8222",
+    "66a13c4",
+    "c397a01",
+    "2b1c310",
+    "27be496",
+    "22d9f43",
+    "28a606e",
+    "dc4e602",
+    "0eb5146",
+    "de81271",
+    "1b1dce7"
+  ]
+}
+➜  jed git:(main) ✗ export TAG=469ba2d
+➜  jed git:(main) ✗ curl -fsS -H "Accept: $ACCEPT" "$REG/v2/$REPO/manifests/$TAG" | jq
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.index.v1+json",
+  "manifests": [
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:84fc4aa373de1d7a91647962a85d93169ed1df9f9c449790d8dfdb5c9d384300",
+      "size": 860,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:f0ca74ea1f9373d36cffff33818f3441130f1dd8ffacf63e968be24000556f21",
+      "size": 860,
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:25c75b3f2cb7ed59f771ec686e01a71ae5673f50301e02f47b5dc98fa6b1a8cb",
+      "size": 564,
+      "annotations": {
+        "vnd.docker.reference.digest": "sha256:84fc4aa373de1d7a91647962a85d93169ed1df9f9c449790d8dfdb5c9d384300",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:c00a0b73cd54b203956e2c6edd27594e126ca9d41bbebb1a074257709422890d",
+      "size": 564,
+      "annotations": {
+        "vnd.docker.reference.digest": "sha256:f0ca74ea1f9373d36cffff33818f3441130f1dd8ffacf63e968be24000556f21",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    }
+  ]
+}
+➜  jed git:(main) ✗ export DIGEST=sha256:84fc4aa373de1d7a91647962a85d93169ed1df9f9c449790d8dfdb5c9d384300
+➜  jed git:(main) ✗ curl -fsS -H "Accept: $ACCEPT" "$REG/v2/$REPO/manifests/$DIGEST" | jq
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.manifest.v1+json",
+  "config": {
+    "mediaType": "application/vnd.oci.image.config.v1+json",
+    "digest": "sha256:b072cefe8f23e0f6607d44753ae94c94a63f55f6e36e8761a52d2afd2a6d6504",
+    "size": 1310
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:8ac16baf7cd7f59504f9fe37ed18b71558e2b378cace3393cd0421cad44e2a90",
+      "size": 431
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:11f86bc268cb353e757d934a5cd8cf89b8575ec55ba31a465453500769bb191b",
+      "size": 126893
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:1ddd03f4554404ee3b641036a8692612b59a77f09888cfc0babb4d089add8cac",
+      "size": 4788363
+    }
+  ]
+}
+➜  jed git:(main) ✗ export CONFIG=sha256:b072cefe8f23e0f6607d44753ae94c94a63f55f6e36e8761a52d2afd2a6d6504
+➜  jed git:(main) ✗ curl -fsS "$REG/v2/$REPO/blobs/$CONFIG" | jq
+{
+  "architecture": "amd64",
+  "config": {
+    "User": "appuser",
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Entrypoint": [
+      "/main"
+    ],
+    "WorkingDir": "/"
+  },
+  "created": "2026-08-04T19:14:17.102514373Z",
+  "history": [
+    {
+      "created": "2026-07-04T07:12:20.561678239Z",
+      "created_by": "WORKDIR /",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    },
+    {
+      "created": "2026-07-04T07:12:20.561678239Z",
+      "created_by": "COPY /etc/passwd /etc/passwd # buildkit",
+      "comment": "buildkit.dockerfile.v0"
+    },
+    {
+      "created": "2026-07-04T07:12:20.581703413Z",
+      "created_by": "COPY /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ # buildkit",
+      "comment": "buildkit.dockerfile.v0"
+    },
+    {
+      "created": "2026-08-04T19:14:17.102514373Z",
+      "created_by": "COPY /app/main /main # buildkit",
+      "comment": "buildkit.dockerfile.v0"
+    },
+    {
+      "created": "2026-08-04T19:14:17.102514373Z",
+      "created_by": "USER appuser",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    },
+    {
+      "created": "2026-08-04T19:14:17.102514373Z",
+      "created_by": "ENTRYPOINT [\"/main\"]",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    }
+  ],
+  "os": "linux",
+  "rootfs": {
+    "type": "layers",
+    "diff_ids": [
+      "sha256:870d7ca47db16bbc159b84b8900a5aaafdcf23f202b8619f2f65f0bb15026457",
+      "sha256:dcd11a876742726f15973b2591eafb728346ed9c84d2af0ee149a8f6edffb67b",
+      "sha256:961dd346c7d41d561348e78d337fd39e2431b126a41ced08ffeed49a8b0eea36"
+    ]
+  }
+}
+➜  jed git:(main) ✗ curl -fsS "$REG/v2/$REPO/blobs/$CONFIG" | jq '.config.Labels'
+null
+➜  jed git:(main) ✗ ### maybe support this non-index thing, maybe
+➜  jed git:(main) ✗ export TAG=91e8222
+➜  jed git:(main) ✗ curl -fsS -H "Accept: $ACCEPT" "$REG/v2/$REPO/manifests/$TAG" | jq
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+  "config": {
+    "mediaType": "application/vnd.docker.container.image.v1+json",
+    "size": 1310,
+    "digest": "sha256:672cadc473324aa4387cbf4944e429c7c58595c688797888bbd1909907cbe478"
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 430,
+      "digest": "sha256:fc16d8228c6b13abcaf2d139f7973496c0689bec85851e25535fbebcb6e48f47"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 126891,
+      "digest": "sha256:75e513e0ca767f98d455fa23e879ee266d3a6a20ea6cf732285ff82ab06b613d"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 4186466,
+      "digest": "sha256:c8521328430166e0b7e42535b801988231279c9183adc92b22c01936fac6c470"
+    }
+  ]
+}
+➜  jed git:(main) ✗ export CONFIG=sha256:672cadc473324aa4387cbf4944e429c7c58595c688797888bbd1909907cbe478
+➜  jed git:(main) ✗ curl -fsS "$REG/v2/$REPO/blobs/$CONFIG" | jq
+{
+  "architecture": "amd64",
+  "config": {
+    "User": "appuser",
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Entrypoint": [
+      "/main"
+    ],
+    "WorkingDir": "/"
+  },
+  "created": "2026-05-15T23:18:25.188277242Z",
+  "history": [
+    {
+      "created": "2026-04-25T15:04:55.900456299Z",
+      "created_by": "WORKDIR /",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    },
+    {
+      "created": "2026-04-25T15:04:55.900456299Z",
+      "created_by": "COPY /etc/passwd /etc/passwd # buildkit",
+      "comment": "buildkit.dockerfile.v0"
+    },
+    {
+      "created": "2026-04-25T15:04:55.914570458Z",
+      "created_by": "COPY /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ # buildkit",
+      "comment": "buildkit.dockerfile.v0"
+    },
+    {
+      "created": "2026-05-15T23:18:25.188277242Z",
+      "created_by": "COPY /app/main /main # buildkit",
+      "comment": "buildkit.dockerfile.v0"
+    },
+    {
+      "created": "2026-05-15T23:18:25.188277242Z",
+      "created_by": "USER appuser",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    },
+    {
+      "created": "2026-05-15T23:18:25.188277242Z",
+      "created_by": "ENTRYPOINT [\"/main\"]",
+      "comment": "buildkit.dockerfile.v0",
+      "empty_layer": true
+    }
+  ],
+  "os": "linux",
+  "rootfs": {
+    "type": "layers",
+    "diff_ids": [
+      "sha256:56c95745a672beca1cd318f849287b8a77ae9d6e4495e7a6fa80f2ecbc25281e",
+      "sha256:b0fb18ffc30b54a2259a23d44512eec692a9e246900912009c1971aef90b3cbe",
+      "sha256:62fe873e0843808f962d410e6926fe4f2ae69bf378dbcf3cd788d08d3a6f8239"
+    ]
+  }
+}
+➜  jed git:(main) ✗ curl -fsS "$REG/v2/$REPO/blobs/$CONFIG" | jq '.config.Labels'
+null
