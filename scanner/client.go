@@ -4,6 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+
+	"github.com/pkg/errors"
+)
+
+const (
+	ociIndexMt       = "application/vnd.oci.image.index.v1+json"
+	ociManifestMt    = "application/vnd.oci.image.manifest.v1+json"
+	dockerListMt     = "application/vnd.docker.distribution.manifest.list.v2+json"
+	dockerManifestMt = "application/vnd.docker.distribution.manifest.v2+json"
 )
 
 type manifestReference struct {
@@ -38,7 +47,7 @@ func (scanner *Scanner) getTags(ctx context.Context, repository string) (tags []
 
 func (scanner *Scanner) getReferences(ctx context.Context, repository, tag string) (references []manifestReference, err error) {
 
-	var idx ociIndex
+	var idx ociTagManifest
 	path := fmt.Sprintf("/v2/%s/manifests/%s", repository, tag)
 
 	err = scanner.client.SendObject(ctx, http.MethodGet, path, nil, &idx)
@@ -46,30 +55,48 @@ func (scanner *Scanner) getReferences(ctx context.Context, repository, tag strin
 		return
 	}
 
-	for _, m := range idx.Manifests {
+	switch idx.MediaType {
+	case ociIndexMt, dockerListMt:
+		// indexed manifests
+		for _, m := range idx.Manifests {
 
-		platform := platformFromOCI(m.Platform)
-		if platform == "" {
-			continue
+			platform := platformFromSpec(m.Platform)
+			if platform == "" {
+				continue
+			}
+			references = append(references, manifestReference{
+				Platform: platform,
+				Digest:   m.Digest,
+			})
 		}
+	case ociManifestMt, dockerManifestMt:
+		// direct manifest
 		references = append(references, manifestReference{
-			Platform: platform,
-			Digest:   m.Digest,
+			Digest: tag,
 		})
+	}
+
+	if len(references) == 0 {
+		scanner.logger.Error(ctx, "failed to get references",
+			errors.New("no manifest references found"),
+			"repository", repository,
+			"tag", tag,
+			"media_type", idx.MediaType,
+		)
 	}
 
 	return
 }
 
 func (scanner *Scanner) getConfig(ctx context.Context, repository string, reference manifestReference) (cfg Config, err error) {
-	var mfst ociManifest
+	var mfst ociImageManifest
 	path := fmt.Sprintf("/v2/%s/manifests/%s", repository, reference.Digest)
 	err = scanner.client.SendObject(ctx, http.MethodGet, path, nil, &mfst)
 	if err != nil {
 		return
 	}
 
-	var ociCfg ociConfig
+	var ociCfg ociImageConfig
 	path = fmt.Sprintf("/v2/%s/blobs/%s", repository, mfst.Config.Digest)
 	err = scanner.client.SendObject(ctx, http.MethodGet, path, nil, &ociCfg)
 	if err != nil {
@@ -88,7 +115,14 @@ func (scanner *Scanner) getConfig(ctx context.Context, repository string, refere
 	return
 }
 
-func platformFromOCI(spec ociPlatform) string {
+func platformFromConfig(cfg Config) string {
+	return platformFromSpec(ociPlatform{
+		Os:           cfg.Os,
+		Architecture: cfg.Architecture,
+	})
+}
+
+func platformFromSpec(spec ociPlatform) string {
 	if spec.Os == "" || spec.Architecture == "" {
 		return ""
 	}

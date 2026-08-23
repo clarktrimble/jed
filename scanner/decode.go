@@ -9,12 +9,13 @@ type ociTags struct {
 	Tags []string `json:"tags"`
 }
 
-type ociIndex struct {
-	MediaType string                  `json:"mediaType"`
-	Manifests []ociManifestDescriptor `json:"manifests"`
+type ociTagManifest struct {
+	MediaType string               `json:"mediaType"`
+	Manifests []ociIndexedManifest `json:"manifests"`
+	Config    ociDescriptor        `json:"config"`
 }
 
-type ociManifestDescriptor struct {
+type ociIndexedManifest struct {
 	MediaType string      `json:"mediaType"`
 	Digest    string      `json:"digest"`
 	Size      int64       `json:"size"`
@@ -27,7 +28,7 @@ type ociPlatform struct {
 	Variant      string `json:"variant,omitempty"`
 }
 
-type ociManifest struct {
+type ociImageManifest struct {
 	MediaType string          `json:"mediaType"`
 	Config    ociDescriptor   `json:"config"`
 	Layers    []ociDescriptor `json:"layers"`
@@ -39,7 +40,7 @@ type ociDescriptor struct {
 	Size      int64  `json:"size"`
 }
 
-type ociConfig struct {
+type ociImageConfig struct {
 	Architecture string           `json:"architecture"`
 	Os           string           `json:"os"`
 	Config       ociRuntimeConfig `json:"config"`

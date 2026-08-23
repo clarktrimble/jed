@@ -15,9 +15,9 @@ func TestScanner(t *testing.T) {
 }
 
 var _ = Describe("registry JSON decode", func() {
-	Describe("ociIndex", func() {
+	Describe("ociTagManifest", func() {
 		It("decodes the OCI index found in the registry transcript", func() {
-			var idx ociIndex
+			var idx ociTagManifest
 			Expect(json.Unmarshal(loadRegistryData("index-oci.json"), &idx)).To(Succeed())
 
 			Expect(idx.MediaType).To(Equal("application/vnd.oci.image.index.v1+json"))
@@ -29,9 +29,9 @@ var _ = Describe("registry JSON decode", func() {
 		})
 	})
 
-	Describe("ociManifest", func() {
+	Describe("ociImageManifest", func() {
 		It("decodes an OCI manifest found through an index", func() {
-			var mfst ociManifest
+			var mfst ociImageManifest
 			Expect(json.Unmarshal(loadRegistryData("manifest-oci.json"), &mfst)).To(Succeed())
 
 			Expect(mfst.MediaType).To(Equal("application/vnd.oci.image.manifest.v1+json"))
@@ -41,9 +41,9 @@ var _ = Describe("registry JSON decode", func() {
 		})
 	})
 
-	Describe("ociConfig", func() {
+	Describe("ociImageConfig", func() {
 		It("decodes config fields found in the registry transcript", func() {
-			var cfg ociConfig
+			var cfg ociImageConfig
 			Expect(json.Unmarshal(loadRegistryData("config-docker.json"), &cfg)).To(Succeed())
 
 			Expect(cfg.Os).To(Equal("linux"))
@@ -56,7 +56,7 @@ var _ = Describe("registry JSON decode", func() {
 		})
 
 		It("decodes labels found on the pushed image", func() {
-			var cfg ociConfig
+			var cfg ociImageConfig
 			Expect(json.Unmarshal(loadRegistryData("config-labels.json"), &cfg)).To(Succeed())
 
 			Expect(cfg.Config.Labels).To(Equal(map[string]string{

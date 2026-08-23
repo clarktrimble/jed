@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 
+	"github.com/clarktrimble/jed/logger"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -13,12 +14,14 @@ type client interface {
 
 type Scanner struct {
 	client client
+	logger logger.Logger
 	limit  int
 }
 
-func New(client client) *Scanner {
+func New(client client, logger logger.Logger) *Scanner {
 	return &Scanner{
 		client: client,
+		logger: logger,
 		limit:  8,
 	}
 }
@@ -29,12 +32,6 @@ func (scanner *Scanner) platforms(ctx context.Context, repository, tag string) (
 	if err != nil {
 		return
 	}
-	/*
-		if len(references) == 0 {
-			err = errors.New("registry tag has no manifest references")
-			return
-		}
-	*/
 
 	for _, reference := range references {
 		cfg, err := scanner.getConfig(ctx, repository, reference)
@@ -42,8 +39,23 @@ func (scanner *Scanner) platforms(ctx context.Context, repository, tag string) (
 			return platforms, err
 		}
 
+		platform := reference.Platform
+		if platform == "" {
+			// Direct manifest
+			platform = platformFromConfig(cfg)
+		}
+		if platform == "" {
+			scanner.logger.Error(ctx, "failed to determine platform for direct manifest",
+				errors.New("missing platform"),
+				"repository", repository,
+				"tag", tag,
+				"manifest", reference.Digest,
+			)
+			continue
+		}
+
 		platforms = append(platforms, Platform{
-			Name:   reference.Platform,
+			Name:   platform,
 			Config: cfg,
 		})
 	}
@@ -57,23 +69,14 @@ func (scanner *Scanner) Images(ctx context.Context) (images []Image, err error) 
 		return
 	}
 
-	/*
-		type repositoryImages struct {
-			Repository string
-			Images     []Image
-		}
-	*/
-
-	//tagses := [][]string{}
 	tagses := make([][]string, len(repositories))
 
-	// Todo: decide whether errgroup.WithContext cancellation is useful here or just hides root errors.
-	var eg errgroup.Group
+	eg, groupCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(scanner.limit)
 
 	for i, repository := range repositories {
 		eg.Go(func() error {
-			tags, err := scanner.getTags(ctx, repository)
+			tags, err := scanner.getTags(groupCtx, repository)
 			if err != nil {
 				return errors.Wrapf(err, "list tags for %s", repository)
 			}
@@ -93,27 +96,6 @@ func (scanner *Scanner) Images(ctx context.Context) (images []Image, err error) 
 		tagsByRepo[repo] = tagses[i]
 	}
 
-	/*
-		for _, repository := range found {
-			for _, tag := range repository.Tags {
-				images = append(images, Image{
-					Repository: repository.Repository,
-					Tag:        tag,
-				})
-			}
-		}
-	*/
-
-	/*
-		offsets := make([]int, len(repositories))
-		for i, repo := range repositories {
-			if i > 0 {
-				offsets[i] = offsets[i-1] + len(tagsByRepo[repositories[i-1]])
-			}
-			images = append(images, make([]Image, len(tagsByRepo[repo]))...)
-		}
-	*/
-
 	for _, repo := range repositories {
 		for _, tag := range tagsByRepo[repo] {
 			images = append(images, Image{
@@ -123,15 +105,13 @@ func (scanner *Scanner) Images(ctx context.Context) (images []Image, err error) 
 		}
 	}
 
-	eg = errgroup.Group{}
+	eg, groupCtx = errgroup.WithContext(ctx)
 	eg.SetLimit(scanner.limit)
 
 	for i, image := range images {
 		eg.Go(func() error {
-			platforms, err := scanner.platforms(ctx, image.Repository, image.Tag)
+			platforms, err := scanner.platforms(groupCtx, image.Repository, image.Tag)
 			if err != nil {
-				// only wrap once mother fucker
-				//return errors.Wrapf(err, "scan %s:%s", image.Repository, image.Tag)
 				return err
 			}
 			images[i].Platforms = platforms
@@ -142,21 +122,3 @@ func (scanner *Scanner) Images(ctx context.Context) (images []Image, err error) 
 	err = eg.Wait()
 	return
 }
-
-/*
-func (scanner *Scanner) tags(ctx context.Context, repository string) (images []Image, err error) {
-	tags, err := scanner.getTags(ctx, repository)
-	if err != nil {
-		return
-	}
-
-	images = make([]Image, len(tags))
-	for i, tag := range tags {
-		images[i] = Image{
-			Repository: repository,
-			Tag:        tag,
-		}
-	}
-	return
-}
-*/
