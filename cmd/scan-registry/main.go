@@ -26,7 +26,13 @@ func main() {
 		},
 	}).NewWithTrippers(lgr)
 
-	images, err := scanner.New(client, lgr).Images(context.Background())
+	scn, err := scanner.New(client, lgr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "new scanner: %v\n", err)
+		os.Exit(1)
+	}
+
+	images, err := scn.Scan(context.Background())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "scan registry: %v\n", err)
 		os.Exit(1)

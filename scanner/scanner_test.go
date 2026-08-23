@@ -39,6 +39,9 @@ var _ = Describe("Scanner", func() {
 			routes = map[string][]byte{}
 			routeErrors = map[string]error{}
 			client = &ClientMock{
+				UriFunc: func() string {
+					return "https://registry.example.com"
+				},
 				SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
 					Expect(method).To(Equal(http.MethodGet))
 					Expect(snd).To(BeNil())
@@ -55,11 +58,12 @@ var _ = Describe("Scanner", func() {
 					return json.Unmarshal(response, rcv)
 				},
 			}
-			scn = scanner.New(client, logger)
+			scn, err = scanner.New(client, logger)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		JustBeforeEach(func() {
-			images, err = scn.Images(ctx)
+			images, err = scn.Scan(ctx)
 		})
 
 		When("a tag resolves through an image index", func() {
@@ -97,9 +101,18 @@ var _ = Describe("Scanner", func() {
 			It("returns configs for the indexed platforms", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(images).To(HaveLen(1))
+				Expect(images[0].Registry).To(Equal("registry.example.com"))
 				Expect(images[0].Repository).To(Equal("repo"))
 				Expect(images[0].Tag).To(Equal("indexed"))
 				Expect(platformNames(images[0].Platforms)).To(ConsistOf("linux/amd64", "linux/arm64", "linux/arm/v7"))
+				Expect(scanner.Images(images).Configs("linux/amd64")).To(Equal(map[string]scanner.Config{
+					"registry.example.com/repo:indexed": {
+						Os:           "linux",
+						Architecture: "amd64",
+						User:         "appuser",
+						WorkingDir:   "/",
+					},
+				}))
 				Expect(logger.ErrorCalls()).To(BeEmpty())
 			})
 		})
