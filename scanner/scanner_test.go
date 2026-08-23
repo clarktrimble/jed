@@ -1,10 +1,13 @@
 package scanner_test
 
+//go:generate moq -out mock_test.go -pkg scanner_test . Client
+
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"testing"
 
 	"github.com/clarktrimble/jed/logger/loggertest"
 	"github.com/clarktrimble/jed/scanner"
@@ -13,6 +16,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func TestScanner(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Scanner Suite")
+}
 
 // Test registry responses are in the spirit of:
 // test/data/registry/index-oci.json

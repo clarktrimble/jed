@@ -9,11 +9,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type Client interface {
-	SendObject(ctx context.Context, method, path string, snd, rcv any) (err error)
-	Uri() string
-}
-
 type Scanner struct {
 	client   Client
 	logger   logger.Logger
@@ -48,6 +43,17 @@ func (scanner *Scanner) Scan(ctx context.Context) (images []Image, err error) {
 		return
 	}
 
+	images, err = scanner.scanImages(ctx, repositories)
+	if err != nil {
+		return
+	}
+
+	err = scanner.addPlatforms(ctx, images)
+	return
+}
+
+func (scanner *Scanner) scanImages(ctx context.Context, repositories []string) (images []Image, err error) {
+
 	tagses := make([][]string, len(repositories))
 
 	eg, groupCtx := errgroup.WithContext(ctx)
@@ -70,13 +76,14 @@ func (scanner *Scanner) Scan(ctx context.Context) (images []Image, err error) {
 		return
 	}
 
-	tagsByRepo := map[string][]string{}
-	for i, repo := range repositories {
-		tagsByRepo[repo] = tagses[i]
+	imageCount := 0
+	for _, tags := range tagses {
+		imageCount += len(tags)
 	}
+	images = make([]Image, 0, imageCount)
 
-	for _, repo := range repositories {
-		for _, tag := range tagsByRepo[repo] {
+	for i, repo := range repositories {
+		for _, tag := range tagses[i] {
 			images = append(images, Image{
 				Registry:   scanner.registry,
 				Repository: repo,
@@ -85,12 +92,17 @@ func (scanner *Scanner) Scan(ctx context.Context) (images []Image, err error) {
 		}
 	}
 
-	eg, groupCtx = errgroup.WithContext(ctx)
+	return
+}
+
+func (scanner *Scanner) addPlatforms(ctx context.Context, images []Image) (err error) {
+
+	eg, groupCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(scanner.limit)
 
 	for i, image := range images {
 		eg.Go(func() error {
-			platforms, err := scanner.platforms(groupCtx, image.Repository, image.Tag)
+			platforms, err := scanner.scanPlatforms(groupCtx, image.Repository, image.Tag)
 			if err != nil {
 				return err
 			}
@@ -103,7 +115,7 @@ func (scanner *Scanner) Scan(ctx context.Context) (images []Image, err error) {
 	return
 }
 
-func (scanner *Scanner) platforms(ctx context.Context, repository, tag string) (platforms []Platform, err error) {
+func (scanner *Scanner) scanPlatforms(ctx context.Context, repository, tag string) (platforms []Platform, err error) {
 
 	references, err := scanner.getReferences(ctx, repository, tag)
 	if err != nil {
@@ -118,7 +130,7 @@ func (scanner *Scanner) platforms(ctx context.Context, repository, tag string) (
 
 		platform := reference.Platform
 		if platform == "" {
-			// Direct manifest
+			// Direct manifest, fill in platform now
 			platform = platformFromConfig(cfg)
 		}
 		if platform == "" {
