@@ -8,17 +8,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type client interface {
+type Client interface {
 	SendObject(ctx context.Context, method, path string, snd, rcv any) (err error)
 }
 
 type Scanner struct {
-	client client
+	client Client
 	logger logger.Logger
 	limit  int
 }
 
-func New(client client, logger logger.Logger) *Scanner {
+func New(client Client, logger logger.Logger) *Scanner {
 	return &Scanner{
 		client: client,
 		logger: logger,
