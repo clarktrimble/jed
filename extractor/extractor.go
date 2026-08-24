@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/clarktrimble/hondo"
+	"github.com/clarktrimble/jed/logger"
 	"github.com/pkg/errors"
 )
 
@@ -23,11 +24,12 @@ type Client interface {
 // Extractor extracts files from Docker images.
 type Extractor struct {
 	client Client
+	logger logger.Logger
 }
 
 // New creates an Extractor.
-func New(client Client) *Extractor {
-	return &Extractor{client: client}
+func New(client Client, logger logger.Logger) *Extractor {
+	return &Extractor{client: client, logger: logger}
 }
 
 // Files extracts paths from imageRef using a temporary stopped container.
@@ -38,6 +40,8 @@ func (extractor *Extractor) Files(ctx context.Context, imageRef string, paths ..
 	if len(paths) == 0 {
 		return
 	}
+
+	extractor.logger.Debug(ctx, "extracting files from image", "ref", imageRef, "count", len(paths))
 
 	err = extractor.pull(ctx, imageRef)
 	if err != nil {
@@ -76,6 +80,8 @@ func (extractor *Extractor) pull(ctx context.Context, imageRef string) (err erro
 		return
 	}
 
+	extractor.logger.Debug(ctx, "pulling image", "ref", imageRef)
+
 	path := fmt.Sprintf("/images/create?fromImage=%s&tag=%s", url.QueryEscape(fromImage), url.QueryEscape(tag))
 	_, err = extractor.client.SendJson(ctx, "POST", path, nil)
 	return
@@ -88,6 +94,7 @@ func (extractor *Extractor) create(ctx context.Context, imageRef string) (id str
 	}
 
 	name := "jed-extract-" + hondo.Rand(7)
+
 	path := fmt.Sprintf("/containers/create?name=%s", url.QueryEscape(name))
 	err = extractor.client.SendObject(ctx, "POST", path, map[string]string{"Image": imageRef}, &response)
 	if err != nil {
@@ -95,17 +102,20 @@ func (extractor *Extractor) create(ctx context.Context, imageRef string) (id str
 	}
 
 	id = response.Id
+	extractor.logger.Debug(ctx, "created extraction container", "ref", imageRef, "name", name, "id", id)
 	return
 }
 
 func (extractor *Extractor) delete(ctx context.Context, id string) error {
 
+	extractor.logger.Debug(ctx, "deleting extraction container", "id", id)
 	path := fmt.Sprintf("/containers/%s", url.PathEscape(id))
 	return extractor.client.SendObject(ctx, "DELETE", path, nil, nil)
 }
 
 func (extractor *Extractor) file(ctx context.Context, id, filePath string) (file []byte, err error) {
 
+	extractor.logger.Debug(ctx, "extracting file from container", "id", id, "path", filePath)
 	path := fmt.Sprintf("/containers/%s/archive?path=%s", url.PathEscape(id), url.QueryEscape(filePath))
 	archive, err := extractor.client.SendJson(ctx, "GET", path, nil)
 	if err != nil {

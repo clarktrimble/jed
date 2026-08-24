@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/clarktrimble/jed/extractor"
+	"github.com/clarktrimble/jed/logger/loggertest"
 	"github.com/pkg/errors"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -65,7 +66,7 @@ var _ = Describe("Extractor", func() {
 		}
 		imageRef = "registry.example.com/app:v1"
 		paths = []string{"/service.yml", "/service.env"}
-		ext = extractor.New(client)
+		ext = extractor.New(client, loggertest.NewLoggerMock())
 	})
 
 	JustBeforeEach(func() {

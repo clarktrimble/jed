@@ -50,6 +50,11 @@ func (scanner *Scanner) Scan(ctx context.Context) (images []jed.Image, err error
 	}
 
 	err = scanner.addPlatforms(ctx, images)
+	if err != nil {
+		return
+	}
+
+	scanner.logger.Debug(ctx, "scanned registry", "registry", scanner.registry, "images", len(images))
 	return
 }
 
@@ -149,5 +154,7 @@ func (scanner *Scanner) scanPlatforms(ctx context.Context, repository, tag strin
 			Config: cfg,
 		})
 	}
+
+	scanner.logger.Debug(ctx, "scanned image platforms", "repository", repository, "tag", tag, "count", len(platforms))
 	return
 }

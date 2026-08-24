@@ -89,6 +89,7 @@ func (scanner *Scanner) getRepositories(ctx context.Context) (repositories []str
 	}
 
 	repositories = catalog.Repositories
+	scanner.logger.Debug(ctx, "listed repositories", "count", len(repositories))
 	return
 }
 
@@ -102,6 +103,7 @@ func (scanner *Scanner) getTags(ctx context.Context, repository string) (tags []
 	}
 
 	tags = rsp.Tags
+	scanner.logger.Debug(ctx, "listed repository tags", "repository", repository, "count", len(tags))
 	return
 }
 
@@ -145,6 +147,7 @@ func (scanner *Scanner) getReferences(ctx context.Context, repository, tag strin
 		)
 	}
 
+	scanner.logger.Debug(ctx, "resolved manifest references", "repository", repository, "tag", tag, "count", len(references))
 	return
 }
 

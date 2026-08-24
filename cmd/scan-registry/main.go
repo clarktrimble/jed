@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/clarktrimble/giant"
-	giantlogger "github.com/clarktrimble/giant/logger"
 	"github.com/clarktrimble/jed"
 	"github.com/clarktrimble/jed/extractor"
+	"github.com/clarktrimble/jed/logger"
 	"github.com/clarktrimble/jed/scanner"
 	"github.com/clarktrimble/sabot"
 )
@@ -57,7 +57,7 @@ func main() {
 	}
 }
 
-func extract(ctx context.Context, lgr giantlogger.Logger, images []jed.Image) (err error) {
+func extract(ctx context.Context, lgr logger.Logger, images []jed.Image) (err error) {
 	platform := os.Getenv("JED_PLATFORM")
 	if platform == "" {
 		platform = "linux/amd64"
@@ -73,7 +73,7 @@ func extract(ctx context.Context, lgr giantlogger.Logger, images []jed.Image) (e
 		UnixSocket: socket,
 	}).NewWithTrippers(lgr)
 
-	ext := extractor.New(client)
+	ext := extractor.New(client, lgr)
 	for imageRef, cfg := range jed.Images(images).Configs(platform) {
 		paths := extractionPaths(cfg)
 		if len(paths) == 0 {
