@@ -18,10 +18,10 @@ import (
 // Bump this when changing the store schema in a backwards-incompatible way.
 const DBSchemaVersion = "4"
 
-// Store persists services and environment variables.
+// Store persists services, images, and environment variables.
 //
 // Implementations must be safe for concurrent use. The Store is the source
-// of truth for all service definitions and environment variables.
+// of truth for service definitions, scanned images, and environment variables.
 type Store interface {
 	// GetService retrieves a service definition by name and image.
 	// Returns NotFoundError if the service does not exist.
@@ -38,6 +38,18 @@ type Store interface {
 
 	// AllServices returns all service definitions.
 	AllServices(ctx context.Context) ([]Service, error)
+
+	// GetImage retrieves a scanned image by image ref.
+	GetImage(ctx context.Context, imageRef string) (Image, error)
+
+	// SetImage creates or updates a scanned image.
+	SetImage(ctx context.Context, image Image) error
+
+	// DelImage removes a scanned image by image ref.
+	DelImage(ctx context.Context, imageRef string) error
+
+	// Images returns all scanned images.
+	Images(ctx context.Context) ([]Image, error)
 
 	// GetEnv retrieves environment variables for a service.
 	// Returns an empty Env with initialized Vars map when the service has no

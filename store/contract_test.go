@@ -19,6 +19,7 @@ func TestStoreContract(t *testing.T) {
 // Simple in-memory store implementation for testing the contract itself.
 type mockStore struct {
 	services map[string]jed.Service
+	images   map[string]jed.Image
 	envs     map[string]jed.Env
 	intents  map[string]jed.Intent
 }
@@ -26,6 +27,7 @@ type mockStore struct {
 func newMockStore() *mockStore {
 	return &mockStore{
 		services: make(map[string]jed.Service),
+		images:   make(map[string]jed.Image),
 		envs:     make(map[string]jed.Env),
 		intents:  make(map[string]jed.Intent),
 	}
@@ -63,6 +65,32 @@ func (m *mockStore) AllServices(ctx context.Context) ([]jed.Service, error) {
 	result := make([]jed.Service, 0, len(m.services))
 	for _, svc := range m.services {
 		result = append(result, svc)
+	}
+	return result, nil
+}
+
+func (m *mockStore) GetImage(ctx context.Context, imageRef string) (jed.Image, error) {
+	image, ok := m.images[imageRef]
+	if !ok {
+		return jed.Image{}, jed.NotFoundError{Kind: "image", Name: imageRef}
+	}
+	return image, nil
+}
+
+func (m *mockStore) SetImage(ctx context.Context, image jed.Image) error {
+	m.images[image.ImageRef()] = image
+	return nil
+}
+
+func (m *mockStore) DelImage(ctx context.Context, imageRef string) error {
+	delete(m.images, imageRef)
+	return nil
+}
+
+func (m *mockStore) Images(ctx context.Context) ([]jed.Image, error) {
+	result := make([]jed.Image, 0, len(m.images))
+	for _, image := range m.images {
+		result = append(result, image)
 	}
 	return result, nil
 }

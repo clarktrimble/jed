@@ -29,6 +29,7 @@ func RunStoreContractTests(
 			ctx     context.Context
 			err     error
 			service jed.Service
+			image   jed.Image
 			env     jed.Env
 			intent  jed.Intent
 		)
@@ -152,6 +153,100 @@ func RunStoreContractTests(
 					Expect(services).To(HaveLen(2))
 					names := []string{services[0].Name, services[1].Name}
 					Expect(names).To(ContainElements("postgres", "redis"))
+				})
+			})
+		})
+
+		Describe("Images", func() {
+			var images []jed.Image
+
+			JustBeforeEach(func() {
+				images, err = store.Images(ctx)
+			})
+
+			When("no images exist", func() {
+				It("should return empty slice", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(images).To(BeEmpty())
+				})
+			})
+
+			When("multiple images exist", func() {
+				BeforeEach(func() {
+					err = store.SetImage(ctx, jed.Image{Repository: "postgres", Tag: "16"})
+					Expect(err).NotTo(HaveOccurred())
+					err = store.SetImage(ctx, jed.Image{Registry: "registry.example.com", Repository: "app/api", Tag: "v1"})
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return all images", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(images).To(HaveLen(2))
+
+					imageRefs := []string{images[0].ImageRef(), images[1].ImageRef()}
+					Expect(imageRefs).To(ContainElements("postgres:16", "registry.example.com/app/api:v1"))
+				})
+			})
+		})
+
+		Describe("SetImage and GetImage", func() {
+			var retrievedImage jed.Image
+
+			BeforeEach(func() {
+				image = jed.Image{
+					Registry:   "registry.example.com",
+					Repository: "app/api",
+					Tag:        "v1",
+					Platforms: []jed.Platform{
+						{Name: "linux/amd64", Config: jed.ImageConfig{Os: "linux", Architecture: "amd64", User: "app"}},
+					},
+				}
+			})
+
+			JustBeforeEach(func() {
+				err = store.SetImage(ctx, image)
+			})
+
+			When("image is set successfully", func() {
+				It("should store and retrieve the image", func() {
+					Expect(err).NotTo(HaveOccurred())
+
+					retrievedImage, err = store.GetImage(ctx, "registry.example.com/app/api:v1")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(retrievedImage).To(Equal(image))
+				})
+			})
+
+			When("getting a non-existent image", func() {
+				It("should return NotFoundError", func() {
+					_, err = store.GetImage(ctx, "missing:latest")
+					Expect(err).To(HaveOccurred())
+
+					var notFound jed.NotFoundError
+					Expect(errors.As(err, &notFound)).To(BeTrue())
+					Expect(notFound.Kind).To(Equal("image"))
+					Expect(notFound.Name).To(Equal("missing:latest"))
+				})
+			})
+		})
+
+		Describe("DelImage", func() {
+			BeforeEach(func() {
+				image = jed.Image{Repository: "postgres", Tag: "16"}
+				err = store.SetImage(ctx, image)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			JustBeforeEach(func() {
+				err = store.DelImage(ctx, "postgres:16")
+			})
+
+			When("deleting an existing image", func() {
+				It("should remove the image", func() {
+					Expect(err).NotTo(HaveOccurred())
+
+					_, err = store.GetImage(ctx, "postgres:16")
+					Expect(err).To(HaveOccurred())
 				})
 			})
 		})

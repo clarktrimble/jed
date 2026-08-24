@@ -8,6 +8,7 @@ import (
 
 type fakeStore struct {
 	services map[string]jed.Service
+	images   map[string]jed.Image
 	envs     map[string]jed.Env
 	intents  map[string]jed.Intent
 }
@@ -15,6 +16,7 @@ type fakeStore struct {
 func newFakeStore() *fakeStore {
 	return &fakeStore{
 		services: map[string]jed.Service{},
+		images:   map[string]jed.Image{},
 		envs:     map[string]jed.Env{},
 		intents:  map[string]jed.Intent{},
 	}
@@ -57,6 +59,32 @@ func (s *fakeStore) AllServices(ctx context.Context) ([]jed.Service, error) {
 		services = append(services, svc)
 	}
 	return services, nil
+}
+
+func (s *fakeStore) GetImage(ctx context.Context, imageRef string) (jed.Image, error) {
+	image, ok := s.images[imageRef]
+	if !ok {
+		return jed.Image{}, jed.NotFoundError{Kind: "image", Name: imageRef}
+	}
+	return image, nil
+}
+
+func (s *fakeStore) SetImage(ctx context.Context, image jed.Image) error {
+	s.images[image.ImageRef()] = image
+	return nil
+}
+
+func (s *fakeStore) DelImage(ctx context.Context, imageRef string) error {
+	delete(s.images, imageRef)
+	return nil
+}
+
+func (s *fakeStore) Images(ctx context.Context) ([]jed.Image, error) {
+	images := make([]jed.Image, 0, len(s.images))
+	for _, image := range s.images {
+		images = append(images, image)
+	}
+	return images, nil
 }
 
 func (s *fakeStore) GetEnv(ctx context.Context, name string) (jed.Env, error) {

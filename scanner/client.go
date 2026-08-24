@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/clarktrimble/jed"
 	"github.com/pkg/errors"
 )
 
@@ -147,7 +148,7 @@ func (scanner *Scanner) getReferences(ctx context.Context, repository, tag strin
 	return
 }
 
-func (scanner *Scanner) getConfig(ctx context.Context, repository string, reference manifestReference) (cfg Config, err error) {
+func (scanner *Scanner) getConfig(ctx context.Context, repository string, reference manifestReference) (cfg jed.ImageConfig, err error) {
 	var mfst ociImageManifest
 	path := fmt.Sprintf("/v2/%s/manifests/%s", repository, reference.Digest)
 	err = scanner.client.SendObject(ctx, http.MethodGet, path, nil, &mfst)
@@ -162,7 +163,7 @@ func (scanner *Scanner) getConfig(ctx context.Context, repository string, refere
 		return
 	}
 
-	cfg = Config{
+	cfg = jed.ImageConfig{
 		Architecture: ociCfg.Architecture,
 		Os:           ociCfg.Os,
 		User:         ociCfg.Config.User,
@@ -174,7 +175,7 @@ func (scanner *Scanner) getConfig(ctx context.Context, repository string, refere
 	return
 }
 
-func platformFromConfig(cfg Config) string {
+func platformFromConfig(cfg jed.ImageConfig) string {
 	return platformFromSpec(ociPlatform{
 		Os:           cfg.Os,
 		Architecture: cfg.Architecture,

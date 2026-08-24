@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 
+	"github.com/clarktrimble/jed"
 	"github.com/clarktrimble/jed/logger"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -36,7 +37,7 @@ func New(client Client, logger logger.Logger) (scanner *Scanner, err error) {
 }
 
 // Scan scans a registry for image infos.
-func (scanner *Scanner) Scan(ctx context.Context) (images []Image, err error) {
+func (scanner *Scanner) Scan(ctx context.Context) (images []jed.Image, err error) {
 
 	repositories, err := scanner.getRepositories(ctx)
 	if err != nil {
@@ -52,7 +53,7 @@ func (scanner *Scanner) Scan(ctx context.Context) (images []Image, err error) {
 	return
 }
 
-func (scanner *Scanner) scanImages(ctx context.Context, repositories []string) (images []Image, err error) {
+func (scanner *Scanner) scanImages(ctx context.Context, repositories []string) (images []jed.Image, err error) {
 
 	tagses := make([][]string, len(repositories))
 
@@ -80,11 +81,11 @@ func (scanner *Scanner) scanImages(ctx context.Context, repositories []string) (
 	for _, tags := range tagses {
 		imageCount += len(tags)
 	}
-	images = make([]Image, 0, imageCount)
+	images = make([]jed.Image, 0, imageCount)
 
 	for i, repo := range repositories {
 		for _, tag := range tagses[i] {
-			images = append(images, Image{
+			images = append(images, jed.Image{
 				Registry:   scanner.registry,
 				Repository: repo,
 				Tag:        tag,
@@ -95,7 +96,7 @@ func (scanner *Scanner) scanImages(ctx context.Context, repositories []string) (
 	return
 }
 
-func (scanner *Scanner) addPlatforms(ctx context.Context, images []Image) (err error) {
+func (scanner *Scanner) addPlatforms(ctx context.Context, images []jed.Image) (err error) {
 
 	eg, groupCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(scanner.limit)
@@ -115,7 +116,7 @@ func (scanner *Scanner) addPlatforms(ctx context.Context, images []Image) (err e
 	return
 }
 
-func (scanner *Scanner) scanPlatforms(ctx context.Context, repository, tag string) (platforms []Platform, err error) {
+func (scanner *Scanner) scanPlatforms(ctx context.Context, repository, tag string) (platforms []jed.Platform, err error) {
 
 	references, err := scanner.getReferences(ctx, repository, tag)
 	if err != nil {
@@ -143,7 +144,7 @@ func (scanner *Scanner) scanPlatforms(ctx context.Context, repository, tag strin
 			continue
 		}
 
-		platforms = append(platforms, Platform{
+		platforms = append(platforms, jed.Platform{
 			Name:   platform,
 			Config: cfg,
 		})

@@ -24,6 +24,7 @@ var DefaultOpenTimeout = 2 * time.Second
 
 var (
 	servicesBucket   = []byte("services")
+	imagesBucket     = []byte("images")
 	envsBucket       = []byte("envs")
 	intentsBucket    = []byte("intents")
 	metaBucket       = []byte("meta")
@@ -84,6 +85,10 @@ func open(path string, timeout time.Duration, skipSchemaCheck bool) (str *Store,
 		if err != nil {
 			return err
 		}
+		_, err = tx.CreateBucketIfNotExists(imagesBucket)
+		if err != nil {
+			return err
+		}
 		_, err = tx.CreateBucketIfNotExists(envsBucket)
 		if err != nil {
 			return err
@@ -129,7 +134,7 @@ func checkSchemaVersion(tx *bbolt.Tx) error {
 }
 
 func storeIsEmpty(tx *bbolt.Tx) bool {
-	return tx.Bucket(servicesBucket).Stats().KeyN == 0 && tx.Bucket(envsBucket).Stats().KeyN == 0 && tx.Bucket(intentsBucket).Stats().KeyN == 0
+	return tx.Bucket(servicesBucket).Stats().KeyN == 0 && tx.Bucket(imagesBucket).Stats().KeyN == 0 && tx.Bucket(envsBucket).Stats().KeyN == 0 && tx.Bucket(intentsBucket).Stats().KeyN == 0
 }
 
 // Close closes the underlying database.
@@ -219,6 +224,69 @@ func (str *Store) AllServices(ctx context.Context) (services []jed.Service, err 
 		})
 	})
 	err = errors.Wrapf(err, "failed to list services")
+	return
+}
+
+// GetImage retrieves a scanned image by image ref.
+func (str *Store) GetImage(ctx context.Context, imageRef string) (image jed.Image, err error) {
+
+	err = str.db.View(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(imagesBucket)
+		data := bkt.Get([]byte(imageRef))
+		if data == nil {
+			return jed.NotFoundError{Kind: "image", Name: imageRef}
+		}
+		err := json.Unmarshal(data, &image)
+		err = errors.Wrapf(err, "failed to decode image")
+		return err
+	})
+	return
+}
+
+// SetImage creates or updates a scanned image.
+func (str *Store) SetImage(ctx context.Context, image jed.Image) (err error) {
+
+	data, err := json.Marshal(image)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to encode image")
+		return
+	}
+
+	err = str.db.Update(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(imagesBucket)
+		return bkt.Put([]byte(image.ImageRef()), data)
+	})
+
+	return
+}
+
+// DelImage removes a scanned image by image ref.
+func (str *Store) DelImage(ctx context.Context, imageRef string) (err error) {
+
+	err = str.db.Update(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(imagesBucket)
+		return bkt.Delete([]byte(imageRef))
+	})
+
+	return
+}
+
+// Images returns all scanned images.
+func (str *Store) Images(ctx context.Context) (images []jed.Image, err error) {
+
+	err = str.db.View(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(imagesBucket)
+		return bkt.ForEach(func(key, val []byte) error {
+			var image jed.Image
+			err := json.Unmarshal(val, &image)
+			if err != nil {
+				return errors.Wrapf(err, "failed to decode image")
+			}
+			images = append(images, image)
+			return nil
+		})
+	})
+	err = errors.Wrapf(err, "failed to list images")
 	return
 }
 

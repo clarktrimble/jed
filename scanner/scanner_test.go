@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/clarktrimble/jed"
 	"github.com/clarktrimble/jed/logger/loggertest"
 	"github.com/clarktrimble/jed/scanner"
 	"github.com/pkg/errors"
@@ -37,7 +38,7 @@ var _ = Describe("Scanner", func() {
 			routes      map[string][]byte
 			routeErrors map[string]error
 			scn         *scanner.Scanner
-			images      []scanner.Image
+			images      []jed.Image
 			err         error
 		)
 
@@ -113,7 +114,7 @@ var _ = Describe("Scanner", func() {
 				Expect(images[0].Repository).To(Equal("repo"))
 				Expect(images[0].Tag).To(Equal("indexed"))
 				Expect(platformNames(images[0].Platforms)).To(ConsistOf("linux/amd64", "linux/arm64", "linux/arm/v7"))
-				Expect(scanner.Images(images).Configs("linux/amd64")).To(Equal(map[string]scanner.Config{
+				Expect(jed.Images(images).Configs("linux/amd64")).To(Equal(map[string]jed.ImageConfig{
 					"registry.example.com/repo:indexed": {
 						Os:           "linux",
 						Architecture: "amd64",
@@ -303,7 +304,7 @@ func imageConfig(os, architecture string) []byte {
 	}`, os, architecture))
 }
 
-func platformNames(platforms []scanner.Platform) []string {
+func platformNames(platforms []jed.Platform) []string {
 	names := make([]string, len(platforms))
 	for i, platform := range platforms {
 		names[i] = platform.Name

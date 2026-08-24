@@ -1,9 +1,9 @@
-package scanner
+package jed
 
 import "strings"
 
-// Config is an image runtime config.
-type Config struct {
+// ImageConfig is an image config.
+type ImageConfig struct {
 	Architecture string            `json:"architecture"`
 	Os           string            `json:"os"`
 	User         string            `json:"user,omitempty"`
@@ -15,8 +15,8 @@ type Config struct {
 
 // Platform is an image platform and its config.
 type Platform struct {
-	Name   string `json:"name"`
-	Config Config `json:"config"`
+	Name   string      `json:"name"`
+	Config ImageConfig `json:"config"`
 }
 
 // Image is a scanned repository tag.
@@ -31,13 +31,13 @@ type Image struct {
 type Images []Image
 
 // Configs returns image refs and configs for a given platform.
-func (images Images) Configs(platformName string) map[string]Config {
-	configs := map[string]Config{}
+func (images Images) Configs(platformName string) map[string]ImageConfig {
+	configs := map[string]ImageConfig{}
 
 	for _, image := range images {
 		for _, imagePlatform := range image.Platforms {
 			if imagePlatform.Name == platformName {
-				configs[image.imageRef()] = imagePlatform.Config
+				configs[image.ImageRef()] = imagePlatform.Config
 				break
 			}
 		}
@@ -46,9 +46,8 @@ func (images Images) Configs(platformName string) map[string]Config {
 	return configs
 }
 
-// unexported
-
-func (image Image) imageRef() string {
+// ImageRef returns the Docker image ref.
+func (image Image) ImageRef() string {
 	parts := []string{}
 	if image.Registry != "" {
 		parts = append(parts, image.Registry)

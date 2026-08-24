@@ -18,6 +18,7 @@ import (
 type Store struct {
 	mu      sync.RWMutex
 	svcs    map[string]jed.Service
+	images  map[string]jed.Image
 	envs    map[string]jed.Env
 	intents map[string]jed.Intent
 }
@@ -26,6 +27,7 @@ type Store struct {
 func New() *Store {
 	return &Store{
 		svcs:    make(map[string]jed.Service),
+		images:  make(map[string]jed.Image),
 		envs:    make(map[string]jed.Env),
 		intents: make(map[string]jed.Intent),
 	}
@@ -84,6 +86,44 @@ func (s *Store) AllServices(ctx context.Context) ([]jed.Service, error) {
 	defer s.mu.RUnlock()
 
 	return slices.Collect(maps.Values(s.svcs)), nil
+}
+
+// GetImage retrieves a scanned image by image ref.
+func (s *Store) GetImage(ctx context.Context, imageRef string) (jed.Image, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	image, ok := s.images[imageRef]
+	if !ok {
+		return jed.Image{}, jed.NotFoundError{Kind: "image", Name: imageRef}
+	}
+	return image, nil
+}
+
+// SetImage persists a scanned image.
+func (s *Store) SetImage(ctx context.Context, image jed.Image) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.images[image.ImageRef()] = image
+	return nil
+}
+
+// DelImage removes a scanned image by image ref.
+func (s *Store) DelImage(ctx context.Context, imageRef string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.images, imageRef)
+	return nil
+}
+
+// Images retrieves all scanned images.
+func (s *Store) Images(ctx context.Context) ([]jed.Image, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return slices.Collect(maps.Values(s.images)), nil
 }
 
 // GetEnv retrieves environment variables for a service.
