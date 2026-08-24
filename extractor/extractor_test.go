@@ -88,6 +88,58 @@ var _ = Describe("Extractor", func() {
 		Expect(client.objectCalls[1].method).To(Equal("DELETE"))
 	})
 
+	When("the image ref includes a registry port", func() {
+		BeforeEach(func() {
+			imageRef = "localhost:5000/app:v1"
+			paths = []string{"/service.yml"}
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				switch method {
+				case "POST":
+					Expect(path).To(HavePrefix("/containers/create?name=jed-extract-"))
+					Expect(snd).To(Equal(map[string]string{"Image": "localhost:5000/app:v1"}))
+					rcv.(*struct {
+						Id string `json:"Id"`
+					}).Id = "abc123"
+				case "DELETE":
+					Expect(path).To(Equal("/containers/abc123"))
+				default:
+					return errors.Errorf("unexpected object request %s %s", method, path)
+				}
+				return nil
+			}
+			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+				Expect(body).To(BeNil())
+				switch method + " " + path {
+				case "POST /images/create?fromImage=localhost%3A5000%2Fapp&tag=v1":
+					return []byte(`{"status":"Image is up to date"}`), nil
+				case "GET /containers/abc123/archive?path=%2Fservice.yml":
+					return tarFile("service.yml", []byte("name: app\n")), nil
+				default:
+					return nil, errors.Errorf("unexpected json request %s %s", method, path)
+				}
+			}
+		})
+
+		It("splits the tag after the image name", func() {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(Equal(map[string][]byte{"/service.yml": []byte("name: app\n")}))
+			Expect(client.jsonCalls[0]).To(Equal(jsonCall{method: "POST", path: "/images/create?fromImage=localhost%3A5000%2Fapp&tag=v1"}))
+		})
+	})
+
+	When("no paths are requested", func() {
+		BeforeEach(func() {
+			paths = nil
+		})
+
+		It("returns an empty file map without calling Docker", func() {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(Equal(map[string][]byte{}))
+			Expect(client.jsonCalls).To(BeEmpty())
+			Expect(client.objectCalls).To(BeEmpty())
+		})
+	})
+
 	When("the image ref has no tag", func() {
 		BeforeEach(func() {
 			imageRef = "registry.example.com/app"
@@ -112,7 +164,7 @@ var _ = Describe("Extractor", func() {
 		})
 
 		It("still deletes the temporary container", func() {
-			Expect(err).To(MatchError("missing file"))
+			Expect(err).To(MatchError("missing file; cleanup err: <nil>"))
 			Expect(client.objectCalls).To(HaveLen(2))
 			Expect(client.objectCalls[1].method).To(Equal("DELETE"))
 		})

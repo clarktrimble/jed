@@ -33,6 +33,12 @@ func New(client Client) *Extractor {
 // Files extracts paths from imageRef using a temporary stopped container.
 func (extractor *Extractor) Files(ctx context.Context, imageRef string, paths ...string) (files map[string][]byte, err error) {
 
+	// Todo: revisit when we have real use from upstream
+	files = map[string][]byte{}
+	if len(paths) == 0 {
+		return
+	}
+
 	err = extractor.pull(ctx, imageRef)
 	if err != nil {
 		return
@@ -44,12 +50,13 @@ func (extractor *Extractor) Files(ctx context.Context, imageRef string, paths ..
 	}
 	defer func() {
 		deleteErr := extractor.delete(ctx, id)
-		if err == nil {
-			err = deleteErr
+		if err != nil || deleteErr != nil {
+			// somewhat awkward, but quite workable
+			err = errors.Errorf("%v; cleanup err: %v", err, deleteErr)
+			return
 		}
 	}()
 
-	files = map[string][]byte{}
 	for _, path := range paths {
 		files[path], err = extractor.file(ctx, id, path)
 		if err != nil {
@@ -59,6 +66,8 @@ func (extractor *Extractor) Files(ctx context.Context, imageRef string, paths ..
 
 	return
 }
+
+// unexported
 
 func (extractor *Extractor) pull(ctx context.Context, imageRef string) (err error) {
 
@@ -95,19 +104,17 @@ func (extractor *Extractor) delete(ctx context.Context, id string) error {
 	return extractor.client.SendObject(ctx, "DELETE", path, nil, nil)
 }
 
-func (extractor *Extractor) file(ctx context.Context, id, filePath string) ([]byte, error) {
+func (extractor *Extractor) file(ctx context.Context, id, filePath string) (file []byte, err error) {
 
 	path := fmt.Sprintf("/containers/%s/archive?path=%s", url.PathEscape(id), url.QueryEscape(filePath))
 	archive, err := extractor.client.SendJson(ctx, "GET", path, nil)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	file, err := readArchiveFile(archive)
-	if err != nil {
-		return nil, errors.Wrapf(err, "read archive for %s", filePath)
-	}
-	return file, nil
+	// Todo: ask giant for a way to get a reader in the first place
+	file, err = readArchiveFile(bytes.NewReader(archive))
+	return
 }
 
 func splitImageRef(imageRef string) (fromImage, tag string, err error) {
@@ -127,26 +134,35 @@ func splitImageRef(imageRef string) (fromImage, tag string, err error) {
 	return
 }
 
-func readArchiveFile(data []byte) ([]byte, error) {
+func readArchiveFile(reader io.Reader) (file []byte, err error) {
 
-	tr := tar.NewReader(bytes.NewReader(data))
+	// currently we return the first file if we were handed a dir
+	// Todo: consider validating, probably by examining X-Docker-Container-Path-Stat header in response
+	// Note: passing in reader here in case that helps bad archive
+
+	tr := tar.NewReader(reader)
+	var hdr *tar.Header
 
 	for {
-		hdr, err := tr.Next()
+		hdr, err = tr.Next()
 		if errors.Is(err, io.EOF) {
-			return nil, errors.New("archive contains no regular file")
+			err = errors.New("archive contains no regular file")
+			return
 		}
 		if err != nil {
-			return nil, err
+			err = errors.Wrapf(err, "failed to read tar header")
+			return
 		}
 		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
 
-		file, err := io.ReadAll(tr)
+		file, err = io.ReadAll(tr)
 		if err != nil {
-			return nil, err
+			err = errors.Wrapf(err, "failed to read file from archive")
+			return
 		}
-		return file, nil
+
+		return
 	}
 }
