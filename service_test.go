@@ -52,13 +52,21 @@ var _ = Describe("Service", func() {
 	})
 
 	Describe("JSON", func() {
-		It("uses lower-case field names for name and image", func() {
-			data, err := json.Marshal(jed.Service{Name: "app", Image: "app:v1", Network: "svc-net"})
+		It("uses lower-case field names for name, integration, and image", func() {
+			data, err := json.Marshal(jed.Service{Name: "app", Integration: "suite", Image: "app:v1", Network: "svc-net"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(data)).To(ContainSubstring(`"name":"app"`))
+			Expect(string(data)).To(ContainSubstring(`"integration":"suite"`))
 			Expect(string(data)).To(ContainSubstring(`"image":"app:v1"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Name"`))
+			Expect(string(data)).NotTo(ContainSubstring(`"Integration"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Image"`))
+		})
+
+		It("omits empty integration", func() {
+			data, err := json.Marshal(jed.Service{Name: "app", Image: "app:v1"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(data)).NotTo(ContainSubstring(`"integration"`))
 		})
 
 		It("accepts restart as a string", func() {

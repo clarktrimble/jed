@@ -84,7 +84,7 @@ var _ = Describe("API", func() {
 			payload := map[string]any{
 				"schema": jed.DBSchemaVersion,
 				"services": []jed.Service{
-					{Name: "web", Image: "nginx:latest", Network: "backend", Ports: map[string]string{}, Labels: map[string]string{}, Volumes: map[string]string{}},
+					{Name: "web", Integration: "frontend", Image: "nginx:latest", Network: "backend", Ports: map[string]string{}, Labels: map[string]string{}, Volumes: map[string]string{}},
 				},
 				"envs": []jed.Env{
 					{Name: "web"},
@@ -104,6 +104,7 @@ var _ = Describe("API", func() {
 			ctx := context.Background()
 			service, err := j.Store().GetService(ctx, "web", "nginx:latest")
 			Expect(err).NotTo(HaveOccurred())
+			Expect(service.Integration).To(Equal("frontend"))
 			Expect(service.Network).To(Equal("backend"))
 			env, err := j.Store().GetEnv(ctx, "web")
 			Expect(err).NotTo(HaveOccurred())
@@ -161,11 +162,12 @@ var _ = Describe("API", func() {
 	Describe("service routes", func() {
 		It("sets, gets, lists, and deletes services", func() {
 			service := jed.Service{
-				Image:   "nginx:latest",
-				Ports:   map[string]string{},
-				Labels:  map[string]string{},
-				Volumes: map[string]string{},
-				Network: "backend",
+				Integration: "frontend",
+				Image:       "nginx:latest",
+				Ports:       map[string]string{},
+				Labels:      map[string]string{},
+				Volumes:     map[string]string{},
+				Network:     "backend",
 			}
 
 			res = doJSON(rtr, http.MethodPut, "/store/services/web", service)
@@ -176,6 +178,7 @@ var _ = Describe("API", func() {
 			var got jed.Service
 			decodeJSON(res, &got)
 			Expect(got.Name).To(Equal("web"))
+			Expect(got.Integration).To(Equal(service.Integration))
 			Expect(got.Image).To(Equal(service.Image))
 
 			res = doRequest(rtr, http.MethodGet, "/store/services", nil)

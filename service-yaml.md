@@ -6,6 +6,7 @@ Define a `jed.Service` for deployment.
 
 ```yaml
 name: reauth-acp
+integration: aruba
 image: local/reauth-acp:3c070f2
 
 restart: on-failure
@@ -40,6 +41,7 @@ resources:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Service name |
+| `integration` | no | Group name for related services |
 | `image` | yes | Docker image with tag |
 | `about` | no | User-facing description, links, and notes |
 | `network` | no | Swarm network name; defaulted to `svc-net` |

@@ -122,6 +122,8 @@ type About struct {
 type Service struct {
 	// Name is the service name (e.g., "postgres").
 	Name string `json:"name"`
+	// Integration identifies a group of related services.
+	Integration string `json:"integration,omitempty"`
 	// Image is the Docker image (e.g., "postgres:16").
 	Image string `json:"image"`
 	// Command overrides the image's default command (e.g., ["sleep", "3600"]).
