@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -118,12 +119,38 @@ type About struct {
 //   Restart is weird
 //   Etc.
 
+// Integration identifies the integration and version a service belongs to.
+type Integration struct {
+	// Name is the integration slug (e.g., "aruba-acp").
+	Name string `json:"name"`
+	// Version is the integration version (e.g., "v1.2.3").
+	Version string `json:"version"`
+}
+
+// Validate checks that the integration has valid configuration.
+func (integration *Integration) Validate() error {
+	if integration == nil {
+		return nil
+	}
+	var issues []string
+	if !validSlug(integration.Name) {
+		issues = append(issues, fmt.Sprintf("name %q must be a valid integration slug", integration.Name))
+	}
+	if !validVersion(integration.Version) {
+		issues = append(issues, fmt.Sprintf("version %q must be a valid integration version", integration.Version))
+	}
+	if len(issues) > 0 {
+		return errors.Errorf("integration invalid: %s", strings.Join(issues, ", "))
+	}
+	return nil
+}
+
 // Service is a service's configuration.
 type Service struct {
 	// Name is the service name (e.g., "postgres").
 	Name string `json:"name"`
-	// Integration identifies a group of related services.
-	Integration string `json:"integration,omitempty"`
+	// Integration identifies the integration and version this service belongs to.
+	Integration *Integration `json:"integration,omitempty" expand:"exclude"`
 	// Image is the Docker image (e.g., "postgres:16").
 	Image string `json:"image"`
 	// Command overrides the image's default command (e.g., ["sleep", "3600"]).
@@ -196,6 +223,10 @@ func (service Service) Validate() error {
 	if service.Name == "" {
 		issues = append(issues, "name is required")
 	}
+	err := service.Integration.Validate()
+	if err != nil {
+		issues = append(issues, err.Error())
+	}
 	if service.User != "" && !validUser(service.User) {
 		issues = append(issues, fmt.Sprintf("user %q must be uid or uid:gid with numeric values or {{VAR}} templates", service.User))
 	}
@@ -235,6 +266,40 @@ func (service Service) Validate() error {
 func validateLocalVolume(volume string) error {
 	_, err := cleanLocalPath("local volume", volume)
 	return err
+}
+
+// validVersion accepts full semantic versions with a leading v,
+// e.g. v1.2.3, using x/mod/semver for prerelease/build validation.
+func validVersion(s string) bool {
+	if !semver.IsValid(s) {
+		return false
+	}
+	core := s
+	if i := strings.IndexAny(core, "-+"); i >= 0 {
+		core = core[:i]
+	}
+	return strings.Count(core, ".") == 2
+}
+
+// validSlug accepts lower-case alnum segments separated by single hyphens.
+func validSlug(s string) bool {
+	if s == "" {
+		return false
+	}
+	lastHyphen := false
+	for i, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+			lastHyphen = false
+		case r >= '0' && r <= '9':
+			lastHyphen = false
+		case r == '-' && i > 0 && !lastHyphen:
+			lastHyphen = true
+		default:
+			return false
+		}
+	}
+	return !lastHyphen
 }
 
 func validUser(user string) bool {

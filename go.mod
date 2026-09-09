@@ -13,6 +13,8 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/pkg/errors v0.9.1
 	go.etcd.io/bbolt v1.4.3
+	golang.org/x/mod v0.27.0
+	golang.org/x/sync v0.16.0
 	golang.org/x/term v0.40.0
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -30,9 +32,7 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect

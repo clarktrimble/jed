@@ -53,10 +53,10 @@ var _ = Describe("Service", func() {
 
 	Describe("JSON", func() {
 		It("uses lower-case field names for name, integration, and image", func() {
-			data, err := json.Marshal(jed.Service{Name: "app", Integration: "suite", Image: "app:v1", Network: "svc-net"})
+			data, err := json.Marshal(jed.Service{Name: "app", Integration: &jed.Integration{Name: "suite", Version: "v1.2.3"}, Image: "app:v1", Network: "svc-net"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(data)).To(ContainSubstring(`"name":"app"`))
-			Expect(string(data)).To(ContainSubstring(`"integration":"suite"`))
+			Expect(string(data)).To(ContainSubstring(`"integration":{"name":"suite","version":"v1.2.3"}`))
 			Expect(string(data)).To(ContainSubstring(`"image":"app:v1"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Name"`))
 			Expect(string(data)).NotTo(ContainSubstring(`"Integration"`))
@@ -101,6 +101,25 @@ var _ = Describe("Service", func() {
 			err := svc.Validate()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("restart"))
+		})
+
+		It("accepts nil and valid integrations", func() {
+			Expect(jed.Service{Name: "app", Image: "app:v1"}.Validate()).To(Succeed())
+			Expect(jed.Service{Name: "app", Image: "app:v1", Integration: &jed.Integration{Name: "foo2-bar", Version: "v1.2.3-alpha.1+build.7"}}.Validate()).To(Succeed())
+		})
+
+		It("rejects invalid integration names", func() {
+			for _, name := range []string{"", "Foo", "foo_bar", "-foo", "foo-", "foo--bar"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Integration: &jed.Integration{Name: name, Version: "v1.2.3"}}
+				Expect(svc.Validate()).NotTo(Succeed(), name)
+			}
+		})
+
+		It("rejects invalid integration versions", func() {
+			for _, version := range []string{"", "1.2.3", "v1", "v1.2", "latest", ">=v1.2.3"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", Integration: &jed.Integration{Name: "foo", Version: version}}
+				Expect(svc.Validate()).NotTo(Succeed(), version)
+			}
 		})
 
 		It("allows numeric and templated user values before render", func() {

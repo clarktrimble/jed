@@ -6,7 +6,9 @@ Define a `jed.Service` for deployment.
 
 ```yaml
 name: reauth-acp
-integration: aruba
+integration:
+  name: aruba
+  version: v1.2.3
 image: local/reauth-acp:3c070f2
 
 restart: on-failure
@@ -41,7 +43,7 @@ resources:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Service name |
-| `integration` | no | Group name for related services |
+| `integration` | no | Integration name and version |
 | `image` | yes | Docker image with tag |
 | `about` | no | User-facing description, links, and notes |
 | `network` | no | Swarm network name; defaulted to `svc-net` |
@@ -59,9 +61,19 @@ resources:
 | `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1001` |
 | `traefik` | no | Traefik routing config; generates labels automatically |
 
+## Integration
+
+`integration` identifies the integration name and version shared by related services. `name` must be an integration slug using lower-case letters, digits, and single hyphens, e.g. `aruba` or `reauth-acp`. `version` must be a full semantic version with a leading `v`, e.g. `v1.2.3`.
+
+```yaml
+integration:
+  name: reauth-acp
+  version: v1.0.13
+```
+
 ## Template Expansion
 
-Any string value in a service definition may contain `{{VAR}}` placeholders. They are rendered by `jed.Jed.Spec` before runtime deploy.
+String values in a service definition may contain `{{VAR}}` placeholders. They are rendered by `jed.Jed.Spec` before runtime deploy. Integration fields are literal metadata: they are validated before rendering and are not template-expanded.
 
 ```yaml
 command:

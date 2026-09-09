@@ -18,8 +18,9 @@ type Spec struct {
 	Intent Intent `json:"intent"`
 }
 
-// render substitutes {{VAR}} placeholders in all string values of service and env,
-// returning a rendered Spec. The global vars are not copied into the rendered Env.
+// render substitutes {{VAR}} placeholders in string values of service and env,
+// excluding fields tagged expand:"exclude", and returns a rendered Spec. The
+// global vars are not copied into the rendered Env.
 // An error is returned from expandStrings iff a value contains a {{name}} placeholder
 // (opening and closing braces) whose name has no matching var; an unmatched {{ is left as-is.
 func render(service Service, env Env, globalVars map[string]string) (Spec, error) {
@@ -63,6 +64,10 @@ func cloneService(service Service) Service {
 	clone.About.Links = slices.Clone(service.About.Links)
 	clone.About.Notes = slices.Clone(service.About.Notes)
 
+	if service.Integration != nil {
+		integration := *service.Integration
+		clone.Integration = &integration
+	}
 	if service.Traefik != nil {
 		traefik := *service.Traefik
 		clone.Traefik = &traefik
@@ -95,6 +100,9 @@ func expandStrings(v reflect.Value, vars map[string]string) error {
 		return expandStrings(v.Elem(), vars)
 	case reflect.Struct:
 		for i := range v.NumField() {
+			if v.Type().Field(i).Tag.Get("expand") == "exclude" {
+				continue
+			}
 			field := v.Field(i)
 			if !field.CanSet() {
 				continue
