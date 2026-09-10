@@ -84,7 +84,7 @@ var _ = Describe("API", func() {
 			payload := map[string]any{
 				"schema": jed.DBSchemaVersion,
 				"services": []jed.Service{
-					{Name: "web", Integration: &jed.Integration{Name: "frontend", Version: "v1.2.3"}, Image: "nginx:latest", Network: "backend", Ports: map[string]string{}, Labels: map[string]string{}, Volumes: map[string]string{}},
+					{Name: "web", Integration: &jed.Integration{Name: "frontend", Versions: []string{"v1.10.0", "v1.2.3"}}, Image: "nginx:latest", Network: "backend", Ports: map[string]string{}, Labels: map[string]string{}, Volumes: map[string]string{}},
 				},
 				"envs": []jed.Env{
 					{Name: "web"},
@@ -104,7 +104,7 @@ var _ = Describe("API", func() {
 			ctx := context.Background()
 			service, err := j.Store().GetService(ctx, "web", "nginx:latest")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(service.Integration).To(Equal(&jed.Integration{Name: "frontend", Version: "v1.2.3"}))
+			Expect(service.Integration).To(Equal(&jed.Integration{Name: "frontend", Versions: []string{"v1.10.0", "v1.2.3"}}))
 			Expect(service.Network).To(Equal("backend"))
 			env, err := j.Store().GetEnv(ctx, "web")
 			Expect(err).NotTo(HaveOccurred())
@@ -162,7 +162,7 @@ var _ = Describe("API", func() {
 	Describe("service routes", func() {
 		It("sets, gets, lists, and deletes services", func() {
 			service := jed.Service{
-				Integration: &jed.Integration{Name: "frontend", Version: "v1.2.3"},
+				Integration: &jed.Integration{Name: "frontend", Versions: []string{"v1.10.0", "v1.2.3"}},
 				Image:       "nginx:latest",
 				Ports:       map[string]string{},
 				Labels:      map[string]string{},

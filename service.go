@@ -119,12 +119,12 @@ type About struct {
 //   Restart is weird
 //   Etc.
 
-// Integration identifies the integration and version a service belongs to.
+// Integration identifies the integration and versions a service belongs to.
 type Integration struct {
 	// Name is the integration slug (e.g., "aruba-acp").
 	Name string `json:"name"`
-	// Version is the integration version (e.g., "v1.2.3").
-	Version string `json:"version"`
+	// Versions are the integration versions (e.g., "v1.2.3").
+	Versions []string `json:"versions"`
 }
 
 // Validate checks that the integration has valid configuration.
@@ -136,8 +136,18 @@ func (integration *Integration) Validate() error {
 	if !validSlug(integration.Name) {
 		issues = append(issues, fmt.Sprintf("name %q must be a valid integration slug", integration.Name))
 	}
-	if !validVersion(integration.Version) {
-		issues = append(issues, fmt.Sprintf("version %q must be a valid integration version", integration.Version))
+	if len(integration.Versions) == 0 {
+		issues = append(issues, "versions are required")
+	}
+	seen := map[string]struct{}{}
+	for _, version := range integration.Versions {
+		if !validVersion(version) {
+			issues = append(issues, fmt.Sprintf("version %q must be a valid integration version", version))
+		}
+		if _, ok := seen[version]; ok {
+			issues = append(issues, fmt.Sprintf("version %q is duplicated", version))
+		}
+		seen[version] = struct{}{}
 	}
 	if len(issues) > 0 {
 		return errors.Errorf("integration invalid: %s", strings.Join(issues, ", "))
@@ -145,11 +155,28 @@ func (integration *Integration) Validate() error {
 	return nil
 }
 
+// Latest returns the greatest integration version by semantic-version comparison.
+func (integration *Integration) Latest() (string, bool) {
+
+	// Todo: look at early validation, not just for Integration, but generally in jed
+
+	if integration == nil || len(integration.Versions) == 0 {
+		return "", false
+	}
+	latest := integration.Versions[0]
+	for _, version := range integration.Versions[1:] {
+		if semver.Compare(version, latest) > 0 {
+			latest = version
+		}
+	}
+	return latest, true
+}
+
 // Service is a service's configuration.
 type Service struct {
 	// Name is the service name (e.g., "postgres").
 	Name string `json:"name"`
-	// Integration identifies the integration and version this service belongs to.
+	// Integration identifies the integration and versions this service belongs to.
 	Integration *Integration `json:"integration,omitempty" expand:"exclude"`
 	// Image is the Docker image (e.g., "postgres:16").
 	Image string `json:"image"`

@@ -8,7 +8,7 @@ func TestRenderSkipsIntegration(t *testing.T) {
 	// template-looking integration values far enough to prove expand:"exclude" behavior.
 	svc := Service{
 		Name:        "app",
-		Integration: &Integration{Name: "infra", Version: "v1.2.3+{{BUILD}}"},
+		Integration: &Integration{Name: "infra", Versions: []string{"v1.2.3+{{BUILD}}"}},
 		Image:       "app:{{TAG}}",
 	}
 
@@ -22,7 +22,7 @@ func TestRenderSkipsIntegration(t *testing.T) {
 	if spec.Service.Integration == nil {
 		t.Fatal("integration is nil")
 	}
-	if spec.Service.Integration.Version != "v1.2.3+{{BUILD}}" {
-		t.Fatalf("integration version = %q, want unrendered template", spec.Service.Integration.Version)
+	if got := spec.Service.Integration.Versions; len(got) != 1 || got[0] != "v1.2.3+{{BUILD}}" {
+		t.Fatalf("integration versions = %q, want unrendered template", got)
 	}
 }

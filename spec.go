@@ -50,6 +50,7 @@ func render(service Service, env Env, globalVars map[string]string) (Spec, error
 	}, nil
 }
 
+// Todo: prolly receive Service here
 func cloneService(service Service) Service {
 	clone := service
 	clone.Command = slices.Clone(service.Command)
@@ -66,6 +67,7 @@ func cloneService(service Service) Service {
 
 	if service.Integration != nil {
 		integration := *service.Integration
+		integration.Versions = slices.Clone(service.Integration.Versions)
 		clone.Integration = &integration
 	}
 	if service.Traefik != nil {

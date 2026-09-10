@@ -482,7 +482,7 @@ var _ = Describe("Jed", func() {
 
 		When("service strings throughout reference vars", func() {
 			BeforeEach(func() {
-				svc.Integration = &jed.Integration{Name: "infra", Version: "v1.2.3"}
+				svc.Integration = &jed.Integration{Name: "infra", Versions: []string{"v1.2.3"}}
 				svc.Image = "postgres:{{PG_VERSION}}"
 				svc.Network = "{{NETWORK}}"
 				svc.User = "1000:{{DOCKER_GID}}"
@@ -523,7 +523,7 @@ var _ = Describe("Jed", func() {
 
 			It("expands vars throughout service strings", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(spec.Service.Integration).To(Equal(&jed.Integration{Name: "infra", Version: "v1.2.3"}))
+				Expect(spec.Service.Integration).To(Equal(&jed.Integration{Name: "infra", Versions: []string{"v1.2.3"}}))
 				Expect(spec.Service.Image).To(Equal("postgres:16"))
 				Expect(spec.Service.Network).To(Equal("prod-net"))
 				Expect(spec.Service.User).To(Equal("1000:967"))

@@ -8,7 +8,8 @@ Define a `jed.Service` for deployment.
 name: reauth-acp
 integration:
   name: aruba
-  version: v1.2.3
+  versions:
+    - v1.2.3
 image: local/reauth-acp:3c070f2
 
 restart: on-failure
@@ -43,7 +44,7 @@ resources:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Service name |
-| `integration` | no | Integration name and version |
+| `integration` | no | Integration name and versions |
 | `image` | yes | Docker image with tag |
 | `about` | no | User-facing description, links, and notes |
 | `network` | no | Swarm network name; defaulted to `svc-net` |
@@ -63,12 +64,13 @@ resources:
 
 ## Integration
 
-`integration` identifies the integration name and version shared by related services. `name` must be an integration slug using lower-case letters, digits, and single hyphens, e.g. `aruba` or `reauth-acp`. `version` must be a full semantic version with a leading `v`, e.g. `v1.2.3`.
+`integration` identifies the integration name and versions shared by related services. `name` must be an integration slug using lower-case letters, digits, and single hyphens, e.g. `aruba` or `reauth-acp`. `versions` must contain one or more full semantic versions with leading `v`, e.g. `v1.2.3`. Duplicates are rejected.
 
 ```yaml
 integration:
   name: reauth-acp
-  version: v1.0.13
+  versions:
+    - v1.0.13
 ```
 
 ## Template Expansion
