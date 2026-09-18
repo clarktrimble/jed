@@ -34,8 +34,11 @@ const (
 type Traefik struct {
 	// Port is the container port that traefik should route traffic to.
 	Port string `json:"port"`
-	// PathPrefixStrip enables stripping the matched path prefix before forwarding.
-	PathPrefixStrip bool `json:"path_prefix_strip,omitempty"`
+	// PreservePathPrefix keeps the matched path prefix when forwarding. By default,
+	// Traefik strips the prefix.
+	PreservePathPrefix bool `json:"preserve_path_prefix,omitempty"`
+	// BypassAuth omits the shared ingress authentication middleware.
+	BypassAuth bool `json:"bypass_auth,omitempty"`
 }
 
 // Resources specifies CPU and memory limits and reservations.

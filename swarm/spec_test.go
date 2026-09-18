@@ -285,10 +285,10 @@ var _ = Describe("Spec", func() {
 		})
 	})
 
-	Describe("with traefik config and strip", func() {
+	Describe("with traefik config", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
-			svc.Traefik = &jed.Traefik{Port: "8080", PathPrefixStrip: true}
+			svc.Traefik = &jed.Traefik{Port: "8080"}
 		})
 
 		It("generates traefik labels", func() {
@@ -299,26 +299,53 @@ var _ = Describe("Spec", func() {
 			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
 			Expect(labels["traefik.http.routers.reauth-acp.entrypoints"]).To(Equal("websecure"))
 			Expect(labels["traefik.http.routers.reauth-acp.tls"]).To(Equal("true"))
-			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal("reauth-acp-strip"))
+			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal("ingress-auth,reauth-acp-strip"))
 			Expect(labels["traefik.http.middlewares.reauth-acp-strip.stripprefix.prefixes"]).To(Equal("/reauth-acp"))
 			Expect(labels["traefik.http.services.reauth-acp.loadbalancer.server.port"]).To(Equal("8080"))
 		})
 	})
 
-	Describe("with traefik config no strip", func() {
+	Describe("with traefik config preserving the path prefix", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
-			svc.Traefik = &jed.Traefik{Port: "8080"}
+			svc.Traefik = &jed.Traefik{Port: "8080", PreservePathPrefix: true}
 		})
 
-		It("does not include strip middleware", func() {
+		It("includes auth but not strip middleware", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			labels := body.Labels
 			Expect(labels["traefik.enable"]).To(Equal("true"))
 			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
-			Expect(labels).NotTo(HaveKey("traefik.http.routers.reauth-acp.middlewares"))
+			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal("ingress-auth"))
 			Expect(labels).NotTo(HaveKey("traefik.http.middlewares.reauth-acp-strip.stripprefix.prefixes"))
+		})
+	})
+
+	Describe("with traefik config bypassing auth", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Traefik = &jed.Traefik{Port: "8080", BypassAuth: true}
+		})
+
+		It("includes strip but not auth middleware", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			labels := body.Labels
+			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal("reauth-acp-strip"))
+			Expect(labels["traefik.http.middlewares.reauth-acp-strip.stripprefix.prefixes"]).To(Equal("/reauth-acp"))
+		})
+	})
+
+	Describe("with traefik config bypassing auth and preserving the path prefix", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Traefik = &jed.Traefik{Port: "8080", BypassAuth: true, PreservePathPrefix: true}
+		})
+
+		It("does not include middleware", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(body.Labels).NotTo(HaveKey("traefik.http.routers.reauth-acp.middlewares"))
 		})
 	})
 
@@ -329,6 +356,7 @@ var _ = Describe("Spec", func() {
 			svc.Labels = map[string]string{
 				"custom.label":   "custom-value",
 				"traefik.enable": "false",
+				"traefik.http.routers.reauth-acp.middlewares": "",
 			}
 		})
 
@@ -338,6 +366,7 @@ var _ = Describe("Spec", func() {
 			labels := body.Labels
 			Expect(labels["custom.label"]).To(Equal("custom-value"))
 			Expect(labels["traefik.enable"]).To(Equal("false"))
+			Expect(labels["traefik.http.routers.reauth-acp.middlewares"]).To(Equal(""))
 			Expect(labels["traefik.http.routers.reauth-acp.rule"]).To(Equal("PathPrefix(`/reauth-acp`)"))
 		})
 	})

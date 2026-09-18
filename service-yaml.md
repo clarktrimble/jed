@@ -177,7 +177,6 @@ When `traefik` is present, routing labels are generated automatically for PathPr
 ```yaml
 traefik:
   port: "8080"
-  path_prefix_strip: true
 ```
 
 Generated labels include:
@@ -188,9 +187,29 @@ labels:
   traefik.http.routers.{name}.rule: "PathPrefix(`/{name}`)"
   traefik.http.routers.{name}.entrypoints: "websecure"
   traefik.http.routers.{name}.tls: "true"
-  traefik.http.routers.{name}.middlewares: "{name}-strip"
+  traefik.http.routers.{name}.middlewares: "ingress-auth,{name}-strip"
   traefik.http.middlewares.{name}-strip.stripprefix.prefixes: "/{name}"
   traefik.http.services.{name}.loadbalancer.server.port: "{port}"
 ```
 
-Explicit labels in `labels:` take precedence over generated Traefik labels.
+`ingress-auth` is a shared middleware declared by Traefik; jed only references it. By default, jed strips the matched path prefix after applying auth. To preserve it instead:
+
+```yaml
+traefik:
+  port: "8080"
+  preserve_path_prefix: true
+```
+
+When preserving the prefix, the router middleware label is `ingress-auth` and no strip middleware is generated.
+
+To bypass the shared ingress authentication middleware:
+
+```yaml
+traefik:
+  port: "8080"
+  bypass_auth: true
+```
+
+This still generates the strip middleware unless `preserve_path_prefix` is also true.
+
+Explicit labels in `labels:` take precedence over generated Traefik labels. Set `traefik.http.routers.{name}.middlewares` explicitly (including to an empty value) to supply custom middleware.
