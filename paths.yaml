@@ -274,6 +274,12 @@ paths:
                   status:
                     type: string
                     example: ok
+        '409':
+          description: Service image is currently referenced by intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:

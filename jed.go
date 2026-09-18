@@ -89,6 +89,16 @@ func (err NotFoundError) Error() string {
 	return fmt.Sprintf("%s not found: %s", err.Kind, err.Name)
 }
 
+// ActiveServiceError reports an attempt to delete the service image named by intent.
+type ActiveServiceError struct {
+	Name  string
+	Image string
+}
+
+func (err ActiveServiceError) Error() string {
+	return fmt.Sprintf("cannot delete active service %q with image %q", err.Name, err.Image)
+}
+
 // Env holds named environment variables for a service.
 //
 // Env entries are stored separately from Service definitions so sensitive or
@@ -168,6 +178,28 @@ func (j *Jed) Enable(ctx context.Context, name, image string) (err error) {
 
 	err = j.store.SetIntent(ctx, intent)
 	return
+}
+
+// DeleteService removes a stored service definition unless the current intent refers to it.
+func (j *Jed) DeleteService(ctx context.Context, name, image string) (err error) {
+
+	// Todo: Make this intent check and deletion an atomic conditional store operation.
+	// Todo: Deal with the name embedded in image thing; not a local concern, but noting it somewhere.
+	// Todo: Decide whether deleting a missing service is idempotent or returns NotFoundError.
+
+	intent, err := j.store.GetIntent(ctx, name)
+	if err == nil && intent.Image == image {
+		// an intent exists for this image, oops
+		return ActiveServiceError{Name: name, Image: image}
+	}
+	if err != nil {
+		var notFound NotFoundError
+		if !errors.As(err, &notFound) {
+			return err
+		}
+	}
+
+	return j.store.DelService(ctx, name, image)
 }
 
 // Disable removes the enabled intent for service name.

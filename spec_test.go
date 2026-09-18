@@ -174,6 +174,42 @@ var _ = Describe("Jed", func() {
 		})
 	})
 
+	Describe("DeleteService", func() {
+		var (
+			ctx   context.Context
+			store *fakeStore
+			j     *jed.Jed
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			store = newFakeStore()
+			j = (&jed.Config{VarsEnvName: "_global"}).New(store, loggertest.NewLoggerMock())
+			Expect(store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v1"})).To(Succeed())
+			Expect(store.SetService(ctx, jed.Service{Name: "app", Image: "local/app:v2"})).To(Succeed())
+		})
+
+		It("rejects deletion of the image named by intent", func() {
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1"}
+
+			err := j.DeleteService(ctx, "app", "local/app:v1")
+			Expect(err).To(MatchError(jed.ActiveServiceError{Name: "app", Image: "local/app:v1"}))
+			Expect(store.services).To(HaveKey("app\x00local/app:v1"))
+		})
+
+		It("allows deletion of an inactive image", func() {
+			store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:v1"}
+
+			Expect(j.DeleteService(ctx, "app", "local/app:v2")).To(Succeed())
+			Expect(store.services).NotTo(HaveKey("app\x00local/app:v2"))
+		})
+
+		It("allows deletion when there is no intent", func() {
+			Expect(j.DeleteService(ctx, "app", "local/app:v1")).To(Succeed())
+			Expect(store.services).NotTo(HaveKey("app\x00local/app:v1"))
+		})
+	})
+
 	Describe("Spec", func() {
 		var (
 			ctx   context.Context

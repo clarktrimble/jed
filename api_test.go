@@ -194,6 +194,18 @@ var _ = Describe("API", func() {
 			Expect(res).To(HaveHTTPStatus(http.StatusNotFound))
 		})
 
+		It("rejects deletion of the image named by intent", func() {
+			ctx := context.Background()
+			Expect(j.Store().SetService(ctx, jed.Service{Name: "web", Image: "nginx:latest"})).To(Succeed())
+			Expect(j.Store().SetIntent(ctx, jed.Intent{Name: "web", Image: "nginx:latest"})).To(Succeed())
+
+			res = doRequest(rtr, http.MethodDelete, "/store/services/web?image=nginx:latest", nil)
+			Expect(res).To(HaveHTTPStatus(http.StatusConflict))
+
+			_, err := j.Store().GetService(ctx, "web", "nginx:latest")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("rejects name mismatches", func() {
 			service := jed.Service{Name: "api", Image: "nginx:latest", Network: "backend"}
 			res = doJSON(rtr, http.MethodPut, "/store/services/web", service)
