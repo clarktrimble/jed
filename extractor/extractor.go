@@ -34,30 +34,85 @@ func New(client Client, logger logger.Logger) *Extractor {
 
 // Files extracts paths from imageRef using a temporary stopped container.
 func (extractor *Extractor) Files(ctx context.Context, imageRef string, paths ...string) (files map[string][]byte, err error) {
-
-	// Todo: revisit when we have real use from upstream
 	files = map[string][]byte{}
 	if len(paths) == 0 {
 		return
 	}
 
 	extractor.logger.Debug(ctx, "extracting files from image", "ref", imageRef, "count", len(paths))
-
-	err = extractor.pull(ctx, imageRef)
-	if err != nil {
+	if err = extractor.pull(ctx, imageRef); err != nil {
 		return
 	}
+
+	return extractor.files(ctx, imageRef, paths)
+}
+
+// LabelFiles extracts files named by labels on imageRef. Each requested label's
+// value is treated as a file path, and the returned map is keyed by label name.
+// Missing or empty labels are omitted. For example:
+//
+//	files, err := extractor.LabelFiles(ctx, "registry.example.com/app:v1", "com.example.env")
+func (extractor *Extractor) LabelFiles(ctx context.Context, imageRef string, labels ...string) (files map[string][]byte, err error) {
+	files = map[string][]byte{}
+	if len(labels) == 0 {
+		return
+	}
+
+	extractor.logger.Debug(ctx, "extracting label files from image", "ref", imageRef, "count", len(labels))
+	if err = extractor.pull(ctx, imageRef); err != nil {
+		return
+	}
+
+	image, err := extractor.inspect(ctx, imageRef)
+	if err != nil {
+		return nil, err
+	}
+
+	pathsByLabel := make(map[string]string, len(labels))
+	for _, label := range labels {
+		if path := image.Labels[label]; path != "" {
+			pathsByLabel[label] = path
+		}
+	}
+	if len(pathsByLabel) == 0 {
+		return files, nil
+	}
+
+	paths := make([]string, 0, len(pathsByLabel))
+	seenPaths := make(map[string]bool, len(pathsByLabel))
+	for _, path := range pathsByLabel {
+		if !seenPaths[path] {
+			paths = append(paths, path)
+			seenPaths[path] = true
+		}
+	}
+
+	contents, err := extractor.files(ctx, image.ID, paths)
+	if err != nil {
+		return nil, err
+	}
+	for label, path := range pathsByLabel {
+		files[label] = contents[path]
+	}
+	return files, nil
+}
+
+type image struct {
+	ID     string
+	Labels map[string]string
+}
+
+func (extractor *Extractor) files(ctx context.Context, imageRef string, paths []string) (files map[string][]byte, err error) {
+	files = make(map[string][]byte, len(paths))
 
 	id, err := extractor.create(ctx, imageRef)
 	if err != nil {
 		return
 	}
 	defer func() {
-		deleteErr := extractor.delete(ctx, id)
+		deleteErr := extractor.delete(context.WithoutCancel(ctx), id)
 		if err != nil || deleteErr != nil {
-			// somewhat awkward, but quite workable
 			err = errors.Errorf("%v; cleanup err: %v", err, deleteErr)
-			return
 		}
 	}()
 
@@ -67,7 +122,6 @@ func (extractor *Extractor) Files(ctx context.Context, imageRef string, paths ..
 			return
 		}
 	}
-
 	return
 }
 
@@ -85,6 +139,24 @@ func (extractor *Extractor) pull(ctx context.Context, imageRef string) (err erro
 	path := fmt.Sprintf("/images/create?fromImage=%s&tag=%s", url.QueryEscape(fromImage), url.QueryEscape(tag))
 	_, err = extractor.client.SendJson(ctx, "POST", path, nil)
 	return
+}
+
+func (extractor *Extractor) inspect(ctx context.Context, imageRef string) (result image, err error) {
+	var response struct {
+		ID     string `json:"Id"`
+		Config struct {
+			Labels map[string]string `json:"Labels"`
+		} `json:"Config"`
+	}
+
+	path := fmt.Sprintf("/images/%s/json", url.PathEscape(imageRef))
+	if err = extractor.client.SendObject(ctx, "GET", path, nil, &response); err != nil {
+		return result, err
+	}
+	if response.ID == "" {
+		return result, errors.Errorf("image inspection for %q returned no ID", imageRef)
+	}
+	return image{ID: response.ID, Labels: response.Config.Labels}, nil
 }
 
 func (extractor *Extractor) create(ctx context.Context, imageRef string) (id string, err error) {

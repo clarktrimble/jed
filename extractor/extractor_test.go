@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -187,6 +188,189 @@ var _ = Describe("Extractor", func() {
 		})
 	})
 })
+
+var _ = Describe("Extractor.LabelFiles", func() {
+	var (
+		ctx              context.Context
+		client           *clientMock
+		ext              *extractor.Extractor
+		files            map[string][]byte
+		err              error
+		labels           map[string]string
+		requestedLabels  []string
+		requests         []string
+		cleanupCancelled bool
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		labels = map[string]string{"com.example.env": "/service.env"}
+		requestedLabels = []string{"com.example.env"}
+		requests = nil
+		cleanupCancelled = false
+		client = &clientMock{}
+		client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+			switch method + " " + path {
+			case "GET /images/registry.example.com%2Fapp:v1/json":
+				return json.Unmarshal([]byte(`{"Id":"sha256:abc123","Config":{"Labels":`+mustJSON(labels)+`}}`), rcv)
+			case "POST /containers/create?name=jed-extract-":
+				return errors.New("container name must be checked by prefix")
+			case "DELETE /containers/abc123":
+				return nil
+			}
+			if method == "POST" && strings.HasPrefix(path, "/containers/create?name=jed-extract-") {
+				Expect(snd).To(Equal(map[string]string{"Image": "sha256:abc123"}))
+				rcv.(*struct {
+					Id string `json:"Id"`
+				}).Id = "abc123"
+				return nil
+			}
+			return errors.Errorf("unexpected object request %s %s", method, path)
+		}
+		client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+			requests = append(requests, method+" "+path)
+			switch method + " " + path {
+			case "POST /images/create?fromImage=registry.example.com%2Fapp&tag=v1":
+				return nil, nil
+			case "GET /containers/abc123/archive?path=%2Fservice.env":
+				return tarFile("service.env", []byte("PORT=8080\n")), nil
+			default:
+				return nil, errors.Errorf("unexpected json request %s %s", method, path)
+			}
+		}
+		ext = extractor.New(client, loggertest.NewLoggerMock())
+	})
+
+	JustBeforeEach(func() {
+		files, err = ext.LabelFiles(ctx, "registry.example.com/app:v1", requestedLabels...)
+	})
+
+	It("resolves a label and returns its file contents keyed by label", func() {
+		Expect(err).ToNot(HaveOccurred())
+		Expect(files).To(Equal(map[string][]byte{"com.example.env": []byte("PORT=8080\n")}))
+		Expect(requests).To(Equal([]string{
+			"POST /images/create?fromImage=registry.example.com%2Fapp&tag=v1",
+			"GET /containers/abc123/archive?path=%2Fservice.env",
+		}))
+	})
+
+	When("multiple labels name the same file", func() {
+		BeforeEach(func() {
+			labels["com.example.copy"] = "/service.env"
+			requestedLabels = []string{"com.example.env", "com.example.copy"}
+		})
+
+		It("extracts the file once and returns it for each label", func() {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(Equal(map[string][]byte{
+				"com.example.env":  []byte("PORT=8080\n"),
+				"com.example.copy": []byte("PORT=8080\n"),
+			}))
+			Expect(requests).To(HaveLen(2))
+		})
+	})
+
+	When("labels are missing or empty", func() {
+		BeforeEach(func() {
+			labels = map[string]string{"com.example.empty": ""}
+			requestedLabels = []string{"com.example.missing", "com.example.empty"}
+		})
+
+		It("omits them without creating a container", func() {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(Equal(map[string][]byte{}))
+			Expect(client.objectCalls).To(HaveLen(1))
+			Expect(requests).To(Equal([]string{"POST /images/create?fromImage=registry.example.com%2Fapp&tag=v1"}))
+		})
+	})
+
+	When("a declared file is empty", func() {
+		BeforeEach(func() {
+			labels["com.example.absent"] = ""
+			requestedLabels = []string{"com.example.env", "com.example.absent"}
+			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+				requests = append(requests, method+" "+path)
+				if method == "POST" {
+					return nil, nil
+				}
+				return tarFile("service.env", nil), nil
+			}
+		})
+
+		It("keeps an entry for the empty file but omits the empty label", func() {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(HaveKey("com.example.env"))
+			Expect(files["com.example.env"]).To(BeEmpty())
+			Expect(files).ToNot(HaveKey("com.example.absent"))
+		})
+	})
+
+	When("inspection fails", func() {
+		BeforeEach(func() {
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				if method == "GET" {
+					return errors.New("inspection failed")
+				}
+				return errors.New("unexpected request")
+			}
+		})
+
+		It("returns the error without creating a container", func() {
+			Expect(err).To(MatchError("inspection failed"))
+			Expect(client.objectCalls).To(HaveLen(1))
+		})
+	})
+
+	When("the extraction context is cancelled", func() {
+		BeforeEach(func() {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+			sendObject := client.SendObjectFunc
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				if method == "DELETE" {
+					cleanupCancelled = ctx.Err() != nil
+				}
+				return sendObject(ctx, method, path, snd, rcv)
+			}
+			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+				if method == "POST" {
+					return nil, nil
+				}
+				cancel()
+				return nil, context.Canceled
+			}
+		})
+
+		It("returns cancellation and still uses a live context for cleanup", func() {
+			Expect(err).To(MatchError("context canceled; cleanup err: <nil>"))
+			Expect(cleanupCancelled).To(BeFalse())
+			Expect(client.objectCalls).To(HaveLen(3))
+		})
+	})
+
+	When("a declared file cannot be extracted", func() {
+		BeforeEach(func() {
+			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+				if method == "POST" {
+					return nil, nil
+				}
+				return nil, errors.New("missing file")
+			}
+		})
+
+		It("returns the extraction error and cleans up the container", func() {
+			Expect(err).To(MatchError("missing file; cleanup err: <nil>"))
+			Expect(client.objectCalls).To(HaveLen(3))
+			Expect(client.objectCalls[2]).To(Equal(objectCall{method: "DELETE", path: "/containers/abc123"}))
+		})
+	})
+})
+
+func mustJSON(value any) string {
+	data, err := json.Marshal(value)
+	Expect(err).ToNot(HaveOccurred())
+	return string(data)
+}
 
 type objectCall struct {
 	method string
