@@ -230,8 +230,6 @@ var _ = Describe("Extractor.LabelFiles", func() {
 		client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 			requests = append(requests, method+" "+path)
 			switch method + " " + path {
-			case "POST /images/create?fromImage=registry.example.com%2Fapp&tag=v1":
-				return nil, nil
 			case "GET /containers/abc123/archive?path=%2Fservice.env":
 				return tarFile("service.env", []byte("PORT=8080\n")), nil
 			default:
@@ -242,14 +240,19 @@ var _ = Describe("Extractor.LabelFiles", func() {
 	})
 
 	JustBeforeEach(func() {
+		// LabelFiles must never pull, including in scenarios that override the mock.
+		sendJson := client.SendJsonFunc
+		client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+			Expect(method).To(Equal("GET"), "LabelFiles must use only local images")
+			return sendJson(ctx, method, path, body)
+		}
 		files, err = ext.LabelFiles(ctx, "registry.example.com/app:v1", requestedLabels...)
 	})
 
-	It("resolves a label and returns its file contents keyed by label", func() {
+	It("resolves a local image label and returns its file contents without pulling", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(files).To(Equal(map[string][]byte{"com.example.env": []byte("PORT=8080\n")}))
 		Expect(requests).To(Equal([]string{
-			"POST /images/create?fromImage=registry.example.com%2Fapp&tag=v1",
 			"GET /containers/abc123/archive?path=%2Fservice.env",
 		}))
 	})
@@ -266,7 +269,7 @@ var _ = Describe("Extractor.LabelFiles", func() {
 				"com.example.env":  []byte("PORT=8080\n"),
 				"com.example.copy": []byte("PORT=8080\n"),
 			}))
-			Expect(requests).To(HaveLen(2))
+			Expect(requests).To(Equal([]string{"GET /containers/abc123/archive?path=%2Fservice.env"}))
 		})
 	})
 
@@ -280,7 +283,7 @@ var _ = Describe("Extractor.LabelFiles", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(files).To(Equal(map[string][]byte{}))
 			Expect(client.objectCalls).To(HaveLen(1))
-			Expect(requests).To(Equal([]string{"POST /images/create?fromImage=registry.example.com%2Fapp&tag=v1"}))
+			Expect(client.jsonCalls).To(BeEmpty())
 		})
 	})
 
@@ -290,9 +293,6 @@ var _ = Describe("Extractor.LabelFiles", func() {
 			requestedLabels = []string{"com.example.env", "com.example.absent"}
 			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 				requests = append(requests, method+" "+path)
-				if method == "POST" {
-					return nil, nil
-				}
 				return tarFile("service.env", nil), nil
 			}
 		})
@@ -321,6 +321,38 @@ var _ = Describe("Extractor.LabelFiles", func() {
 		})
 	})
 
+	When("no labels are requested", func() {
+		BeforeEach(func() {
+			requestedLabels = nil
+		})
+
+		It("returns an empty file map without calling Docker", func() {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(Equal(map[string][]byte{}))
+			Expect(client.objectCalls).To(BeEmpty())
+			Expect(client.jsonCalls).To(BeEmpty())
+		})
+	})
+
+	When("the image is not available locally", func() {
+		BeforeEach(func() {
+			client.SendObjectFunc = func(ctx context.Context, method, path string, snd, rcv any) error {
+				Expect(method).To(Equal("GET"))
+				Expect(path).To(Equal("/images/registry.example.com%2Fapp:v1/json"))
+				return errors.New("No such image: registry.example.com/app:v1")
+			}
+		})
+
+		It("returns the inspection error without pulling or creating a container", func() {
+			Expect(err).To(MatchError("No such image: registry.example.com/app:v1"))
+			Expect(files).To(BeNil())
+			Expect(client.objectCalls).To(Equal([]objectCall{
+				{method: "GET", path: "/images/registry.example.com%2Fapp:v1/json"},
+			}))
+			Expect(client.jsonCalls).To(BeEmpty())
+		})
+	})
+
 	When("the extraction context is cancelled", func() {
 		BeforeEach(func() {
 			var cancel context.CancelFunc
@@ -333,9 +365,6 @@ var _ = Describe("Extractor.LabelFiles", func() {
 				return sendObject(ctx, method, path, snd, rcv)
 			}
 			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
-				if method == "POST" {
-					return nil, nil
-				}
 				cancel()
 				return nil, context.Canceled
 			}
@@ -351,9 +380,6 @@ var _ = Describe("Extractor.LabelFiles", func() {
 	When("a declared file cannot be extracted", func() {
 		BeforeEach(func() {
 			client.SendJsonFunc = func(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
-				if method == "POST" {
-					return nil, nil
-				}
 				return nil, errors.New("missing file")
 			}
 		})

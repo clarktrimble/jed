@@ -59,9 +59,12 @@ func (extractor *Extractor) LabelFiles(ctx context.Context, imageRef string, lab
 	}
 
 	extractor.logger.Debug(ctx, "extracting label files from image", "ref", imageRef, "count", len(labels))
-	if err = extractor.pull(ctx, imageRef); err != nil {
-		return
-	}
+
+	// fail fast(er?) by depending on local image
+	// Todo: fix propery, prolly by storing all env on discover, sigh
+	//if err = extractor.pull(ctx, imageRef); err != nil {
+	//return
+	//}
 
 	image, err := extractor.inspect(ctx, imageRef)
 	if err != nil {
