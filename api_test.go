@@ -162,7 +162,7 @@ var _ = Describe("API", func() {
 	Describe("service routes", func() {
 		It("sets, gets, lists, and deletes services", func() {
 			service := jed.Service{
-				Integration: &jed.Integration{Name: "frontend", Versions: []string{"v1.10.0", "v1.2.3"}},
+				Integration: &jed.Integration{Name: "frontend", Desc: "Frontend services", Versions: []string{"v1.10.0", "v1.2.3"}},
 				Image:       "nginx:latest",
 				Ports:       map[string]string{},
 				Labels:      map[string]string{},

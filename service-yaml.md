@@ -8,6 +8,7 @@ Define a `jed.Service` for deployment.
 name: reauth-acp
 integration:
   name: aruba
+  desc: Aruba access-control integration
   versions:
     - v1.2.3
 image: local/reauth-acp:3c070f2
@@ -44,7 +45,7 @@ resources:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Service name |
-| `integration` | no | Integration name and versions |
+| `integration` | no | Integration name, optional description, and versions |
 | `image` | yes | Docker image with tag |
 | `about` | no | User-facing description, links, and notes |
 | `network` | no | Swarm network name; defaulted to `svc-net` |
@@ -66,9 +67,12 @@ resources:
 
 `integration` identifies the integration name and versions shared by related services. `name` must be an integration slug using lower-case letters, digits, and single hyphens, e.g. `aruba` or `reauth-acp`. `versions` must contain one or more full semantic versions with leading `v`, e.g. `v1.2.3`. Duplicates are rejected.
 
+`desc` is an optional human-readable description of the integration, distinct from `about.desc`, which describes the individual service. Empty descriptions are omitted when serialized. Like the other integration fields, `desc` is literal metadata and is not template-expanded. Descriptions are stored per service; consistency across services with the same integration name is not enforced.
+
 ```yaml
 integration:
   name: reauth-acp
+  desc: Reauthorization access-control integration
   versions:
     - v1.0.13
 ```

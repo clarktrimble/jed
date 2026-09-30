@@ -55,6 +55,11 @@ func RunStoreContractTests(
 					Image:   "postgres:14",
 					Network: "app-net",
 					Restart: jed.RestartAny,
+					Integration: &jed.Integration{
+						Name:     "infra",
+						Desc:     "Shared infrastructure services",
+						Versions: []string{"v1.2.3"},
+					},
 					Ports: map[string]string{
 						"5432/tcp": "5432",
 					},
@@ -76,6 +81,7 @@ func RunStoreContractTests(
 					Expect(err).NotTo(HaveOccurred())
 					Expect(retrievedService.Name).To(Equal("postgres"))
 					Expect(retrievedService.Image).To(Equal("postgres:14"))
+					Expect(retrievedService.Integration).To(Equal(service.Integration))
 					Expect(retrievedService.Ports["5432/tcp"]).To(Equal("5432"))
 				})
 			})

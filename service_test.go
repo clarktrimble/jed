@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/clarktrimble/jed"
+	"sigs.k8s.io/yaml"
 )
 
 func TestJed(t *testing.T) {
@@ -63,6 +64,23 @@ var _ = Describe("Service", func() {
 			Expect(string(data)).NotTo(ContainSubstring(`"Image"`))
 		})
 
+		It("roundtrips optional integration descriptions", func() {
+			for _, desc := range []string{"", "Access-control integration"} {
+				integration := jed.Integration{Name: "suite", Desc: desc, Versions: []string{"v1.2.3"}}
+				Expect(integration.Validate()).To(Succeed())
+				data, err := json.Marshal(integration)
+				Expect(err).NotTo(HaveOccurred())
+				if desc == "" {
+					Expect(string(data)).NotTo(ContainSubstring(`"desc"`))
+				} else {
+					Expect(string(data)).To(ContainSubstring(`"desc":"Access-control integration"`))
+				}
+				var got jed.Integration
+				Expect(json.Unmarshal(data, &got)).To(Succeed())
+				Expect(got).To(Equal(integration))
+			}
+		})
+
 		It("omits empty integration", func() {
 			data, err := json.Marshal(jed.Service{Name: "app", Image: "app:v1"})
 			Expect(err).NotTo(HaveOccurred())
@@ -74,6 +92,29 @@ var _ = Describe("Service", func() {
 			err := json.Unmarshal([]byte(`{"name":"app","image":"app:v1","network":"svc-net","restart":"on-failure"}`), &svc)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(svc.Restart).To(Equal(jed.RestartOnFailure))
+		})
+	})
+
+	Describe("YAML", func() {
+		It("roundtrips optional integration descriptions", func() {
+			for _, desc := range []string{"", "Access control\nShared by related services"} {
+				svc := jed.Service{
+					Name:        "app",
+					Image:       "app:v1",
+					Integration: &jed.Integration{Name: "suite", Desc: desc, Versions: []string{"v1.2.3"}},
+				}
+				data, err := yaml.Marshal(svc)
+				Expect(err).NotTo(HaveOccurred())
+				if desc == "" {
+					Expect(string(data)).NotTo(ContainSubstring("desc:"))
+				} else {
+					Expect(string(data)).To(ContainSubstring("desc:"))
+				}
+				var got jed.Service
+				Expect(yaml.UnmarshalStrict(data, &got)).To(Succeed())
+				Expect(got.Integration).To(Equal(svc.Integration))
+				Expect(got.Validate()).To(Succeed())
+			}
 		})
 	})
 

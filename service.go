@@ -126,6 +126,8 @@ type About struct {
 type Integration struct {
 	// Name is the integration slug (e.g., "aruba-acp").
 	Name string `json:"name"`
+	// Desc is a short human-readable description of the integration.
+	Desc string `json:"desc,omitempty"`
 	// Versions are the integration versions (e.g., "v1.2.3").
 	Versions []string `json:"versions"`
 }
