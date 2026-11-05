@@ -5,8 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	"github.com/clarktrimble/jed"
 )
@@ -23,7 +23,7 @@ func RunStoreContractTests(
 	newStore func(ctx context.Context) (jed.Store, error),
 	cleanup func(),
 ) {
-	var _ = Describe(name+" Store Contract", func() {
+	var _ = ginkgo.Describe(name+" Store Contract", func() {
 		var (
 			store   jed.Store
 			ctx     context.Context
@@ -34,22 +34,22 @@ func RunStoreContractTests(
 			intent  jed.Intent
 		)
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			ctx = context.Background()
 			store, err = newStore(ctx)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			if cleanup != nil {
 				cleanup()
 			}
 		})
 
-		Describe("SetService and GetService", func() {
+		ginkgo.Describe("SetService and GetService", func() {
 			var retrievedService jed.Service
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				service = jed.Service{
 					Name:    "postgres",
 					Image:   "postgres:14",
@@ -69,136 +69,136 @@ func RunStoreContractTests(
 				}
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.SetService(ctx, service)
 			})
 
-			When("service is set successfully", func() {
-				It("should store and retrieve the service", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("service is set successfully", func() {
+				ginkgo.It("should store and retrieve the service", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					retrievedService, err = store.GetService(ctx, "postgres", "postgres:14")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(retrievedService.Name).To(Equal("postgres"))
-					Expect(retrievedService.Image).To(Equal("postgres:14"))
-					Expect(retrievedService.Integration).To(Equal(service.Integration))
-					Expect(retrievedService.Ports["5432/tcp"]).To(Equal("5432"))
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(retrievedService.Name).To(gomega.Equal("postgres"))
+					gomega.Expect(retrievedService.Image).To(gomega.Equal("postgres:14"))
+					gomega.Expect(retrievedService.Integration).To(gomega.Equal(service.Integration))
+					gomega.Expect(retrievedService.Ports["5432/tcp"]).To(gomega.Equal("5432"))
 				})
 			})
 
-			When("getting a non-existent service", func() {
-				It("should return NotFoundError", func() {
+			ginkgo.When("getting a non-existent service", func() {
+				ginkgo.It("should return NotFoundError", func() {
 					_, err = store.GetService(ctx, "nonexistent", "postgres:14")
-					Expect(err).To(HaveOccurred())
+					gomega.Expect(err).To(gomega.HaveOccurred())
 
 					var notFound jed.NotFoundError
-					Expect(errors.As(err, &notFound)).To(BeTrue())
-					Expect(notFound.Kind).To(Equal("service"))
-					Expect(notFound.Name).To(Equal("nonexistent@postgres:14"))
+					gomega.Expect(errors.As(err, &notFound)).To(gomega.BeTrue())
+					gomega.Expect(notFound.Kind).To(gomega.Equal("service"))
+					gomega.Expect(notFound.Name).To(gomega.Equal("nonexistent@postgres:14"))
 				})
 			})
 		})
 
-		Describe("Services", func() {
+		ginkgo.Describe("Services", func() {
 			var services []jed.Service
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				services, err = store.Services(ctx, "postgres")
 			})
 
-			When("no services exist", func() {
-				It("should return empty slice", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(services).To(BeEmpty())
+			ginkgo.When("no services exist", func() {
+				ginkgo.It("should return empty slice", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(services).To(gomega.BeEmpty())
 				})
 			})
 
-			When("multiple services exist for the same name", func() {
-				BeforeEach(func() {
+			ginkgo.When("multiple services exist for the same name", func() {
+				ginkgo.BeforeEach(func() {
 					err = store.SetService(ctx, jed.Service{Name: "postgres", Image: "postgres:14"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					err = store.SetService(ctx, jed.Service{Name: "postgres", Image: "postgres:15"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					err = store.SetService(ctx, jed.Service{Name: "redis", Image: "redis:7"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				})
 
-				It("should return services with the requested name", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(services).To(HaveLen(2))
+				ginkgo.It("should return services with the requested name", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(services).To(gomega.HaveLen(2))
 					images := []string{services[0].Image, services[1].Image}
-					Expect(images).To(ContainElements("postgres:14", "postgres:15"))
+					gomega.Expect(images).To(gomega.ContainElements("postgres:14", "postgres:15"))
 				})
 			})
 		})
 
-		Describe("AllServices", func() {
+		ginkgo.Describe("AllServices", func() {
 			var services []jed.Service
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				services, err = store.AllServices(ctx)
 			})
 
-			When("no services exist", func() {
-				It("should return empty slice", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(services).To(BeEmpty())
+			ginkgo.When("no services exist", func() {
+				ginkgo.It("should return empty slice", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(services).To(gomega.BeEmpty())
 				})
 			})
 
-			When("multiple services exist", func() {
-				BeforeEach(func() {
+			ginkgo.When("multiple services exist", func() {
+				ginkgo.BeforeEach(func() {
 					err = store.SetService(ctx, jed.Service{Name: "postgres", Image: "postgres:14"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					err = store.SetService(ctx, jed.Service{Name: "redis", Image: "redis:7"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				})
 
-				It("should return all services", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(services).To(HaveLen(2))
+				ginkgo.It("should return all services", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(services).To(gomega.HaveLen(2))
 					names := []string{services[0].Name, services[1].Name}
-					Expect(names).To(ContainElements("postgres", "redis"))
+					gomega.Expect(names).To(gomega.ContainElements("postgres", "redis"))
 				})
 			})
 		})
 
-		Describe("Images", func() {
+		ginkgo.Describe("Images", func() {
 			var images []jed.Image
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				images, err = store.Images(ctx)
 			})
 
-			When("no images exist", func() {
-				It("should return empty slice", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(images).To(BeEmpty())
+			ginkgo.When("no images exist", func() {
+				ginkgo.It("should return empty slice", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(images).To(gomega.BeEmpty())
 				})
 			})
 
-			When("multiple images exist", func() {
-				BeforeEach(func() {
+			ginkgo.When("multiple images exist", func() {
+				ginkgo.BeforeEach(func() {
 					err = store.SetImage(ctx, jed.Image{Repository: "postgres", Tag: "16"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					err = store.SetImage(ctx, jed.Image{Registry: "registry.example.com", Repository: "app/api", Tag: "v1"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				})
 
-				It("should return all images", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(images).To(HaveLen(2))
+				ginkgo.It("should return all images", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(images).To(gomega.HaveLen(2))
 
 					imageRefs := []string{images[0].ImageRef(), images[1].ImageRef()}
-					Expect(imageRefs).To(ContainElements("postgres:16", "registry.example.com/app/api:v1"))
+					gomega.Expect(imageRefs).To(gomega.ContainElements("postgres:16", "registry.example.com/app/api:v1"))
 				})
 			})
 		})
 
-		Describe("SetImage and GetImage", func() {
+		ginkgo.Describe("SetImage and GetImage", func() {
 			var retrievedImage jed.Image
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				image = jed.Image{
 					Registry:   "registry.example.com",
 					Repository: "app/api",
@@ -209,80 +209,80 @@ func RunStoreContractTests(
 				}
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.SetImage(ctx, image)
 			})
 
-			When("image is set successfully", func() {
-				It("should store and retrieve the image", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("image is set successfully", func() {
+				ginkgo.It("should store and retrieve the image", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					retrievedImage, err = store.GetImage(ctx, "registry.example.com/app/api:v1")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(retrievedImage).To(Equal(image))
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(retrievedImage).To(gomega.Equal(image))
 				})
 			})
 
-			When("getting a non-existent image", func() {
-				It("should return NotFoundError", func() {
+			ginkgo.When("getting a non-existent image", func() {
+				ginkgo.It("should return NotFoundError", func() {
 					_, err = store.GetImage(ctx, "missing:latest")
-					Expect(err).To(HaveOccurred())
+					gomega.Expect(err).To(gomega.HaveOccurred())
 
 					var notFound jed.NotFoundError
-					Expect(errors.As(err, &notFound)).To(BeTrue())
-					Expect(notFound.Kind).To(Equal("image"))
-					Expect(notFound.Name).To(Equal("missing:latest"))
+					gomega.Expect(errors.As(err, &notFound)).To(gomega.BeTrue())
+					gomega.Expect(notFound.Kind).To(gomega.Equal("image"))
+					gomega.Expect(notFound.Name).To(gomega.Equal("missing:latest"))
 				})
 			})
 		})
 
-		Describe("DelImage", func() {
-			BeforeEach(func() {
+		ginkgo.Describe("DelImage", func() {
+			ginkgo.BeforeEach(func() {
 				image = jed.Image{Repository: "postgres", Tag: "16"}
 				err = store.SetImage(ctx, image)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.DelImage(ctx, "postgres:16")
 			})
 
-			When("deleting an existing image", func() {
-				It("should remove the image", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("deleting an existing image", func() {
+				ginkgo.It("should remove the image", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					_, err = store.GetImage(ctx, "postgres:16")
-					Expect(err).To(HaveOccurred())
+					gomega.Expect(err).To(gomega.HaveOccurred())
 				})
 			})
 		})
 
-		Describe("DelService", func() {
+		ginkgo.Describe("DelService", func() {
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				service = jed.Service{Name: "postgres", Image: "postgres:14"}
 				err = store.SetService(ctx, service)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.DelService(ctx, "postgres", "postgres:14")
 			})
 
-			When("deleting an existing service", func() {
-				It("should remove the service", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("deleting an existing service", func() {
+				ginkgo.It("should remove the service", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					_, err = store.GetService(ctx, "postgres", "postgres:14")
-					Expect(err).To(HaveOccurred())
+					gomega.Expect(err).To(gomega.HaveOccurred())
 				})
 			})
 		})
 
-		Describe("SetEnv and GetEnv", func() {
+		ginkgo.Describe("SetEnv and GetEnv", func() {
 			var retrievedEnv jed.Env
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				env = jed.Env{
 					Name: "postgres",
 					Vars: map[string]string{
@@ -292,180 +292,180 @@ func RunStoreContractTests(
 				}
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.SetEnv(ctx, env)
 			})
 
-			When("env is set successfully", func() {
-				It("should store and retrieve the env", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("env is set successfully", func() {
+				ginkgo.It("should store and retrieve the env", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					retrievedEnv, err = store.GetEnv(ctx, "postgres")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(retrievedEnv.Name).To(Equal("postgres"))
-					Expect(retrievedEnv.Vars["POSTGRES_PASSWORD"]).To(Equal("secret123"))
-					Expect(retrievedEnv.Vars["POSTGRES_USER"]).To(Equal("admin"))
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(retrievedEnv.Name).To(gomega.Equal("postgres"))
+					gomega.Expect(retrievedEnv.Vars["POSTGRES_PASSWORD"]).To(gomega.Equal("secret123"))
+					gomega.Expect(retrievedEnv.Vars["POSTGRES_USER"]).To(gomega.Equal("admin"))
 				})
 			})
 
-			When("getting a non-existent env", func() {
-				It("should return empty env", func() {
+			ginkgo.When("getting a non-existent env", func() {
+				ginkgo.It("should return empty env", func() {
 					retrievedEnv, err := store.GetEnv(ctx, "nonexistent")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(retrievedEnv.Name).To(Equal("nonexistent"))
-					Expect(retrievedEnv.Vars).To(BeEmpty())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(retrievedEnv.Name).To(gomega.Equal("nonexistent"))
+					gomega.Expect(retrievedEnv.Vars).To(gomega.BeEmpty())
 				})
 			})
 		})
 
-		Describe("Envs", func() {
+		ginkgo.Describe("Envs", func() {
 			var envs []jed.Env
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				envs, err = store.Envs(ctx)
 			})
 
-			When("no envs exist", func() {
-				It("should return empty slice", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(envs).To(BeEmpty())
+			ginkgo.When("no envs exist", func() {
+				ginkgo.It("should return empty slice", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(envs).To(gomega.BeEmpty())
 				})
 			})
 
-			When("multiple envs exist", func() {
-				BeforeEach(func() {
+			ginkgo.When("multiple envs exist", func() {
+				ginkgo.BeforeEach(func() {
 					err = store.SetEnv(ctx, jed.Env{
 						Name: "postgres",
 						Vars: map[string]string{"POSTGRES_PASSWORD": "secret"},
 					})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					err = store.SetEnv(ctx, jed.Env{
 						Name: "redis",
 						Vars: map[string]string{"REDIS_PASSWORD": "secret"},
 					})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				})
 
-				It("should return all envs", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(envs).To(HaveLen(2))
+				ginkgo.It("should return all envs", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(envs).To(gomega.HaveLen(2))
 					names := []string{envs[0].Name, envs[1].Name}
-					Expect(names).To(ContainElements("postgres", "redis"))
+					gomega.Expect(names).To(gomega.ContainElements("postgres", "redis"))
 				})
 			})
 		})
 
-		Describe("DelEnv", func() {
+		ginkgo.Describe("DelEnv", func() {
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				env = jed.Env{
 					Name: "postgres",
 					Vars: map[string]string{"POSTGRES_PASSWORD": "secret"},
 				}
 				err = store.SetEnv(ctx, env)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.DelEnv(ctx, "postgres")
 			})
 
-			When("deleting an existing env", func() {
-				It("should remove the env", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("deleting an existing env", func() {
+				ginkgo.It("should remove the env", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					retrievedEnv, err := store.GetEnv(ctx, "postgres")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(retrievedEnv.Vars).To(BeEmpty())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(retrievedEnv.Vars).To(gomega.BeEmpty())
 				})
 			})
 		})
 
-		Describe("SetIntent and GetIntent", func() {
+		ginkgo.Describe("SetIntent and GetIntent", func() {
 			var retrievedIntent jed.Intent
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				intent = jed.Intent{Name: "postgres", Image: "postgres:14", Replicas: 1}
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.SetIntent(ctx, intent)
 			})
 
-			When("intent is set successfully", func() {
-				It("should store and retrieve the intent", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("intent is set successfully", func() {
+				ginkgo.It("should store and retrieve the intent", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					retrievedIntent, err = store.GetIntent(ctx, "postgres")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(retrievedIntent.Name).To(Equal("postgres"))
-					Expect(retrievedIntent.Image).To(Equal("postgres:14"))
-					Expect(retrievedIntent.Replicas).To(Equal(1))
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(retrievedIntent.Name).To(gomega.Equal("postgres"))
+					gomega.Expect(retrievedIntent.Image).To(gomega.Equal("postgres:14"))
+					gomega.Expect(retrievedIntent.Replicas).To(gomega.Equal(1))
 				})
 			})
 
-			When("getting a non-existent intent", func() {
-				It("should return NotFoundError", func() {
+			ginkgo.When("getting a non-existent intent", func() {
+				ginkgo.It("should return NotFoundError", func() {
 					_, err = store.GetIntent(ctx, "nonexistent")
-					Expect(err).To(HaveOccurred())
+					gomega.Expect(err).To(gomega.HaveOccurred())
 
 					var notFound jed.NotFoundError
-					Expect(errors.As(err, &notFound)).To(BeTrue())
-					Expect(notFound.Kind).To(Equal("intent"))
-					Expect(notFound.Name).To(Equal("nonexistent"))
+					gomega.Expect(errors.As(err, &notFound)).To(gomega.BeTrue())
+					gomega.Expect(notFound.Kind).To(gomega.Equal("intent"))
+					gomega.Expect(notFound.Name).To(gomega.Equal("nonexistent"))
 				})
 			})
 		})
 
-		Describe("Intents", func() {
+		ginkgo.Describe("Intents", func() {
 			var intents []jed.Intent
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				intents, err = store.Intents(ctx)
 			})
 
-			When("no intents exist", func() {
-				It("should return empty slice", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(intents).To(BeEmpty())
+			ginkgo.When("no intents exist", func() {
+				ginkgo.It("should return empty slice", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(intents).To(gomega.BeEmpty())
 				})
 			})
 
-			When("multiple intents exist", func() {
-				BeforeEach(func() {
+			ginkgo.When("multiple intents exist", func() {
+				ginkgo.BeforeEach(func() {
 					err = store.SetIntent(ctx, jed.Intent{Name: "postgres", Image: "postgres:14", Replicas: 1})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					err = store.SetIntent(ctx, jed.Intent{Name: "redis", Image: "redis:7"})
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				})
 
-				It("should return all intents", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(intents).To(HaveLen(2))
+				ginkgo.It("should return all intents", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(intents).To(gomega.HaveLen(2))
 					names := []string{intents[0].Name, intents[1].Name}
-					Expect(names).To(ContainElements("postgres", "redis"))
+					gomega.Expect(names).To(gomega.ContainElements("postgres", "redis"))
 				})
 			})
 		})
 
-		Describe("DelIntent", func() {
+		ginkgo.Describe("DelIntent", func() {
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				intent = jed.Intent{Name: "postgres", Image: "postgres:14"}
 				err = store.SetIntent(ctx, intent)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
-			JustBeforeEach(func() {
+			ginkgo.JustBeforeEach(func() {
 				err = store.DelIntent(ctx, "postgres")
 			})
 
-			When("deleting an existing intent", func() {
-				It("should remove the intent", func() {
-					Expect(err).NotTo(HaveOccurred())
+			ginkgo.When("deleting an existing intent", func() {
+				ginkgo.It("should remove the intent", func() {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					_, err = store.GetIntent(ctx, "postgres")
-					Expect(err).To(HaveOccurred())
+					gomega.Expect(err).To(gomega.HaveOccurred())
 				})
 			})
 		})
