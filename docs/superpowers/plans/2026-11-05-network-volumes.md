@@ -94,7 +94,7 @@ Add table cases named `custom_prefix`, `trailing_slashes`, `flattened_service`, 
 
 In `service_test.go`, add named NetworkVolumes cases that reject the same untemplated bad paths as LocalVolumes, accept `{{VOL_PATH}}` before rendering, and round-trip `network_volumes` through JSON and YAML. Assert empty declarations omit the field. Test `cloneService` in the same-package test file: editing the clone's NetworkVolumes must leave the original unchanged.
 
-Extend the existing service fixture in `store/contract.go` with `NetworkVolumes: []string{"/var/lib/postgresql/data"}` so all store implementations prove declaration round-trip equality.
+Extend the existing service fixture in `store/contract.go` with `NetworkVolumes: []string{"/var/lib/postgresql/data"}`. After retrieval, explicitly assert `gomega.Expect(retrievedService.NetworkVolumes).To(gomega.Equal(service.NetworkVolumes))`; the existing selected-field assertions alone do not prove this field survives a round trip.
 
 - [ ] **Step 2: Run failing tests.**
 
@@ -193,7 +193,7 @@ Expect(options).To(Equal(map[string]any{
 
 Here `mount` is the decoded Mounts entry and `options` is its VolumeOptions.DriverConfig.Options; also assert DriverConfig.Name is `local`.
 
-Named cases: `keeps existing mounts` includes `/srv/certs` → `/certs` and `ordinary-data` → `/ordinary` alongside NFS, comparing without ordering assumptions; both ordinary entries omit VolumeOptions. `no network declarations` preserves existing wire format. `rejects unresolved network declarations` passes Service.NetworkVolumes without resolved descriptors; expect an error and zero Docker client calls.
+Named cases: `keeps existing mounts` includes `/srv/certs` → `/certs` and `ordinary-data` → `/ordinary` alongside NFS, comparing without ordering assumptions; both ordinary entries omit VolumeOptions. `no network declarations` preserves existing wire format. `rejects unresolved network declarations` passes Service.NetworkVolumes without resolved descriptors and overrides the empty lookup inputs with `Secrets: []string{"db-password"}` and `Configs: map[string]string{"app-config": "/etc/app.conf"}`. Expect an unresolved-network-declaration error and zero Docker client calls. These non-empty inputs would normally trigger lookups, so zero calls establishes that rejection happens before either resolution loop.
 
 In `swarm/deploy_test.go`, add a network case calling Deploy with a resolved descriptor. Capture POST `/services/create` and assert its marshaled Mounts contains the same driver configuration. Assert no requests to `/volumes` or other provisioning endpoints. This tests the real outgoing payload without an NAS or live Docker daemon.
 
