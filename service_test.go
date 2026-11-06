@@ -226,5 +226,39 @@ var _ = Describe("Service", func() {
 			svc := jed.Service{Name: "app", Image: "app:v1", Network: "svc-net", LocalVolumes: []string{"{{VOL_PATH}}"}}
 			Expect(svc.Validate()).To(Succeed())
 		})
+
+		It("rejects network volumes that are not absolute paths below root", func() {
+			for _, volume := range []string{"data", "", "/", "/.", "/data/.", "/data/..", "/foo/../data"} {
+				svc := jed.Service{Name: "app", Image: "app:v1", NetworkVolumes: []string{volume}}
+				Expect(svc.Validate()).NotTo(Succeed(), volume)
+			}
+		})
+
+		It("allows templated network volumes before render", func() {
+			svc := jed.Service{Name: "app", Image: "app:v1", NetworkVolumes: []string{"{{VOL_PATH}}"}}
+			Expect(svc.Validate()).To(Succeed())
+		})
+
+		It("round-trips network volume declarations through JSON and YAML", func() {
+			for _, codec := range []struct {
+				marshal   func(any) ([]byte, error)
+				unmarshal func([]byte, any) error
+			}{
+				{json.Marshal, json.Unmarshal},
+				{yaml.Marshal, func(data []byte, value any) error { return yaml.Unmarshal(data, value) }},
+			} {
+				svc := jed.Service{Name: "app", Image: "app:v1", NetworkVolumes: []string{"/data"}}
+				data, err := codec.marshal(svc)
+				Expect(err).NotTo(HaveOccurred())
+				var decoded jed.Service
+				Expect(codec.unmarshal(data, &decoded)).To(Succeed())
+				Expect(decoded.NetworkVolumes).To(Equal([]string{"/data"}))
+
+				svc.NetworkVolumes = nil
+				data, err = codec.marshal(svc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(data)).NotTo(ContainSubstring("network_volumes"))
+			}
+		})
 	})
 })

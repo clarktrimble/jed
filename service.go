@@ -195,6 +195,8 @@ type Service struct {
 	Volumes map[string]string `json:"volumes"`
 	// LocalVolumes lists container paths backed by convention-derived local bind mounts.
 	LocalVolumes []string `json:"local_volumes,omitempty"`
+	// NetworkVolumes lists container paths backed by convention-derived NFSv3 mounts.
+	NetworkVolumes []string `json:"network_volumes,omitempty"`
 	// Network is the swarm network name. Jed applies DefaultNetwork when omitted.
 	Network string `json:"network,omitempty"`
 	// Restart specifies restart behavior. Empty means no restart.
@@ -273,6 +275,14 @@ func (service Service) Validate() error {
 		}
 		err := validateLocalVolume(volume)
 		if err != nil {
+			issues = append(issues, err.Error())
+		}
+	}
+	for _, volume := range service.NetworkVolumes {
+		if strings.HasPrefix(volume, "{{") { // full-path templates are validated after rendering
+			continue
+		}
+		if _, err := cleanLocalPath("network volume", volume); err != nil {
 			issues = append(issues, err.Error())
 		}
 	}

@@ -51,10 +51,11 @@ func RunStoreContractTests(
 
 			ginkgo.BeforeEach(func() {
 				service = jed.Service{
-					Name:    "postgres",
-					Image:   "postgres:14",
-					Network: "app-net",
-					Restart: jed.RestartAny,
+					Name:           "postgres",
+					Image:          "postgres:14",
+					Network:        "app-net",
+					Restart:        jed.RestartAny,
+					NetworkVolumes: []string{"/var/lib/postgresql/data"},
 					Integration: &jed.Integration{
 						Name:     "infra",
 						Desc:     "Shared infrastructure services",
@@ -82,6 +83,7 @@ func RunStoreContractTests(
 					gomega.Expect(retrievedService.Name).To(gomega.Equal("postgres"))
 					gomega.Expect(retrievedService.Image).To(gomega.Equal("postgres:14"))
 					gomega.Expect(retrievedService.Integration).To(gomega.Equal(service.Integration))
+					gomega.Expect(retrievedService.NetworkVolumes).To(gomega.Equal(service.NetworkVolumes))
 					gomega.Expect(retrievedService.Ports["5432/tcp"]).To(gomega.Equal("5432"))
 				})
 			})

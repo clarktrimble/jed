@@ -16,6 +16,8 @@ type Spec struct {
 	Env Env `json:"env"`
 	// Intent is the selected image and desired replica count used to render the spec.
 	Intent Intent `json:"intent"`
+	// NetworkMounts contains derived NFS mounts for runtime adapters, never stored services.
+	NetworkMounts []NetworkMount `json:"network_mounts,omitempty"`
 }
 
 // render substitutes {{VAR}} placeholders in string values of service and env,
@@ -58,6 +60,7 @@ func cloneService(service Service) Service {
 	clone.Labels = maps.Clone(service.Labels)
 	clone.Volumes = maps.Clone(service.Volumes)
 	clone.LocalVolumes = slices.Clone(service.LocalVolumes)
+	clone.NetworkVolumes = slices.Clone(service.NetworkVolumes)
 	clone.Secrets = slices.Clone(service.Secrets)
 	clone.Configs = maps.Clone(service.Configs)
 	clone.Hosts = slices.Clone(service.Hosts)
