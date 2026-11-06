@@ -372,6 +372,86 @@ var _ = Describe("Spec", func() {
 	})
 })
 
+var _ = Describe("network volumes", func() {
+	var (
+		client *ClientMock
+		input  jed.Spec
+		body   swarm.Spec
+		err    error
+	)
+	wantNetworkMount := map[string]any{
+		"Type": "volume", "Source": "jed-postgres-var_lib_postgresql_data", "Target": "/var/lib/postgresql/data",
+		"VolumeOptions": map[string]any{"DriverConfig": map[string]any{
+			"Name":    "local",
+			"Options": map[string]any{"type": "nfs", "o": "addr=nas,nfsvers=3,rw", "device": ":/exports/jed/postgres/_var_lib_postgresql_data"},
+		}},
+	}
+	wireMounts := func() []map[string]any {
+		data, marshalErr := json.Marshal(body)
+		Expect(marshalErr).NotTo(HaveOccurred())
+		var wire struct {
+			TaskTemplate struct {
+				ContainerSpec struct{ Mounts []map[string]any }
+			}
+		}
+		Expect(json.Unmarshal(data, &wire)).To(Succeed())
+		return wire.TaskTemplate.ContainerSpec.Mounts
+	}
+	BeforeEach(func() {
+		client = newSpecMock()
+		input = jed.Spec{
+			Service:       jed.Service{Name: "postgres", Image: "postgres:16", Network: "svc-net", User: "1000"},
+			NetworkMounts: []jed.NetworkMount{{Name: "jed-postgres-var_lib_postgresql_data", Target: "/var/lib/postgresql/data", Server: "nas", Export: "/exports/jed/postgres/_var_lib_postgresql_data"}},
+		}
+	})
+	JustBeforeEach(func() { body, err = swarm.New(client, nopLogger{}).Spec(context.Background(), input) })
+
+	It("emits the complete Docker NFSv3 mount", func() {
+		Expect(err).NotTo(HaveOccurred())
+		Expect(wireMounts()).To(ConsistOf(wantNetworkMount))
+	})
+
+	When("there are existing mounts", func() {
+		BeforeEach(func() {
+			input.Service.Volumes = map[string]string{"/srv/certs": "/certs", "ordinary-data": "/ordinary"}
+		})
+		It("keeps existing mounts without adding driver options to them", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(wireMounts()).To(ConsistOf(
+				wantNetworkMount,
+				map[string]any{"Type": "bind", "Source": "/srv/certs", "Target": "/certs"},
+				map[string]any{"Type": "volume", "Source": "ordinary-data", "Target": "/ordinary"},
+			))
+		})
+	})
+
+	When("there are no network declarations", func() {
+		BeforeEach(func() {
+			input.NetworkMounts = nil
+			input.Service.Volumes = map[string]string{"ordinary-data": "/ordinary"}
+		})
+		It("preserves the ordinary mount wire format", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(wireMounts()).To(ConsistOf(map[string]any{"Type": "volume", "Source": "ordinary-data", "Target": "/ordinary"}))
+		})
+	})
+
+	When("network declarations have not been resolved", func() {
+		BeforeEach(func() {
+			input.NetworkMounts = nil
+			input.Service.NetworkVolumes = []string{"/var/lib/postgresql/data"}
+			input.Service.Secrets = []string{"db-password"}
+			input.Service.Configs = map[string]string{"app-config": "/etc/app.conf"}
+		})
+		It("rejects unresolved network declarations before Docker lookups", func() {
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unresolved network volumes"))
+			Expect(client.SendObjectCalls()).To(BeEmpty())
+			Expect(client.SendJsonCalls()).To(BeEmpty())
+		})
+	})
+})
+
 func newSpecMock() *ClientMock {
 	return &ClientMock{
 		SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {

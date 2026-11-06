@@ -134,9 +134,21 @@ type FileRef struct {
 
 // Mount is a volume or bind mount for the container.
 type Mount struct {
-	Type   string `json:"Type"`
-	Source string `json:"Source"`
-	Target string `json:"Target"`
+	Type          string         `json:"Type"`
+	Source        string         `json:"Source"`
+	Target        string         `json:"Target"`
+	VolumeOptions *VolumeOptions `json:"VolumeOptions,omitempty"`
+}
+
+// VolumeOptions configures the driver for a named Docker volume.
+type VolumeOptions struct {
+	DriverConfig *DriverConfig `json:"DriverConfig,omitempty"`
+}
+
+// DriverConfig selects a Docker volume driver and its mount options.
+type DriverConfig struct {
+	Name    string            `json:"Name"`
+	Options map[string]string `json:"Options"`
 }
 
 // Spec builds the Docker Swarm service spec payload for a rendered jed.Spec.
@@ -146,6 +158,10 @@ func (d *Swarm) Spec(ctx context.Context, jspec jed.Spec) (Spec, error) {
 	service := jspec.Service
 	if err := service.Validate(); err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to validate service %q", service.Name)
+	}
+
+	if len(service.NetworkVolumes) > 0 {
+		return Spec{}, errors.Errorf("unresolved network volumes for service %q: render with Jed.Spec before building a Swarm spec", service.Name)
 	}
 
 	resolved, err := d.resolveSecrets(ctx, service.Secrets)
@@ -208,6 +224,7 @@ func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfi
 	if len(service.Volumes) > 0 {
 		containerSpec.Mounts = swarmMounts(service.Volumes)
 	}
+	containerSpec.Mounts = append(containerSpec.Mounts, swarmNetworkMounts(jspec.NetworkMounts)...)
 
 	labels := map[string]string{}
 	if service.Traefik != nil {
@@ -337,6 +354,24 @@ func swarmMounts(volumes map[string]string) []Mount {
 			Type:   mountType,
 			Source: source,
 			Target: target,
+		})
+	}
+	return mounts
+}
+
+func swarmNetworkMounts(networkMounts []jed.NetworkMount) []Mount {
+	mounts := make([]Mount, 0, len(networkMounts))
+	for _, mount := range networkMounts {
+		mounts = append(mounts, Mount{
+			Type: "volume", Source: mount.Name, Target: mount.Target,
+			VolumeOptions: &VolumeOptions{DriverConfig: &DriverConfig{
+				Name: "local",
+				Options: map[string]string{
+					"type":   "nfs",
+					"o":      "addr=" + mount.Server + ",nfsvers=3,rw",
+					"device": ":" + mount.Export,
+				},
+			}},
 		})
 	}
 	return mounts

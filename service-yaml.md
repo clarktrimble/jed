@@ -24,6 +24,9 @@ volumes:
 local_volumes:
   - /qkview-history
 
+network_volumes:
+  - /var/lib/app
+
 secrets:
   - aruba_client_secret
 
@@ -54,6 +57,7 @@ resources:
 | `ports` | no | Container port to host port mapping |
 | `volumes` | no | Named volume or host path to container path |
 | `local_volumes` | no | Container paths backed by convention-derived local bind mounts from `LOCAL_ROOT` |
+| `network_volumes` | no | Container paths backed by convention-derived NFSv3 mounts from global `NETWORK_ROOT` (Swarm only) |
 | `secrets` | no | Swarm secret base names; latest version resolved at deploy |
 | `configs` | no | Swarm config base names mapped to target mount paths |
 | `hosts` | no | Extra `/etc/hosts` entries |
@@ -146,6 +150,45 @@ local_volumes:
 ```
 
 If an explicit `volumes` entry already mounts the same container path, the explicit volume wins and Jed logs an error.
+
+### Network volumes (Swarm)
+
+Declare only the container paths; Jed derives the NFSv3 mount settings:
+
+```yaml
+name: postgres
+network_volumes:
+  - /var/lib/postgresql/data
+```
+
+Set these values in the global render-vars env (`_global` by default), alongside `LOCAL_ROOT`:
+
+```yaml
+name: _global
+vars:
+  NETWORK_ROOT: nas:/exports/jed
+  NETWORK_VOLUME_PREFIX: jed
+```
+
+`NETWORK_ROOT` combines the NAS hostname/IP and absolute export root. It is required only for services declaring network volumes. IPv6 addresses use brackets, for example `[2001:db8::10]:/exports/jed`. `NETWORK_VOLUME_PREFIX` defaults to `jed` when absent or empty. Service env values do not override these global configuration values.
+
+The example derives:
+
+```text
+Docker volume: jed-postgres-var_lib_postgresql_data
+NAS directory: /exports/jed/postgres/_var_lib_postgresql_data
+Container:     /var/lib/postgresql/data
+```
+
+Directory naming follows `LocalVolumes`: service name, then the container path flattened with underscores and prefixed with `_`. The Docker name joins the prefix, flattened service name, and flattened target without that leading underscore. Template expansion happens first; absolute paths below `/` are required, and `.`/`..` segments are rejected. Derived Docker names and the prefix must use letters, digits, `_`, `.`, or `-`, starting with a letter or digit.
+
+An explicit `volumes` entry at the same target wins and Jed logs the conflict. A target declared in both `local_volumes` and `network_volumes` is an error, even if an explicit mount also uses it. Repeated equivalent network targets are deduplicated; distinct targets that flatten to the same volume name within a spec are rejected.
+
+`Jed.Spec()` generates transient `NetworkMounts` descriptors, and the Swarm adapter emits Docker `local` driver settings with `type=nfs`, `nfsvers=3`, and read/write access. Stored service declarations remain unchanged; resolved mounts are not persisted. The standalone `container` runtime does not resolve or support `network_volumes`.
+
+The external storage setup must prepare the NAS export, derived directories, and permissions. Eligible Swarm workers need NFS support and connectivity. Jed does not create directories, adjust ownership, or provision/replace volumes.
+
+**Deferred investigation:** existing Docker volumes may retain creation-time NFS settings. Changing `NETWORK_ROOT` is not a documented way to retarget an existing volume. Reuse, cross-service naming collisions, mismatch detection, and replacement policy remain to be investigated; this feature provides no mismatch protection or automatic recreation.
 
 ## Secrets
 

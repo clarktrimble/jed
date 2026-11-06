@@ -324,6 +324,53 @@ var _ = Describe("Deploy", func() {
 
 })
 
+var _ = Describe("Deploy network volumes", func() {
+	It("sends NFS driver settings in the create request without provisioning volumes", func() {
+		client := &ClientMock{
+			SendObjectFunc: func(ctx context.Context, method, path string, snd, rcv any) error {
+				switch {
+				case method == "GET" && strings.Contains(path, "/services?"):
+					mockResponse([]map[string]any{}, rcv)
+					return nil
+				case method == "POST" && strings.Contains(path, "/services/create"):
+					mockResponse(map[string]string{"ID": "svc-network"}, rcv)
+					return nil
+				default:
+					return errors.New("unexpected Docker call")
+				}
+			},
+		}
+		input := jed.Spec{
+			Service:       jed.Service{Name: "postgres", Image: "postgres:16", Network: "svc-net", User: "1000"},
+			NetworkMounts: []jed.NetworkMount{{Name: "jed-postgres-var_lib_postgresql_data", Target: "/var/lib/postgresql/data", Server: "nas", Export: "/exports/jed/postgres/_var_lib_postgresql_data"}},
+		}
+		id, created, err := swarm.New(client, nopLogger{}).Deploy(context.Background(), input)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(id).To(Equal("svc-network"))
+		Expect(created).To(BeTrue())
+		calls := client.SendObjectCalls()
+		Expect(calls).To(HaveLen(2))
+		Expect(client.SendJsonCalls()).To(BeEmpty())
+		create := findCall(calls, "POST", "/services/create")
+		Expect(create).NotTo(BeNil())
+		data, marshalErr := json.Marshal(create.Snd)
+		Expect(marshalErr).NotTo(HaveOccurred())
+		var wire struct {
+			TaskTemplate struct {
+				ContainerSpec struct{ Mounts []map[string]any }
+			}
+		}
+		Expect(json.Unmarshal(data, &wire)).To(Succeed())
+		Expect(wire.TaskTemplate.ContainerSpec.Mounts).To(ConsistOf(map[string]any{
+			"Type": "volume", "Source": "jed-postgres-var_lib_postgresql_data", "Target": "/var/lib/postgresql/data",
+			"VolumeOptions": map[string]any{"DriverConfig": map[string]any{
+				"Name":    "local",
+				"Options": map[string]any{"type": "nfs", "o": "addr=nas,nfsvers=3,rw", "device": ":/exports/jed/postgres/_var_lib_postgresql_data"},
+			}},
+		}))
+	})
+})
+
 func deploySpec(ctx context.Context, deployer *swarm.Swarm, svc jed.Service, env jed.Env) (string, bool, error) {
 	return deployer.Deploy(ctx, jed.Spec{Service: svc, Env: env})
 }

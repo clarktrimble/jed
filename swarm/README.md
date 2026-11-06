@@ -66,6 +66,16 @@ j, err := jed.New(ctx, store, "deploy-vars", logger)
 spec, err := j.Spec(ctx, "myapp")
 ```
 
+## Network Volumes
+
+Use `network_volumes` in the service declaration and global render vars `NETWORK_ROOT` (for example `nas:/exports/jed`) and optional `NETWORK_VOLUME_PREFIX` (default `jed`). `Jed.Spec()` derives volume names and remote paths; `Swarm.Spec`/`Swarm.Deploy` emits the NFSv3 read/write driver configuration for Docker to mount on the worker. No resolved-volume records are stored.
+
+Always render through `Jed.Spec()` or `Jed.SpecWithEnv()` first. Passing unresolved `Service.NetworkVolumes` directly to the Swarm adapter is rejected before secret/config lookups. Existing explicit volumes and local bind mounts retain their formats and behavior; explicit mounts override network targets, while local/network target conflicts are errors.
+
+Prepare the NAS export, derived directories, permissions, and worker connectivity/NFS support outside Jed. This feature neither provisions nor replaces storage. Existing named-volume behavior after a root change is **uninvestigated**; do not assume configuration changes retarget existing volumes or that Jed detects mismatches. Standalone container deployment is outside this feature's scope.
+
+See [network-volume configuration and naming](../service-yaml.md#network-volumes-swarm).
+
 ## Restarting Services
 
 `Swarm.Restart(ctx, name)` forces Docker Swarm to roll an existing service's tasks without changing `jed.Service` or persisted store state. It reads the current Docker service spec, increments Docker's `TaskTemplate.ForceUpdate`, and updates the service with the current Docker service version.
