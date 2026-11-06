@@ -298,6 +298,169 @@ var _ = Describe("Jed", func() {
 			})
 		})
 
+		When("the service has network volumes", func() {
+			var lgr *loggertest.LoggerMock
+			updateService := func(update func(*jed.Service)) {
+				svc, getErr := store.GetService(ctx, "app", "local/app:v1")
+				Expect(getErr).NotTo(HaveOccurred())
+				update(&svc)
+				Expect(store.SetService(ctx, svc)).To(Succeed())
+			}
+
+			BeforeEach(func() {
+				updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/var/lib/app"} })
+				store.envs["_global"].Vars["NETWORK_ROOT"] = "nas:/exports/jed"
+				lgr = loggertest.NewLoggerMock()
+				j = (&jed.Config{VarsEnvName: "_global"}).New(store, lgr)
+			})
+
+			It("derives mounts without mutating stored declarations", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app/_var_lib_app"}}))
+				Expect(spec.Service.NetworkVolumes).To(BeNil())
+				stored, getErr := store.GetService(ctx, "app", "local/app:v1")
+				Expect(getErr).NotTo(HaveOccurred())
+				Expect(stored.NetworkVolumes).To(Equal([]string{"/var/lib/app"}))
+				Expect(stored.Volumes).To(BeNil())
+			})
+
+			It("reloads network configuration", func() {
+				Expect(err).NotTo(HaveOccurred())
+				store.envs["_global"].Vars["NETWORK_ROOT"] = "other:/exports/new"
+				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = "team"
+				spec, err = j.Spec(ctx, "app")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "team-app-var_lib_app", Target: "/var/lib/app", Server: "other", Export: "/exports/new/app/_var_lib_app"}}))
+				stored, getErr := store.GetService(ctx, "app", "local/app:v1")
+				Expect(getErr).NotTo(HaveOccurred())
+				Expect(stored.NetworkVolumes).To(Equal([]string{"/var/lib/app"}))
+			})
+
+			When("service env has network configuration", func() {
+				BeforeEach(func() {
+					store.envs["app"].Vars["NETWORK_ROOT"] = "wrong:/other"
+					store.envs["app"].Vars["NETWORK_VOLUME_PREFIX"] = "wrong"
+				})
+				It("uses global network configuration", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app/_var_lib_app"}))
+				})
+			})
+
+			When("the target is templated", func() {
+				BeforeEach(func() {
+					updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"{{VOL_PATH}}"} })
+					store.envs["_global"].Vars["VOL_PATH"] = "/var/lib/app"
+				})
+				It("renders paths before deriving mounts", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app/_var_lib_app"}))
+					stored, getErr := store.GetService(ctx, "app", "local/app:v1")
+					Expect(getErr).NotTo(HaveOccurred())
+					Expect(stored.NetworkVolumes).To(Equal([]string{"{{VOL_PATH}}"}))
+				})
+				It("validates rendered paths", func() {
+					store.envs["_global"].Vars["VOL_PATH"] = "/foo/../data"
+					_, err = j.Spec(ctx, "app")
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("cannot contain . or .."))
+				})
+				It("SpecWithEnv resolves network paths without saving env", func() {
+					spec, err = j.SpecWithEnv(ctx, "app", jed.Env{Name: "app", Vars: map[string]string{"PORT": "9000", "VOL_PATH": "/other/data"}})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-other_data", Target: "/other/data", Server: "nas", Export: "/exports/jed/app/_other_data"}))
+					Expect(store.envs["app"].Vars).To(Equal(map[string]string{"PORT": "8080"}))
+					stored, getErr := store.GetService(ctx, "app", "local/app:v1")
+					Expect(getErr).NotTo(HaveOccurred())
+					Expect(stored.NetworkVolumes).To(Equal([]string{"{{VOL_PATH}}"}))
+				})
+			})
+
+			It("requires a valid root for network declarations", func() {
+				for _, root := range []string{"", "nas:relative", "nas:/exports/../jed"} {
+					store.envs["_global"].Vars["NETWORK_ROOT"] = root
+					_, err = j.Spec(ctx, "app")
+					Expect(err).To(HaveOccurred(), root)
+					Expect(err.Error()).To(ContainSubstring("NETWORK_ROOT"))
+				}
+			})
+
+			It("ignores network configuration without network declarations", func() {
+				updateService(func(svc *jed.Service) { svc.NetworkVolumes = nil })
+				store.envs["_global"].Vars["NETWORK_ROOT"] = "bad"
+				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = ".bad"
+				_, err = j.Spec(ctx, "app")
+				Expect(err).NotTo(HaveOccurred())
+				updateService(func(svc *jed.Service) { svc.LocalVolumes = []string{"/cache"} })
+				store.envs["_global"].Vars["LOCAL_ROOT"] = "/opt/bastille"
+				spec, err = j.Spec(ctx, "app")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.Service.Volumes).To(HaveKeyWithValue("/opt/bastille/app/_cache", "/cache"))
+			})
+
+			When("explicit volumes use the target", func() {
+				BeforeEach(func() {
+					updateService(func(svc *jed.Service) { svc.Volumes = map[string]string{"/explicit": "/var/lib/app/"} })
+				})
+				It("keeps explicit volumes and logs the conflict", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(BeEmpty())
+					Expect(spec.Service.NetworkVolumes).To(BeNil())
+					Expect(spec.Service.Volumes).To(HaveKeyWithValue("/explicit", "/var/lib/app/"))
+					Expect(lgr.ErrorCalls()).To(HaveLen(1))
+				})
+			})
+
+			When("local and network declarations target the same directory", func() {
+				BeforeEach(func() {
+					updateService(func(svc *jed.Service) {
+						svc.LocalVolumes = []string{"/var/lib/app/"}
+						svc.NetworkVolumes = []string{"{{VOL_PATH}}"}
+					})
+					store.envs["_global"].Vars["VOL_PATH"] = "/var/lib/app"
+				})
+				It("rejects the conflict before requiring LOCAL_ROOT", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("local and network volumes"))
+					Expect(err.Error()).NotTo(ContainSubstring("LOCAL_ROOT"))
+				})
+				It("rejects the conflict even with an explicit mount", func() {
+					updateService(func(svc *jed.Service) { svc.Volumes = map[string]string{"/explicit": "/var/lib/app"} })
+					_, err = j.Spec(ctx, "app")
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("local and network volumes"))
+				})
+			})
+
+			When("there are unrelated local mounts", func() {
+				BeforeEach(func() {
+					updateService(func(svc *jed.Service) { svc.LocalVolumes = []string{"/cache"} })
+					store.envs["_global"].Vars["LOCAL_ROOT"] = "/opt/bastille"
+				})
+				It("keeps unrelated local mounts", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.Service.Volumes).To(HaveKeyWithValue("/opt/bastille/app/_cache", "/cache"))
+					Expect(spec.NetworkMounts).To(HaveLen(1))
+				})
+			})
+
+			When("network targets repeat", func() {
+				BeforeEach(func() { updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/data", "/data/"} }) })
+				It("deduplicates equivalent targets", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-data", Target: "/data", Server: "nas", Export: "/exports/jed/app/_data"}))
+				})
+			})
+
+			When("distinct targets flatten to the same name", func() {
+				BeforeEach(func() { updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/a/b", "/a_b"} }) })
+				It("rejects flattened network name collisions", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("same network volume name"))
+				})
+			})
+		})
+
 		When("the service has local volumes", func() {
 			BeforeEach(func() {
 				svc, err := store.GetService(ctx, "app", "local/app:v1")

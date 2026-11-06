@@ -1,6 +1,7 @@
 package jed
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path"
@@ -65,6 +66,64 @@ func networkVolumeMount(networkRoot, prefix, serviceName, target string) (Networ
 		Name: name, Target: target, Server: server,
 		Export: path.Join(root, service, "_"+flatTarget),
 	}, nil
+}
+
+func validateConventionalVolumeTargets(service Service) error {
+	if len(service.NetworkVolumes) == 0 {
+		return nil
+	}
+	localTargets := make(map[string]bool, len(service.LocalVolumes))
+	for _, rawTarget := range service.LocalVolumes {
+		target, err := cleanLocalPath("local volume", rawTarget)
+		if err != nil {
+			return err
+		}
+		localTargets[target] = true
+	}
+	for _, rawTarget := range service.NetworkVolumes {
+		target, err := cleanLocalPath("network volume", rawTarget)
+		if err != nil {
+			return err
+		}
+		if localTargets[target] {
+			return fmt.Errorf("local and network volumes share container target %q", target)
+		}
+	}
+	return nil
+}
+
+func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, networkRoot, prefix string) error {
+	if len(spec.Service.NetworkVolumes) == 0 {
+		return nil
+	}
+	explicitTargets := make(map[string]bool, len(spec.Service.Volumes))
+	for _, target := range spec.Service.Volumes {
+		explicitTargets[path.Clean(target)] = true
+	}
+	seenTargets := make(map[string]bool)
+	names := make(map[string]string)
+	for _, target := range spec.Service.NetworkVolumes {
+		mount, err := networkVolumeMount(networkRoot, prefix, spec.Service.Name, target)
+		if err != nil {
+			return err
+		}
+		if seenTargets[mount.Target] {
+			continue
+		}
+		seenTargets[mount.Target] = true
+		if explicitTargets[mount.Target] {
+			j.logger.Error(ctx, "network volume conflicts with explicit volume; using explicit volume",
+				fmt.Errorf("network volume target %q already mounted", mount.Target), "service", spec.Service.Name, "target", mount.Target)
+			continue
+		}
+		if previous, exists := names[mount.Name]; exists {
+			return fmt.Errorf("targets %q and %q produce the same network volume name %q", previous, mount.Target, mount.Name)
+		}
+		names[mount.Name] = mount.Target
+		spec.NetworkMounts = append(spec.NetworkMounts, mount)
+	}
+	spec.Service.NetworkVolumes = nil
+	return nil
 }
 
 func validNetworkServer(server string) bool {
