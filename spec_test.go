@@ -309,7 +309,8 @@ var _ = Describe("Jed", func() {
 
 			BeforeEach(func() {
 				updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/var/lib/app"} })
-				store.envs["_global"].Vars["NETWORK_ROOT"] = "nas:/exports/jed"
+				store.envs["_global"].Vars["NFS_HOST"] = "nas"
+				store.envs["_global"].Vars["NFS_ROOT"] = "/exports/jed"
 				lgr = loggertest.NewLoggerMock()
 				j = (&jed.Config{VarsEnvName: "_global"}).New(store, lgr)
 			})
@@ -326,7 +327,8 @@ var _ = Describe("Jed", func() {
 
 			It("reloads network configuration", func() {
 				Expect(err).NotTo(HaveOccurred())
-				store.envs["_global"].Vars["NETWORK_ROOT"] = "other:/exports/new"
+				store.envs["_global"].Vars["NFS_HOST"] = "other"
+				store.envs["_global"].Vars["NFS_ROOT"] = "/exports/new"
 				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = "team"
 				spec, err = j.Spec(ctx, "app")
 				Expect(err).NotTo(HaveOccurred())
@@ -338,7 +340,8 @@ var _ = Describe("Jed", func() {
 
 			When("service env has network configuration", func() {
 				BeforeEach(func() {
-					store.envs["app"].Vars["NETWORK_ROOT"] = "wrong:/other"
+					store.envs["app"].Vars["NFS_HOST"] = "wrong"
+					store.envs["app"].Vars["NFS_ROOT"] = "/other"
 					store.envs["app"].Vars["NETWORK_VOLUME_PREFIX"] = "wrong"
 				})
 				It("uses global network configuration", func() {
@@ -376,18 +379,47 @@ var _ = Describe("Jed", func() {
 				})
 			})
 
-			It("requires a valid root for network declarations", func() {
-				for _, root := range []string{"", "nas:relative", "nas:/exports/../jed"} {
-					store.envs["_global"].Vars["NETWORK_ROOT"] = root
+			It("requires a valid NFS root for network declarations", func() {
+				for _, root := range []string{"", "relative", "/exports/../jed"} {
+					store.envs["_global"].Vars["NFS_ROOT"] = root
 					_, err = j.Spec(ctx, "app")
 					Expect(err).To(HaveOccurred(), root)
-					Expect(err.Error()).To(ContainSubstring("NETWORK_ROOT"))
+					Expect(err.Error()).To(ContainSubstring("NFS_ROOT"))
 				}
+			})
+
+			It("requires a valid NFS host for network declarations", func() {
+				for _, host := range []string{"", "nas,rw", "nas:2049"} {
+					store.envs["_global"].Vars["NFS_HOST"] = host
+					_, err = j.Spec(ctx, "app")
+					Expect(err).To(HaveOccurred(), host)
+					Expect(err.Error()).To(ContainSubstring("NFS_HOST"))
+				}
+			})
+
+			It("does not fall back to the legacy combined setting", func() {
+				store.envs["_global"].Vars["NETWORK_ROOT"] = "legacy:/exports/old"
+				for _, key := range []string{"NFS_HOST", "NFS_ROOT"} {
+					value := store.envs["_global"].Vars[key]
+					delete(store.envs["_global"].Vars, key)
+					_, err = j.Spec(ctx, "app")
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring(key))
+					store.envs["_global"].Vars[key] = value
+				}
+			})
+
+			It("accepts a bare IPv6 NFS host", func() {
+				store.envs["_global"].Vars["NFS_HOST"] = "2001:db8::10"
+				spec, err = j.Spec(ctx, "app")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "2001:db8::10", Export: "/exports/jed/app/_var_lib_app"}}))
 			})
 
 			It("ignores network configuration without network declarations", func() {
 				updateService(func(svc *jed.Service) { svc.NetworkVolumes = nil })
-				store.envs["_global"].Vars["NETWORK_ROOT"] = "bad"
+				store.envs["_global"].Vars["NFS_HOST"] = "bad,host"
+				store.envs["_global"].Vars["NFS_ROOT"] = "relative"
 				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = ".bad"
 				_, err = j.Spec(ctx, "app")
 				Expect(err).NotTo(HaveOccurred())

@@ -57,7 +57,7 @@ resources:
 | `ports` | no | Container port to host port mapping |
 | `volumes` | no | Named volume or host path to container path |
 | `local_volumes` | no | Container paths backed by convention-derived local bind mounts from `LOCAL_ROOT` |
-| `network_volumes` | no | Container paths backed by convention-derived NFSv3 mounts from global `NETWORK_ROOT` (Swarm only) |
+| `network_volumes` | no | Container paths backed by convention-derived NFSv3 mounts from global `NFS_HOST` and `NFS_ROOT` (Swarm only) |
 | `secrets` | no | Swarm secret base names; latest version resolved at deploy |
 | `configs` | no | Swarm config base names mapped to target mount paths |
 | `hosts` | no | Extra `/etc/hosts` entries |
@@ -166,11 +166,12 @@ Set these values in the global render-vars env (`_global` by default), alongside
 ```yaml
 name: _global
 vars:
-  NETWORK_ROOT: nas:/exports/jed
+  NFS_HOST: nas
+  NFS_ROOT: /exports/jed
   NETWORK_VOLUME_PREFIX: jed
 ```
 
-`NETWORK_ROOT` combines the NAS hostname/IP and absolute export root. It is required only for services declaring network volumes. IPv6 addresses use brackets, for example `[2001:db8::10]:/exports/jed`. `NETWORK_VOLUME_PREFIX` defaults to `jed` when absent or empty. Service env values do not override these global configuration values.
+`NFS_HOST` is the NAS hostname or IP address; `NFS_ROOT` is the absolute export root. Both are required only for services declaring network volumes. Use bare IPv6 addresses, for example `NFS_HOST: '2001:db8::10'`. `NETWORK_VOLUME_PREFIX` defaults to `jed` when absent or empty. Service env values do not override these global configuration values. The former combined `NETWORK_ROOT` setting is no longer supported.
 
 The example derives:
 
@@ -188,7 +189,7 @@ An explicit `volumes` entry at the same target wins and Jed logs the conflict. A
 
 The external storage setup must prepare the NAS export, derived directories, and permissions. Eligible Swarm workers need NFS support and connectivity. Jed does not create directories, adjust ownership, or provision/replace volumes.
 
-**Deferred investigation:** existing Docker volumes may retain creation-time NFS settings. Changing `NETWORK_ROOT` is not a documented way to retarget an existing volume. Reuse, cross-service naming collisions, mismatch detection, and replacement policy remain to be investigated; this feature provides no mismatch protection or automatic recreation.
+**Deferred investigation:** existing Docker volumes may retain creation-time NFS settings. Changing `NFS_HOST` or `NFS_ROOT` is not a documented way to retarget an existing volume. Reuse, cross-service naming collisions, mismatch detection, and replacement policy remain to be investigated; this feature provides no mismatch protection or automatic recreation.
 
 ## Secrets
 

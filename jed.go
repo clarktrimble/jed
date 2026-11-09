@@ -296,11 +296,12 @@ func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 		return Spec{}, errors.Wrapf(err, "invalid volume targets for service %q", name)
 	}
 
+	// Todo: vars for ROOT etc is wearing thin, find a better way
 	err = j.resolveLocalVolumes(ctx, &spec.Service, varsEnv.Vars["LOCAL_ROOT"])
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to resolve local volumes for service %q", name)
 	}
-	err = j.resolveNetworkVolumes(ctx, &spec, varsEnv.Vars["NETWORK_ROOT"], varsEnv.Vars["NETWORK_VOLUME_PREFIX"])
+	err = j.resolveNetworkVolumes(ctx, &spec, varsEnv.Vars["NFS_HOST"], varsEnv.Vars["NFS_ROOT"], varsEnv.Vars["NETWORK_VOLUME_PREFIX"])
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to resolve network volumes for service %q", name)
 	}

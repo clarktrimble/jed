@@ -23,25 +23,16 @@ var (
 	networkHostLabel  = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`)
 )
 
-func networkVolumeMount(networkRoot, prefix, serviceName, target string) (NetworkMount, error) {
-	server, root, ok := strings.Cut(networkRoot, ":/")
-	if !ok || server == "" {
-		return NetworkMount{}, fmt.Errorf("NETWORK_ROOT %q must be server:/absolute/export", networkRoot)
+func networkVolumeMount(server, root, prefix, serviceName, target string) (NetworkMount, error) {
+	if !validNetworkServer(server) {
+		return NetworkMount{}, fmt.Errorf("NFS_HOST has invalid server %q", server)
 	}
-	if strings.HasPrefix(server, "[") && strings.HasSuffix(server, "]") {
-		server = strings.TrimSuffix(strings.TrimPrefix(server, "["), "]")
-		if ip := net.ParseIP(server); ip == nil || !strings.Contains(server, ":") {
-			return NetworkMount{}, fmt.Errorf("NETWORK_ROOT has invalid IPv6 server %q", server)
-		}
-	} else if !validNetworkServer(server) {
-		return NetworkMount{}, fmt.Errorf("NETWORK_ROOT has invalid server %q", server)
-	}
-	root, err := cleanLocalPath("NETWORK_ROOT export", "/"+root)
+	root, err := cleanLocalPath("NFS_ROOT", root)
 	if err != nil {
 		return NetworkMount{}, err
 	}
 	if strings.ContainsRune(root, 0) {
-		return NetworkMount{}, fmt.Errorf("NETWORK_ROOT export cannot contain NUL")
+		return NetworkMount{}, fmt.Errorf("NFS_ROOT cannot contain NUL")
 	}
 	target, err = cleanLocalPath("network volume", target)
 	if err != nil {
@@ -92,7 +83,7 @@ func validateConventionalVolumeTargets(service Service) error {
 	return nil
 }
 
-func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, networkRoot, prefix string) error {
+func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, server, root, prefix string) error {
 	if len(spec.Service.NetworkVolumes) == 0 {
 		return nil
 	}
@@ -103,7 +94,7 @@ func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, networkRoot
 	seenTargets := make(map[string]bool)
 	names := make(map[string]string)
 	for _, target := range spec.Service.NetworkVolumes {
-		mount, err := networkVolumeMount(networkRoot, prefix, spec.Service.Name, target)
+		mount, err := networkVolumeMount(server, root, prefix, spec.Service.Name, target)
 		if err != nil {
 			return err
 		}
@@ -127,11 +118,11 @@ func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, networkRoot
 }
 
 func validNetworkServer(server string) bool {
-	if strings.Contains(server, ":") { // IPv6 must be bracketed in NETWORK_ROOT.
-		return false
-	}
 	if net.ParseIP(server) != nil {
 		return true
+	}
+	if strings.Contains(server, ":") {
+		return false
 	}
 	if len(server) > 253 {
 		return false

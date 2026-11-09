@@ -68,7 +68,7 @@ spec, err := j.Spec(ctx, "myapp")
 
 ## Network Volumes
 
-Use `network_volumes` in the service declaration and global render vars `NETWORK_ROOT` (for example `nas:/exports/jed`) and optional `NETWORK_VOLUME_PREFIX` (default `jed`). `Jed.Spec()` derives volume names and remote paths; `Swarm.Spec`/`Swarm.Deploy` emits the NFSv3 read/write driver configuration for Docker to mount on the worker. No resolved-volume records are stored.
+Use `network_volumes` in the service declaration and global render vars `NFS_HOST` (for example `nas`), `NFS_ROOT` (for example `/exports/jed`), and optional `NETWORK_VOLUME_PREFIX` (default `jed`). Both NFS globals are required only for network volumes; service env values do not override them. IPv6 hosts use bare addresses without brackets. `Jed.Spec()` derives volume names and remote paths; `Swarm.Spec`/`Swarm.Deploy` emits the NFSv3 read/write driver configuration for Docker to mount on the worker. No resolved-volume records are stored.
 
 Always render through `Jed.Spec()` or `Jed.SpecWithEnv()` first. Passing unresolved `Service.NetworkVolumes` directly to the Swarm adapter is rejected before secret/config lookups. Existing explicit volumes and local bind mounts retain their formats and behavior; explicit mounts override network targets, while local/network target conflicts are errors.
 
