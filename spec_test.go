@@ -317,7 +317,7 @@ var _ = Describe("Jed", func() {
 
 			It("derives mounts without mutating stored declarations", func() {
 				Expect(err).NotTo(HaveOccurred())
-				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app/_var_lib_app"}}))
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "app_app_42fbde", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app_app_42fbde"}}))
 				Expect(spec.Service.NetworkVolumes).To(BeNil())
 				stored, getErr := store.GetService(ctx, "app", "local/app:v1")
 				Expect(getErr).NotTo(HaveOccurred())
@@ -329,10 +329,9 @@ var _ = Describe("Jed", func() {
 				Expect(err).NotTo(HaveOccurred())
 				store.envs["_global"].Vars["NFS_HOST"] = "other"
 				store.envs["_global"].Vars["NFS_ROOT"] = "/exports/new"
-				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = "team"
 				spec, err = j.Spec(ctx, "app")
 				Expect(err).NotTo(HaveOccurred())
-				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "team-app-var_lib_app", Target: "/var/lib/app", Server: "other", Export: "/exports/new/app/_var_lib_app"}}))
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "app_app_42fbde", Target: "/var/lib/app", Server: "other", Export: "/exports/new/app_app_42fbde"}}))
 				stored, getErr := store.GetService(ctx, "app", "local/app:v1")
 				Expect(getErr).NotTo(HaveOccurred())
 				Expect(stored.NetworkVolumes).To(Equal([]string{"/var/lib/app"}))
@@ -342,11 +341,10 @@ var _ = Describe("Jed", func() {
 				BeforeEach(func() {
 					store.envs["app"].Vars["NFS_HOST"] = "wrong"
 					store.envs["app"].Vars["NFS_ROOT"] = "/other"
-					store.envs["app"].Vars["NETWORK_VOLUME_PREFIX"] = "wrong"
 				})
 				It("uses global network configuration", func() {
 					Expect(err).NotTo(HaveOccurred())
-					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app/_var_lib_app"}))
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "app_app_42fbde", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app_app_42fbde"}))
 				})
 			})
 
@@ -357,7 +355,7 @@ var _ = Describe("Jed", func() {
 				})
 				It("renders paths before deriving mounts", func() {
 					Expect(err).NotTo(HaveOccurred())
-					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app/_var_lib_app"}))
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "app_app_42fbde", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app_app_42fbde"}))
 					stored, getErr := store.GetService(ctx, "app", "local/app:v1")
 					Expect(getErr).NotTo(HaveOccurred())
 					Expect(stored.NetworkVolumes).To(Equal([]string{"{{VOL_PATH}}"}))
@@ -371,7 +369,7 @@ var _ = Describe("Jed", func() {
 				It("SpecWithEnv resolves network paths without saving env", func() {
 					spec, err = j.SpecWithEnv(ctx, "app", jed.Env{Name: "app", Vars: map[string]string{"PORT": "9000", "VOL_PATH": "/other/data"}})
 					Expect(err).NotTo(HaveOccurred())
-					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-other_data", Target: "/other/data", Server: "nas", Export: "/exports/jed/app/_other_data"}))
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "app_data_34370a", Target: "/other/data", Server: "nas", Export: "/exports/jed/app_data_34370a"}))
 					Expect(store.envs["app"].Vars).To(Equal(map[string]string{"PORT": "8080"}))
 					stored, getErr := store.GetService(ctx, "app", "local/app:v1")
 					Expect(getErr).NotTo(HaveOccurred())
@@ -413,14 +411,20 @@ var _ = Describe("Jed", func() {
 				store.envs["_global"].Vars["NFS_HOST"] = "2001:db8::10"
 				spec, err = j.Spec(ctx, "app")
 				Expect(err).NotTo(HaveOccurred())
-				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "jed-app-var_lib_app", Target: "/var/lib/app", Server: "2001:db8::10", Export: "/exports/jed/app/_var_lib_app"}}))
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "app_app_42fbde", Target: "/var/lib/app", Server: "2001:db8::10", Export: "/exports/jed/app_app_42fbde"}}))
+			})
+
+			It("ignores the obsolete network volume prefix", func() {
+				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = ".bad"
+				spec, err = j.Spec(ctx, "app")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.NetworkMounts).To(Equal([]jed.NetworkMount{{Name: "app_app_42fbde", Target: "/var/lib/app", Server: "nas", Export: "/exports/jed/app_app_42fbde"}}))
 			})
 
 			It("ignores network configuration without network declarations", func() {
 				updateService(func(svc *jed.Service) { svc.NetworkVolumes = nil })
 				store.envs["_global"].Vars["NFS_HOST"] = "bad,host"
 				store.envs["_global"].Vars["NFS_ROOT"] = "relative"
-				store.envs["_global"].Vars["NETWORK_VOLUME_PREFIX"] = ".bad"
 				_, err = j.Spec(ctx, "app")
 				Expect(err).NotTo(HaveOccurred())
 				updateService(func(svc *jed.Service) { svc.LocalVolumes = []string{"/cache"} })
@@ -480,13 +484,40 @@ var _ = Describe("Jed", func() {
 				BeforeEach(func() { updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/data", "/data/"} }) })
 				It("deduplicates equivalent targets", func() {
 					Expect(err).NotTo(HaveOccurred())
-					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "jed-app-data", Target: "/data", Server: "nas", Export: "/exports/jed/app/_data"}))
+					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "app_data_97d481", Target: "/data", Server: "nas", Export: "/exports/jed/app_data_97d481"}))
 				})
 			})
 
-			When("distinct targets flatten to the same name", func() {
+			When("distinct targets used to flatten to the same name", func() {
 				BeforeEach(func() { updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/a/b", "/a_b"} }) })
-				It("rejects flattened network name collisions", func() {
+				It("keeps both mounts distinct", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(ConsistOf(
+						jed.NetworkMount{Name: "app_b_85123d", Target: "/a/b", Server: "nas", Export: "/exports/jed/app_b_85123d"},
+						jed.NetworkMount{Name: "app_a_b_6c7bcd", Target: "/a_b", Server: "nas", Export: "/exports/jed/app_a_b_6c7bcd"},
+					))
+				})
+			})
+
+			When("network targets have matching basenames", func() {
+				BeforeEach(func() {
+					updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/foo/data", "/bar/data"} })
+				})
+				It("hashes the full paths to distinguish their names", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(spec.NetworkMounts).To(ConsistOf(
+						jed.NetworkMount{Name: "app_data_a07d5c", Target: "/foo/data", Server: "nas", Export: "/exports/jed/app_data_a07d5c"},
+						jed.NetworkMount{Name: "app_data_4f5bcb", Target: "/bar/data", Server: "nas", Export: "/exports/jed/app_data_4f5bcb"},
+					))
+				})
+			})
+
+			When("distinct targets have the same final name", func() {
+				// These paths have the same low 24 FNV-1a bits: c6e29b.
+				BeforeEach(func() {
+					updateService(func(svc *jed.Service) { svc.NetworkVolumes = []string{"/dir9979/data", "/dir11804/data"} })
+				})
+				It("rejects hash collisions", func() {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("same network volume name"))
 				})

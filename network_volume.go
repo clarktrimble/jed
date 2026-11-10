@@ -3,6 +3,7 @@ package jed
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"net"
 	"path"
 	"regexp"
@@ -23,7 +24,7 @@ var (
 	networkHostLabel  = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`)
 )
 
-func networkVolumeMount(server, root, prefix, serviceName, target string) (NetworkMount, error) {
+func networkVolumeMount(server, root, serviceName, target string) (NetworkMount, error) {
 	if !validNetworkServer(server) {
 		return NetworkMount{}, fmt.Errorf("NFS_HOST has invalid server %q", server)
 	}
@@ -42,20 +43,20 @@ func networkVolumeMount(server, root, prefix, serviceName, target string) (Netwo
 	if err != nil {
 		return NetworkMount{}, err
 	}
-	if prefix == "" {
-		prefix = "jed"
+	stem := service + "_" + path.Base(target)
+	if !networkVolumeName.MatchString(stem) {
+		return NetworkMount{}, fmt.Errorf("invalid network volume name stem %q", stem)
 	}
-	if !networkVolumeName.MatchString(prefix) {
-		return NetworkMount{}, fmt.Errorf("invalid NETWORK_VOLUME_PREFIX %q", prefix)
+	if len(stem) > 25 {
+		stem = stem[:25]
 	}
-	flatTarget := strings.ReplaceAll(strings.TrimPrefix(target, "/"), "/", "_")
-	name := prefix + "-" + service + "-" + flatTarget
-	if !networkVolumeName.MatchString(name) {
-		return NetworkMount{}, fmt.Errorf("invalid derived network volume name %q", name)
-	}
+	// This encoding and hash are the storage identity shared with the NAS provisioner.
+	hash := fnv.New64a()
+	hash.Write([]byte(serviceName + "\x00" + target))
+	name := fmt.Sprintf("%s_%06x", stem, hash.Sum64()&0xffffff)
 	return NetworkMount{
 		Name: name, Target: target, Server: server,
-		Export: path.Join(root, service, "_"+flatTarget),
+		Export: path.Join(root, name),
 	}, nil
 }
 
@@ -83,7 +84,7 @@ func validateConventionalVolumeTargets(service Service) error {
 	return nil
 }
 
-func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, server, root, prefix string) error {
+func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, server, root string) error {
 	if len(spec.Service.NetworkVolumes) == 0 {
 		return nil
 	}
@@ -94,7 +95,7 @@ func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, server, roo
 	seenTargets := make(map[string]bool)
 	names := make(map[string]string)
 	for _, target := range spec.Service.NetworkVolumes {
-		mount, err := networkVolumeMount(server, root, prefix, spec.Service.Name, target)
+		mount, err := networkVolumeMount(server, root, spec.Service.Name, target)
 		if err != nil {
 			return err
 		}

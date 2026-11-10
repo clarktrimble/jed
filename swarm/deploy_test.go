@@ -342,7 +342,7 @@ var _ = Describe("Deploy network volumes", func() {
 		}
 		input := jed.Spec{
 			Service:       jed.Service{Name: "postgres", Image: "postgres:16", Network: "svc-net", User: "1000"},
-			NetworkMounts: []jed.NetworkMount{{Name: "jed-postgres-var_lib_postgresql_data", Target: "/var/lib/postgresql/data", Server: "nas", Export: "/exports/jed/postgres/_var_lib_postgresql_data"}},
+			NetworkMounts: []jed.NetworkMount{{Name: "postgres_data_d2546c", Target: "/var/lib/postgresql/data", Server: "nas", Export: "/exports/jed/postgres_data_d2546c"}},
 		}
 		id, created, err := swarm.New(client, nopLogger{}).Deploy(context.Background(), input)
 		Expect(err).NotTo(HaveOccurred())
@@ -362,10 +362,10 @@ var _ = Describe("Deploy network volumes", func() {
 		}
 		Expect(json.Unmarshal(data, &wire)).To(Succeed())
 		Expect(wire.TaskTemplate.ContainerSpec.Mounts).To(ConsistOf(map[string]any{
-			"Type": "volume", "Source": "jed-postgres-var_lib_postgresql_data", "Target": "/var/lib/postgresql/data",
+			"Type": "volume", "Source": "postgres_data_d2546c", "Target": "/var/lib/postgresql/data",
 			"VolumeOptions": map[string]any{"DriverConfig": map[string]any{
 				"Name":    "local",
-				"Options": map[string]any{"type": "nfs", "o": "addr=nas,nfsvers=3,rw", "device": ":/exports/jed/postgres/_var_lib_postgresql_data"},
+				"Options": map[string]any{"type": "nfs", "o": "addr=nas,nfsvers=3,rw", "device": ":/exports/jed/postgres_data_d2546c"},
 			}},
 		}))
 	})

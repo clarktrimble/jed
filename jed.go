@@ -301,7 +301,7 @@ func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to resolve local volumes for service %q", name)
 	}
-	err = j.resolveNetworkVolumes(ctx, &spec, varsEnv.Vars["NFS_HOST"], varsEnv.Vars["NFS_ROOT"], varsEnv.Vars["NETWORK_VOLUME_PREFIX"])
+	err = j.resolveNetworkVolumes(ctx, &spec, varsEnv.Vars["NFS_HOST"], varsEnv.Vars["NFS_ROOT"])
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to resolve network volumes for service %q", name)
 	}

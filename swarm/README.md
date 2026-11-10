@@ -68,11 +68,13 @@ spec, err := j.Spec(ctx, "myapp")
 
 ## Network Volumes
 
-Use `network_volumes` in the service declaration and global render vars `NFS_HOST` (for example `nas`), `NFS_ROOT` (for example `/exports/jed`), and optional `NETWORK_VOLUME_PREFIX` (default `jed`). Both NFS globals are required only for network volumes; service env values do not override them. IPv6 hosts use bare addresses without brackets. `Jed.Spec()` derives volume names and remote paths; `Swarm.Spec`/`Swarm.Deploy` emits the NFSv3 read/write driver configuration for Docker to mount on the worker. No resolved-volume records are stored.
+Use `network_volumes` in the service declaration and global render vars `NFS_HOST` (for example `nas`) and `NFS_ROOT` (the parent path of the NAS shares, for example `/volume1`). Both NFS globals are required only for network volumes; service env values do not override them. IPv6 hosts use bare addresses without brackets. `Jed.Spec()` derives volume names and remote paths; `Swarm.Spec`/`Swarm.Deploy` emits the NFSv3 read/write driver configuration for Docker to mount on the worker. No resolved-volume records are stored.
 
 Always render through `Jed.Spec()` or `Jed.SpecWithEnv()` first. Passing unresolved `Service.NetworkVolumes` directly to the Swarm adapter is rejected before secret/config lookups. Existing explicit volumes and local bind mounts retain their formats and behavior; explicit mounts override network targets, while local/network target conflicts are errors.
 
-Prepare the NAS export, derived directories, permissions, and worker connectivity/NFS support outside Jed. This feature neither provisions nor replaces storage. Existing named-volume behavior after a root change is **uninvestigated**; do not assume configuration changes retarget existing volumes or that Jed detects mismatches. Standalone container deployment is outside this feature's scope.
+Names are `<service_lastdir, capped at 25 ASCII characters>_<6 hex hash>`, always hashed and at most 32 characters. The suffix is the low 24 bits of FNV-1a 64-bit over the full original service name, a NUL separator, and the validated/normalized full container path, formatted as six zero-padded lowercase hex digits. The same name is used for the Docker volume and the NAS share, exported at `NFS_ROOT/<name>`. `NETWORK_VOLUME_PREFIX` is no longer used. Jed detects collisions within a service; upstream provisioning must enforce share ownership by full service/path identity across services.
+
+Prepare the NAS shares/exports, permissions, and worker connectivity/NFS support outside Jed. **This changes existing volume names and NAS paths; migrate data explicitly before redeploying.** Jed does not rename or migrate storage. This feature neither provisions nor replaces storage. Existing named-volume behavior after a root change is **uninvestigated**; do not assume configuration changes retarget existing volumes or that Jed detects mismatches. Standalone container deployment is outside this feature's scope.
 
 See [network-volume configuration and naming](../service-yaml.md#network-volumes-swarm).
 

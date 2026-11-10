@@ -380,10 +380,10 @@ var _ = Describe("network volumes", func() {
 		err    error
 	)
 	wantNetworkMount := map[string]any{
-		"Type": "volume", "Source": "jed-postgres-var_lib_postgresql_data", "Target": "/var/lib/postgresql/data",
+		"Type": "volume", "Source": "postgres_data_d2546c", "Target": "/var/lib/postgresql/data",
 		"VolumeOptions": map[string]any{"DriverConfig": map[string]any{
 			"Name":    "local",
-			"Options": map[string]any{"type": "nfs", "o": "addr=nas,nfsvers=3,rw", "device": ":/exports/jed/postgres/_var_lib_postgresql_data"},
+			"Options": map[string]any{"type": "nfs", "o": "addr=nas,nfsvers=3,rw", "device": ":/exports/jed/postgres_data_d2546c"},
 		}},
 	}
 	wireMounts := func() []map[string]any {
@@ -401,7 +401,7 @@ var _ = Describe("network volumes", func() {
 		client = newSpecMock()
 		input = jed.Spec{
 			Service:       jed.Service{Name: "postgres", Image: "postgres:16", Network: "svc-net", User: "1000"},
-			NetworkMounts: []jed.NetworkMount{{Name: "jed-postgres-var_lib_postgresql_data", Target: "/var/lib/postgresql/data", Server: "nas", Export: "/exports/jed/postgres/_var_lib_postgresql_data"}},
+			NetworkMounts: []jed.NetworkMount{{Name: "postgres_data_d2546c", Target: "/var/lib/postgresql/data", Server: "nas", Export: "/exports/jed/postgres_data_d2546c"}},
 		}
 	})
 	JustBeforeEach(func() { body, err = swarm.New(client, nopLogger{}).Spec(context.Background(), input) })
