@@ -247,23 +247,28 @@ func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 		return Spec{}, errors.Wrapf(err, "failed to get env %q from store", name)
 	}
 
-	return j.spec(ctx, name, env)
-}
-
-// SpecWithEnv renders name's spec using the provided service env instead of the
-// stored one. The env is not merged with the stored env and is not saved; it is
-// used only to render this spec, e.g. to preflight a submitted env before saving.
-func (j *Jed) SpecWithEnv(ctx context.Context, name string, env Env) (Spec, error) {
-	return j.spec(ctx, name, env)
-}
-
-// spec renders name's enabled service using env as the service env and the stored render vars.
-func (j *Jed) spec(ctx context.Context, name string, env Env) (Spec, error) {
 	intent, err := j.store.GetIntent(ctx, name)
 	if err != nil {
 		return Spec{}, err
 	}
 
+	return j.spec(ctx, intent, env)
+}
+
+// ProvisionalSpec renders a spec using the supplied intent and service env.
+func (j *Jed) ProvisionalSpec(ctx context.Context, intent Intent, env Env) (Spec, error) {
+	if err := intent.Validate(); err != nil {
+		return Spec{}, err
+	}
+	if intent.Name != env.Name {
+		return Spec{}, errors.Errorf("intent name %q does not match env name %q", intent.Name, env.Name)
+	}
+	return j.spec(ctx, intent, env)
+}
+
+// spec renders intent using env as the service env and the stored render vars.
+func (j *Jed) spec(ctx context.Context, intent Intent, env Env) (Spec, error) {
+	name := intent.Name
 	svc, err := j.store.GetService(ctx, name, intent.Image)
 	if err != nil {
 		return Spec{}, err

@@ -49,10 +49,18 @@ if created {
 } else {
     // id is the updated swarm service ID
 }
+
+// or to preview an unsaved intent and env:
+spec, err := j.ProvisionalSpec(ctx,
+    jed.Intent{Name: "postgres", Image: "postgres:16", Replicas: 1},
+    jed.Env{Name: "postgres", Vars: map[string]string{"POSTGRES_DB": "app"}},
+)
 ```
 
-
 ## CLIs
+
+Note: these have not been maintained, much
+Todo: resuscitate or remove please
 
 - [`cmd/jed`](cmd/jed/README.md): edit service and env definitions in the store.
 - [`cmd/transship`](cmd/transship/README.md): deploy and operate stored services on Docker Swarm.

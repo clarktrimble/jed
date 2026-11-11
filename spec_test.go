@@ -250,6 +250,14 @@ var _ = Describe("Jed", func() {
 			Expect(spec.Env.Vars).NotTo(HaveKey("VHOST"))
 		})
 
+		It("continues to use the env loaded by the requested name", func() {
+			store.envs["app"] = jed.Env{Name: "other", Vars: map[string]string{"PORT": "8080"}}
+			spec, err = j.Spec(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Env.Name).To(Equal("other"))
+			Expect(spec.Service.Command).To(ContainElement("--port=8080"))
+		})
+
 		It("reloads render vars from the store", func() {
 			Expect(err).NotTo(HaveOccurred())
 
@@ -366,8 +374,8 @@ var _ = Describe("Jed", func() {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("cannot contain . or .."))
 				})
-				It("SpecWithEnv resolves network paths without saving env", func() {
-					spec, err = j.SpecWithEnv(ctx, "app", jed.Env{Name: "app", Vars: map[string]string{"PORT": "9000", "VOL_PATH": "/other/data"}})
+				It("ProvisionalSpec resolves network paths without saving env", func() {
+					spec, err = j.ProvisionalSpec(ctx, jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}, jed.Env{Name: "app", Vars: map[string]string{"PORT": "9000", "VOL_PATH": "/other/data"}})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(spec.NetworkMounts).To(ConsistOf(jed.NetworkMount{Name: "app_data_34370a", Target: "/other/data", Server: "nas", Export: "/exports/jed/app_data_34370a"}))
 					Expect(store.envs["app"].Vars).To(Equal(map[string]string{"PORT": "8080"}))
@@ -664,7 +672,7 @@ var _ = Describe("Jed", func() {
 		})
 	})
 
-	Describe("SpecWithEnv", func() {
+	Describe("ProvisionalSpec", func() {
 		var (
 			ctx   context.Context
 			store *fakeStore
@@ -698,26 +706,88 @@ var _ = Describe("Jed", func() {
 		JustBeforeEach(func() {
 			err = store.SetService(ctx, svc)
 			Expect(err).NotTo(HaveOccurred())
-			store.intents["app"] = jed.Intent{Name: "app", Image: svc.Image, Replicas: 2}
 			store.envs["_global"] = jed.Env{Name: "_global", Vars: vars}
-			spec, err = j.SpecWithEnv(ctx, "app", env)
+			spec, err = j.ProvisionalSpec(ctx, jed.Intent{Name: "app", Image: svc.Image, Replicas: 2}, env)
 		})
 
-		It("renders using the provided env and stored render vars", func() {
+		It("renders without a stored intent or service env and saves neither", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Service.Command).To(Equal([]string{"serve", "--host=app.example.com", "--port=8080"}))
 			Expect(spec.Env.Vars).To(HaveKeyWithValue("PORT", "8080"))
+			Expect(spec.Intent).To(Equal(jed.Intent{Name: "app", Image: svc.Image, Replicas: 2}))
+			Expect(store.intents).To(BeEmpty())
+			Expect(store.envs).NotTo(HaveKey("app"))
+		})
+
+		When("another intent is stored", func() {
+			BeforeEach(func() {
+				store.intents["app"] = jed.Intent{Name: "app", Image: "local/app:old", Replicas: 5}
+			})
+
+			It("uses the proposed image and replicas without replacing stored intent", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(spec.Service.Image).To(Equal("local/app:v1"))
+				Expect(spec.Intent).To(Equal(jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 2}))
+				Expect(store.intents["app"]).To(Equal(jed.Intent{Name: "app", Image: "local/app:old", Replicas: 5}))
+			})
+		})
+
+		It("rejects mismatched env names before looking up the service", func() {
+			for _, envName := range []string{"other", ""} {
+				proposed := jed.Intent{Name: "not-stored", Image: "missing:v1"}
+				_, err = j.ProvisionalSpec(ctx, proposed, jed.Env{Name: envName})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("does not match"))
+				Expect(err.Error()).To(ContainSubstring("not-stored"))
+				Expect(err.Error()).To(ContainSubstring("env name"))
+			}
+		})
+
+		It("validates supplied intent before looking up the service", func() {
+			for _, intent := range []jed.Intent{
+				{Image: svc.Image},
+				{Name: "app"},
+				{Name: "not-stored", Image: "missing", Replicas: -1},
+			} {
+				_, err = j.ProvisionalSpec(ctx, intent, env)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("intent"))
+				Expect(err.Error()).To(ContainSubstring("invalid"))
+			}
+		})
+
+		It("requires the proposed service definition to exist", func() {
+			_, err = j.ProvisionalSpec(ctx, jed.Intent{Name: "missing", Image: "missing:v1"}, jed.Env{Name: "missing", Vars: env.Vars})
+			Expect(err).To(MatchError(jed.NotFoundError{Kind: "service", Name: "missing@missing:v1"}))
+		})
+
+		It("applies defaults without changing stored service or supplied env", func() {
+			svc.Network = ""
+			Expect(store.SetService(ctx, svc)).To(Succeed())
+			j = (&jed.Config{VarsEnvName: "_global", DefaultUid: "1000", DefaultNetwork: "default-net"}).New(store, loggertest.NewLoggerMock())
+			spec, err = j.ProvisionalSpec(ctx, jed.Intent{Name: "app", Image: svc.Image}, env)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Service.Network).To(Equal("default-net"))
+			Expect(spec.Service.User).To(Equal("1000"))
+			spec.Service.Command[0] = "changed"
+			spec.Env.Vars["PORT"] = "changed"
+			stored, getErr := store.GetService(ctx, "app", svc.Image)
+			Expect(getErr).NotTo(HaveOccurred())
+			Expect(stored).To(Equal(svc))
+			Expect(stored.Command).To(Equal([]string{"serve", "--host={{VHOST}}", "--port={{PORT}}"}))
+			Expect(env.Vars).To(Equal(map[string]string{"PORT": "8080"}))
 		})
 
 		When("a different env is stored for the service", func() {
 			BeforeEach(func() {
-				store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "1111"}}
+				store.envs["app"] = jed.Env{Name: "app", Vars: map[string]string{"PORT": "1111", "STORED_ONLY": "not-proposed"}}
 			})
 
 			It("uses the provided env and does not save it", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(spec.Service.Command).To(ContainElement("--port=8080"))
-				Expect(store.envs["app"].Vars).To(HaveKeyWithValue("PORT", "1111"))
+				Expect(spec.Env.Vars).NotTo(HaveKey("STORED_ONLY"))
+				Expect(store.envs["app"].Vars).To(Equal(map[string]string{"PORT": "1111", "STORED_ONLY": "not-proposed"}))
 			})
 		})
 
