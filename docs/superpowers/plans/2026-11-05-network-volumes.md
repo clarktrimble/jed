@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-05-network-volumes-design.md`
 
+**Completion:** Tasks 1–3 were implemented in `452f1e2`, `39e3e8b`, and `9905ffa`. Checked items reflect committed deliverables and fresh format, diagnostic, test, race, and lint verification. Unchecked preparation and RED-run steps lack historical execution evidence; they do not indicate missing implementation. Historical design and instructions below are unchanged.
+
 ## Global Constraints
 
 - Existing `volumes` and `local_volumes` formats stay unchanged.
@@ -73,7 +75,7 @@ Check local/network intersections before either fold clears its declaration list
 - Produces `NetworkMount`, `Spec.NetworkMounts`, `Service.NetworkVolumes`.
 - Produces `networkVolumeMount(networkRoot, prefix, serviceName, target string) (NetworkMount, error)`.
 
-- [ ] **Step 1: Add failing model and convention tests.**
+- [x] **Step 1: Add failing model and convention tests.**
 
 In same-package `network_volume_test.go`, `TestNetworkVolumeMount` asserts:
 
@@ -100,15 +102,15 @@ Extend the existing service fixture in `store/contract.go` with `NetworkVolumes:
 
 Run `go test . ./store/...`; expect compilation failure for missing NetworkVolumes/networkVolumeMount before implementation. Do not accept unrelated failures as the red result.
 
-- [ ] **Step 3: Implement the declared interfaces and validation.**
+- [x] **Step 3: Implement the declared interfaces and validation.**
 
 Add the additive fields, slice clone, and pure convention helper; reuse existing path helpers. Validate both before rendering where possible and after expansion through the convention helper. Leave DBSchemaVersion unchanged: this is an additive optional service field.
 
-- [ ] **Step 4: Format, diagnose, and verify.**
+- [x] **Step 4: Format, diagnose, and verify.**
 
 Run `gofmt -w network_volume.go network_volume_test.go service.go spec.go service_test.go store/contract.go`, then `gopls check` on those files, then `go test . ./store/...`. Expect no diagnostics and PASS.
 
-- [ ] **Step 5: Commit this tested unit.**
+- [x] **Step 5: Commit this tested unit.**
 
 `git add network_volume.go network_volume_test.go service.go spec.go service_test.go store/contract.go && git commit -m "feat: define network volume convention"`
 
@@ -122,7 +124,7 @@ Run `gofmt -w network_volume.go network_volume_test.go service.go spec.go servic
 - Produces `(j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, networkRoot, prefix string) error`.
 - Public `Jed.Spec` and `Jed.SpecWithEnv` signatures remain unchanged.
 
-- [ ] **Step 1: Add failing `When("the service has network volumes")` cases inside the existing Spec fixture in `spec_test.go`.**
+- [x] **Step 1: Add failing `When("the service has network volumes")` cases inside the existing Spec fixture in `spec_test.go`.**
 
 Use service `app`, image `local/app:v1`, global NETWORK_ROOT `nas:/exports/jed`, and declaration `/var/lib/app`. Assert:
 
@@ -153,15 +155,15 @@ Add named cases with these exact assertions:
 
 Run `go test . -run '^TestJed$' -ginkgo.focus='network volumes' -count=1`; expect assertions to fail because NetworkMounts are absent.
 
-- [ ] **Step 3: Implement preflight and network resolution.**
+- [x] **Step 3: Implement preflight and network resolution.**
 
 Make preflight and network resolution no-ops when NetworkVolumes is empty. After `render`, call the preflight before existing `resolveLocalVolumes`; then resolve network declarations with `varsEnv.Vars["NETWORK_ROOT"]` and `varsEnv.Vars["NETWORK_VOLUME_PREFIX"]`. Skip explicit-target conflicts with an error log; append derived NetworkMounts for remaining targets and clear only the rendered NetworkVolumes slice. Do not put generated named sources in Service.Volumes too, which would create duplicate Docker mounts. No store writes or Docker calls.
 
-- [ ] **Step 4: Format, diagnose, and verify.**
+- [x] **Step 4: Format, diagnose, and verify.**
 
 Run `gofmt -w network_volume.go jed.go spec_test.go`, `gopls check network_volume.go jed.go spec_test.go`, and `go test . -count=1`. Expect no diagnostics and PASS, including all legacy local-volume cases.
 
-- [ ] **Step 5: Commit this tested unit.**
+- [x] **Step 5: Commit this tested unit.**
 
 `git add network_volume.go jed.go spec_test.go && git commit -m "feat: resolve network volumes in rendered specs"`
 
@@ -177,7 +179,7 @@ Run `gofmt -w network_volume.go jed.go spec_test.go`, `gopls check network_volum
 - Produce `swarmNetworkMounts(networkMounts []jed.NetworkMount) []Mount` in `swarm/spec.go`.
 - Existing public Swarm.Spec/Deploy signatures stay unchanged.
 
-- [ ] **Step 1: Add failing adapter and outgoing-request tests.**
+- [x] **Step 1: Add failing adapter and outgoing-request tests.**
 
 In `swarm/spec_test.go`, add a separate `Describe("network volumes")` using newSpecMock, nopLogger, and no secrets. Feed a jed.Spec with the Task 1 postgres descriptor. Marshal the returned body and assert the mount contains:
 
@@ -201,15 +203,15 @@ In `swarm/deploy_test.go`, add a network case calling Deploy with a resolved des
 
 Run `go test ./swarm -run '^TestSwarm$' -ginkgo.focus='network volumes' -count=1`; expect missing network-mount assertions to fail before adapter implementation.
 
-- [ ] **Step 3: Implement conversion and fail-closed unresolved input.**
+- [x] **Step 3: Implement conversion and fail-closed unresolved input.**
 
 Append converted network mounts to existing `swarmMounts(service.Volumes)` in buildSpec. Construct `local` driver options exactly as asserted. In Swarm.Spec, reject remaining Service.NetworkVolumes before secret/config lookups, instructing callers to use Jed.Spec. Do not create/check/delete Docker volumes, mount NFS on the host, or call the NAS.
 
-- [ ] **Step 4: Document the declaration and convention.**
+- [x] **Step 4: Document the declaration and convention.**
 
 Add `network_volumes` to the YAML example/table and explain global NETWORK_ROOT, prefix/default, derived names, explicit/local conflict rules, external directory/permission preparation, and Swarm-only scope. Explain that generated settings are not stored. Mark existing named-volume reuse after root changes as uninvestigated: changing configuration is not a documented retargeting mechanism. Do not claim replacement or mismatch protection.
 
-- [ ] **Step 5: Format, diagnose, and run final validation.**
+- [x] **Step 5: Format, diagnose, and run final validation.**
 
 Run `gofmt -w swarm/spec.go swarm/spec_test.go swarm/deploy_test.go` and `gopls check` on every changed Go file. Then run:
 
@@ -223,7 +225,7 @@ git diff --check
 
 Expect PASS/exit 0 for each; staticcheck is the configured Makefile lint alongside go vet and is available in the inspected workspace. Do not run destructive `make clean` or unnecessary generation. No live NAS test is authorized or implied by mock success.
 
-- [ ] **Step 6: Commit this tested unit.**
+- [x] **Step 6: Commit this tested unit.**
 
 `git add swarm/spec.go swarm/spec_test.go swarm/deploy_test.go service-yaml.md swarm/README.md && git commit -m "feat: emit conventional NFSv3 mounts for swarm"`
 

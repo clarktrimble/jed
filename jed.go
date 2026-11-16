@@ -296,7 +296,7 @@ func (j *Jed) spec(ctx context.Context, intent Intent, env Env) (Spec, error) {
 		return Spec{}, errors.Wrapf(err, "failed to render spec for service %q", name)
 	}
 
-	err = validateConventionalVolumeTargets(spec.Service)
+	networkTargets, err := networkVolumeTargets(spec.Service)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "invalid volume targets for service %q", name)
 	}
@@ -306,7 +306,7 @@ func (j *Jed) spec(ctx context.Context, intent Intent, env Env) (Spec, error) {
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to resolve local volumes for service %q", name)
 	}
-	err = j.resolveNetworkVolumes(ctx, &spec, varsEnv.Vars["NFS_HOST"], varsEnv.Vars["NFS_ROOT"])
+	err = j.resolveNetworkVolumes(ctx, &spec, networkTargets, varsEnv.Vars["NFS_HOST"], varsEnv.Vars["NFS_ROOT"])
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to resolve network volumes for service %q", name)
 	}

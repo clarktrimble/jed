@@ -57,7 +57,7 @@ resources:
 | `ports` | no | Container port to host port mapping |
 | `volumes` | no | Named volume or host path to container path |
 | `local_volumes` | no | Container paths backed by convention-derived local bind mounts from `LOCAL_ROOT` |
-| `network_volumes` | no | Container paths backed by convention-derived NFSv3 mounts from global `NFS_HOST` and `NFS_ROOT` (Swarm only) |
+| `network_volumes` | no | Container paths backed by convention-derived NFSv3 mounts from `NFS_HOST` and `NFS_ROOT` |
 | `secrets` | no | Swarm secret base names; latest version resolved at deploy |
 | `configs` | no | Swarm config base names mapped to target mount paths |
 | `hosts` | no | Extra `/etc/hosts` entries |
@@ -151,9 +151,9 @@ local_volumes:
 
 If an explicit `volumes` entry already mounts the same container path, the explicit volume wins and Jed logs an error.
 
-### Network volumes (Swarm)
+### Network volumes
 
-Declare only the container paths; Jed derives the NFSv3 mount settings:
+Declare only the container paths.
 
 ```yaml
 name: postgres
@@ -161,7 +161,7 @@ network_volumes:
   - /var/lib/postgresql/data
 ```
 
-Set these values in the global render-vars env (`_global` by default), alongside `LOCAL_ROOT`:
+Set these values in the global env:
 
 ```yaml
 name: _global
@@ -169,8 +169,6 @@ vars:
   NFS_HOST: nas
   NFS_ROOT: /volume1
 ```
-
-`NFS_HOST` is the NAS hostname or IP address; `NFS_ROOT` is the absolute parent path of the NAS shares (for example `/volume1` on Synology). Both are required only for services declaring network volumes. Use bare IPv6 addresses, for example `NFS_HOST: '2001:db8::10'`. Service env values do not override these global configuration values. The former `NETWORK_ROOT` and `NETWORK_VOLUME_PREFIX` settings are no longer supported.
 
 The example derives:
 
@@ -186,20 +184,6 @@ Docker volumes and NAS shares use the same name, at most 32 ASCII characters:
 ```text
 <service_lastdir, truncated to 25 characters>_<6 hex hash>
 ```
-
-Template expansion happens first. Validate the container path as absolute and below `/`, rejecting `.`/`..` segments, then normalize it with Go's `path.Clean`. Build the readable stem from the flattened service name, `_`, and the normalized path's last directory. Validate the complete stem before truncating: letters, digits, `_`, `.`, or `-`, starting with a letter or digit.
-
-Always append a hash, even for short stems. Hash the original full service name, one NUL byte, and the normalized full container path as UTF-8 bytes with **FNV-1a 64-bit**. Format its low 24 bits as exactly six lowercase hexadecimal characters, zero-padded. The full service and path are hashed before any stem truncation. Export paths are `NFS_ROOT/<name>`, with no service-directory nesting. Local-volume naming is unchanged.
-
-An explicit `volumes` entry at the same target wins and Jed logs the conflict. A target declared in both `local_volumes` and `network_volumes` is an error, even if an explicit mount also uses it. Repeated equivalent network targets are deduplicated. Distinct targets with the same basename normally get different hashes; any collision of the final names within one service is rejected. Jed resolves one service at a time and cannot enforce global uniqueness: the upstream NAS provisioner must record each share's full service/path identity and reject reuse by a different identity. An existing share alone does not prove a collision.
-
-`Jed.Spec()` generates transient `NetworkMounts` descriptors, and the Swarm adapter emits Docker `local` driver settings with `type=nfs`, `nfsvers=3`, and read/write access. Stored service declarations remain unchanged; resolved mounts are not persisted. The standalone `container` runtime does not resolve or support `network_volumes`.
-
-The external storage setup must prepare the derived NAS shares/exports and permissions. Eligible Swarm workers need NFS support and connectivity. Jed does not create directories, adjust ownership, or provision/replace volumes.
-
-**Migration:** this naming convention changes Docker volume names and NAS paths from the older prefix/full-path layout. Jed does not rename or migrate existing storage. Prepare/migrate data explicitly before redeploying existing workloads; a new name does not move the old data.
-
-**Deferred investigation:** existing Docker volumes may retain creation-time NFS settings. Changing `NFS_HOST` or `NFS_ROOT` is not a documented way to retarget an existing volume. Reuse, cross-service naming collisions, mismatch detection, and replacement policy remain to be investigated; this feature provides no mismatch protection or automatic recreation.
 
 ## Secrets
 

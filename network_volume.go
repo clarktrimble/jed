@@ -11,7 +11,6 @@ import (
 )
 
 // NetworkMount describes a convention-resolved NFS mount in a rendered Spec.
-// It is not part of the persisted service definition.
 type NetworkMount struct {
 	Name   string `json:"name"`
 	Target string `json:"target"`
@@ -24,7 +23,7 @@ var (
 	networkHostLabel  = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`)
 )
 
-func networkVolumeMount(server, root, serviceName, target string) (NetworkMount, error) {
+func networkVolumeMount(server, root, serviceName, normalizedTarget string) (NetworkMount, error) {
 	if !validNetworkServer(server) {
 		return NetworkMount{}, fmt.Errorf("NFS_HOST has invalid server %q", server)
 	}
@@ -35,57 +34,54 @@ func networkVolumeMount(server, root, serviceName, target string) (NetworkMount,
 	if strings.ContainsRune(root, 0) {
 		return NetworkMount{}, fmt.Errorf("NFS_ROOT cannot contain NUL")
 	}
-	target, err = cleanLocalPath("network volume", target)
-	if err != nil {
-		return NetworkMount{}, err
-	}
 	service, err := flatPathPart("service name", serviceName)
 	if err != nil {
 		return NetworkMount{}, err
 	}
-	stem := service + "_" + path.Base(target)
+	stem := service + "_" + path.Base(normalizedTarget)
 	if !networkVolumeName.MatchString(stem) {
 		return NetworkMount{}, fmt.Errorf("invalid network volume name stem %q", stem)
 	}
 	if len(stem) > 25 {
 		stem = stem[:25]
 	}
-	// This encoding and hash are the storage identity shared with the NAS provisioner.
 	hash := fnv.New64a()
-	hash.Write([]byte(serviceName + "\x00" + target))
+	hash.Write([]byte(serviceName + "\x00" + normalizedTarget))
 	name := fmt.Sprintf("%s_%06x", stem, hash.Sum64()&0xffffff)
 	return NetworkMount{
-		Name: name, Target: target, Server: server,
+		Name: name, Target: normalizedTarget, Server: server,
 		Export: path.Join(root, name),
 	}, nil
 }
 
-func validateConventionalVolumeTargets(service Service) error {
+func networkVolumeTargets(service Service) ([]string, error) {
 	if len(service.NetworkVolumes) == 0 {
-		return nil
+		return nil, nil
 	}
 	localTargets := make(map[string]bool, len(service.LocalVolumes))
 	for _, rawTarget := range service.LocalVolumes {
 		target, err := cleanLocalPath("local volume", rawTarget)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		localTargets[target] = true
 	}
+	targets := make([]string, 0, len(service.NetworkVolumes))
 	for _, rawTarget := range service.NetworkVolumes {
 		target, err := cleanLocalPath("network volume", rawTarget)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if localTargets[target] {
-			return fmt.Errorf("local and network volumes share container target %q", target)
+			return nil, fmt.Errorf("local and network volumes share container target %q", target)
 		}
+		targets = append(targets, target)
 	}
-	return nil
+	return targets, nil
 }
 
-func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, server, root string) error {
-	if len(spec.Service.NetworkVolumes) == 0 {
+func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, targets []string, server, root string) error {
+	if len(targets) == 0 {
 		return nil
 	}
 	explicitTargets := make(map[string]bool, len(spec.Service.Volumes))
@@ -94,7 +90,7 @@ func (j *Jed) resolveNetworkVolumes(ctx context.Context, spec *Spec, server, roo
 	}
 	seenTargets := make(map[string]bool)
 	names := make(map[string]string)
-	for _, target := range spec.Service.NetworkVolumes {
+	for _, target := range targets {
 		mount, err := networkVolumeMount(server, root, spec.Service.Name, target)
 		if err != nil {
 			return err

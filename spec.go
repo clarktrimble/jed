@@ -16,7 +16,7 @@ type Spec struct {
 	Env Env `json:"env"`
 	// Intent is the selected image and desired replica count used to render the spec.
 	Intent Intent `json:"intent"`
-	// NetworkMounts contains derived NFS mounts for runtime adapters, never stored services.
+	// NetworkMounts contains derived NFS mounts.
 	NetworkMounts []NetworkMount `json:"network_mounts,omitempty"`
 }
 
