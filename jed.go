@@ -279,6 +279,9 @@ func (j *Jed) spec(ctx context.Context, intent Intent, env Env) (Spec, error) {
 	if svc.Network == "" {
 		svc.Network = j.defaultNetwork
 	}
+	if svc.Restart == "" {
+		svc.Restart = RestartAny
+	}
 
 	err = svc.Validate()
 	if err != nil {

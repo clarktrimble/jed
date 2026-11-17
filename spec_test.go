@@ -38,6 +38,37 @@ var _ = Describe("Jed", func() {
 		})
 	})
 
+	Describe("restart condition rendering", func() {
+		DescribeTable("resolves the condition without changing the stored definition", func(input, want string) {
+			ctx := context.Background()
+			store := newFakeStore()
+			intent := jed.Intent{Name: "app", Image: "local/app:v1", Replicas: 1}
+			env := jed.Env{Name: "app", Vars: map[string]string{}}
+			Expect(store.SetService(ctx, jed.Service{
+				Name: "app", Image: "local/app:v1", Restart: input,
+			})).To(Succeed())
+			Expect(store.SetIntent(ctx, intent)).To(Succeed())
+			j := (&jed.Config{
+				VarsEnvName: "_global", DefaultUid: "1000", DefaultNetwork: "svc-net",
+			}).New(store, loggertest.NewLoggerMock())
+
+			storedSpec, err := j.Spec(ctx, "app")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(storedSpec.Service.Restart).To(Equal(want))
+			preview, err := j.ProvisionalSpec(ctx, intent, env)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(preview.Service.Restart).To(Equal(want))
+			stored, err := store.GetService(ctx, "app", "local/app:v1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(stored.Restart).To(Equal(input))
+		},
+			Entry("defaults empty to any", "", jed.RestartAny),
+			Entry("preserves explicit any", jed.RestartAny, jed.RestartAny),
+			Entry("preserves on-failure", jed.RestartOnFailure, jed.RestartOnFailure),
+			Entry("preserves none", jed.RestartNone, jed.RestartNone),
+		)
+	})
+
 	Describe("Store", func() {
 		It("returns the underlying store", func() {
 			store := newFakeStore()

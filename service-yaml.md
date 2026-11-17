@@ -114,7 +114,9 @@ labels:
 
 ## Restart
 
-Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`.
+Restart condition is one of `none`, `on-failure`, or `any`. Jed renders an empty
+value as `any`. Use explicit `none` for one-shot services that must not run again
+after successful completion.
 For swarm, `on-failure` uses one restart attempt.
 
 ```yaml

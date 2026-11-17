@@ -200,7 +200,7 @@ type Service struct {
 	NetworkVolumes []string `json:"network_volumes,omitempty"`
 	// Network is the swarm network name. Jed applies DefaultNetwork when omitted.
 	Network string `json:"network,omitempty"`
-	// Restart specifies restart behavior. Empty means no restart.
+	// Restart specifies restart behavior. Jed renders an empty value as "any".
 	Restart string `json:"restart,omitempty"`
 	// Secrets lists swarm secret base names to mount (e.g., "s3_secret_key").
 	Secrets []string `json:"secrets,omitempty"`
