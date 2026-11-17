@@ -10,6 +10,8 @@
 - Todo: improve deploy UX with an optional rendered-intent preview before deploy; avoid plan/apply abstractions until there is a concrete need
 - Todo: add a store/data migration path, perhaps explicit `jed export > services.yaml` and `jed import services.yaml` commands
 - Todo: add focused coverage where it buys confidence, e.g. swarm restart `any` and cmd smoke-ish behavior (`Swarm.TaskLogs` decoder coverage is now in place)
+- Todo: investigate why swarm maps `on-failure` to one restart attempt and what relies on that behavior. Preserve the limit for now; changing the default restart condition to `any` does not authorize changing this limit.
+- Todo: consolidate Swarm construction around `swarm.Config.New` and consider an `export_test.go` helper for local mock-client injection. Keep public `swarm.New(client, logger)` for now: downstream tests use it, and their migration needs to be addressed before removing it.
 - Todo: cut back on nil checks, lets rely on New instead
 - Todo: add store HTTP routes for intents if/when the HTTP API needs parity
 - Todo: add CLI intent commands only if the CLI becomes active again
