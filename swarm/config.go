@@ -13,11 +13,11 @@ type Config struct {
 	// Socket is the Docker socket path.
 	Socket string `json:"socket" default:"/var/run/docker.sock"`
 	// RestartDelay is the delay before an automatic task restart.
-	RestartDelay time.Duration `json:"restart_delay" default:"5s" split_words:"true"`
+	RestartDelay time.Duration `json:"restart_delay" default:"5s" split_words:"true" desc:"delay before an automatic task restart"`
 	// RestartMaxAttempts limits retries for "any"; zero means unlimited.
-	RestartMaxAttempts int `json:"restart_max_attempts" default:"5" split_words:"true"`
+	RestartMaxAttempts int `json:"restart_max_attempts" default:"5" split_words:"true" desc:"maximum retries when restart=any"`
 	// RestartWindow is the retry-count lookback period for "any"; zero counts all retries.
-	RestartWindow time.Duration `json:"restart_window" default:"2m" split_words:"true"`
+	RestartWindow time.Duration `json:"restart_window" default:"2m" split_words:"true" desc:"retry-count lookback period when restart=any"`
 }
 
 // New creates a Swarm from Config.
