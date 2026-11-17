@@ -62,7 +62,7 @@ resources:
 | `configs` | no | Swarm config base names mapped to target mount paths |
 | `hosts` | no | Extra `/etc/hosts` entries |
 | `resources` | no | CPU and memory limits/reservations |
-| `restart` | no | Restart policy (`none`, `on-failure`, `any`) |
+| `restart` | no | Restart condition (`none`, `on-failure`, `any`); Jed defaults to `any` |
 | `publish_mode` | no | Port publish mode: `host` for direct binding; default is ingress |
 | `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1000` |
 | `groups` | no | Supplementary group GIDs, e.g. `967` |
@@ -116,12 +116,28 @@ labels:
 
 Restart condition is one of `none`, `on-failure`, or `any`. Jed renders an empty
 value as `any`. Use explicit `none` for one-shot services that must not run again
-after successful completion.
-For swarm, `on-failure` uses one restart attempt.
+after successful completion. Stored definitions are not rewritten when Jed
+resolves the default.
+
+Swarm applies the same runtime-wide policy to explicit and defaulted `any`:
+by default, a five-second delay and five restart attempts within a two-minute
+lookback period per service slot. Rapid failures can exhaust attempts before two
+minutes elapse; retries do not automatically resume when the window expires.
+`on-failure` retains one restart attempt, no explicit window, and the configured
+delay. `none` has no automatic retries.
 
 ```yaml
-restart: on-failure
+restart: none
 ```
+
+Delay, attempts, and window are configured on `swarm.Config`, not in service
+YAML. See [Swarm automatic restart policy](swarm/README.md#automatic-restart-policy)
+for fields, environment variables, and zero-value behavior.
+
+On the next deployment, existing empty settings change from no restart to `any`,
+and existing explicit `any` settings change from unlimited retries to the
+configured retry budget. Running services are unaffected until redeployed. The
+service YAML shape and store schema are unchanged.
 
 ## Resources
 

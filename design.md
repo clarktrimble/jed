@@ -141,6 +141,26 @@ secret/config versions.
 The swarm runtime supplies its own defaults and constraints. These are
 documented in [swarm/README.md](swarm/README.md).
 
+Restart condition remains a simple string on `jed.Service`. Jed resolves an
+empty condition as `any` during spec rendering, without rewriting the stored
+service. Swarm projects the supplied condition without an empty-value fallback
+or a new empty-value validation error.
+
+Delay and retry budgeting are runtime-wide policy on `swarm.Config`. The defaults
+are a five-second delay and, for `any`, five attempts within a two-minute
+lookback period per service slot. Explicit and defaulted `any` are treated
+identically. `on-failure` retains one retry and no explicit window, with the
+configured delay; `none` disables automatic restart. One-shot services can use
+explicit `none` to avoid repeating after successful completion.
+
+The window does not ensure two minutes of retries or resume an exhausted service
+automatically. This favors bounded crash-loop recovery over unlimited retries.
+Manual `Swarm.Restart` remains a separate rollout operation.
+
+These changes apply on deployment: existing empty settings acquire `any`, and
+explicit `any` acquires the configured retry budget. Running services do not
+change immediately. No service-format or store-schema migration is required.
+
 Traefik support is modeled on `jed.Service` as high-level routing intent. Swarm
 projects that intent into Docker-provider labels. If another runtime is added
 later, it can project the same intent differently, such as Kubernetes ingress

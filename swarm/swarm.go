@@ -17,7 +17,7 @@
 //
 //   - Read-only root filesystem
 //   - Secrets mounted with the service UID/GID, mode 0400
-//   - Restart disabled by default; enabled restart policies have 5s delay
+//   - Runtime-wide automatic restart settings; on-failure retains one retry
 //   - Update order stop-first, pause on failure
 //   - JSON file logging with 10MB rotation, 3 files
 package swarm
@@ -29,6 +29,7 @@ package swarm
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/clarktrimble/jed/logger"
 	"github.com/pkg/errors"
@@ -43,16 +44,26 @@ type Client interface {
 
 // Swarm interacts with Docker Swarm.
 type Swarm struct {
-	client Client
-	logger logger.Logger
+	client             Client
+	logger             logger.Logger
+	restartDelay       time.Duration
+	restartMaxAttempts int
+	restartWindow      time.Duration
 }
 
 // ErrServiceNotFound is returned when a swarm service does not exist.
 var ErrServiceNotFound = errors.New("swarm service not found")
 
-// New creates a Swarm.
+// New creates a Swarm with default runtime settings and the supplied client.
+// Use Config.New to customize runtime settings.
 func New(client Client, logger logger.Logger) *Swarm {
-	return &Swarm{client: client, logger: logger}
+	return &Swarm{
+		client:             client,
+		logger:             logger,
+		restartDelay:       5 * time.Second,
+		restartMaxAttempts: 5,
+		restartWindow:      2 * time.Minute,
+	}
 }
 
 // IDResponse identifies a Docker resource created by an API call.

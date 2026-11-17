@@ -51,12 +51,13 @@ type ResourceValues struct {
 	MemoryBytes int64 `json:"MemoryBytes"`
 }
 
-// RestartPolicy controls task restart behavior. Delay and MaxAttempts are
-// omitted for the "none" condition.
+// RestartPolicy controls task restart behavior. Delay and Window are nanoseconds.
+// Optional fields are omitted when zero; all are omitted for the "none" condition.
 type RestartPolicy struct {
 	Condition   string `json:"Condition"`
 	Delay       int64  `json:"Delay,omitempty"`
 	MaxAttempts int    `json:"MaxAttempts,omitempty"`
+	Window      int64  `json:"Window,omitempty"`
 }
 
 // Network attaches the task to a Docker network by name.
@@ -174,7 +175,7 @@ func (d *Swarm) Spec(ctx context.Context, jspec jed.Spec) (Spec, error) {
 		return Spec{}, err
 	}
 
-	body, err := buildSpec(jspec, resolved, resolvedCfgs)
+	body, err := d.buildSpec(jspec, resolved, resolvedCfgs)
 	if err != nil {
 		return Spec{}, errors.Wrapf(err, "failed to build spec for %q", service.Name)
 	}
@@ -182,7 +183,7 @@ func (d *Swarm) Spec(ctx context.Context, jspec jed.Spec) (Spec, error) {
 	return body, nil
 }
 
-func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfig) (Spec, error) {
+func (d *Swarm) buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfig) (Spec, error) {
 	service := jspec.Service
 	env := jspec.Env
 
@@ -245,7 +246,7 @@ func buildSpec(jspec jed.Spec, secrets []resolvedSecret, configs []resolvedConfi
 				},
 			},
 			Resources:     resources,
-			RestartPolicy: restartPolicy(service),
+			RestartPolicy: d.restartPolicy(service),
 			Networks: []Network{
 				{Target: service.Network},
 			},
@@ -435,23 +436,18 @@ func parseMem(s string) (int64, error) {
 	return n * 1024 * 1024, nil
 }
 
-func restartPolicy(service jed.Service) RestartPolicy {
-	condition := service.Restart
-	if condition == "" {
-		condition = jed.RestartNone
+func (d *Swarm) restartPolicy(service jed.Service) RestartPolicy {
+	restart := RestartPolicy{Condition: service.Restart}
+	if service.Restart == jed.RestartNone {
+		return restart
 	}
 
-	if condition == jed.RestartNone {
-		return RestartPolicy{
-			Condition: "none",
-		}
-	}
-
-	restart := RestartPolicy{
-		Condition: condition,
-		Delay:     5000000000,
-	}
-	if condition == jed.RestartOnFailure {
+	restart.Delay = int64(d.restartDelay)
+	switch service.Restart {
+	case jed.RestartAny:
+		restart.MaxAttempts = d.restartMaxAttempts
+		restart.Window = int64(d.restartWindow)
+	case jed.RestartOnFailure:
 		restart.MaxAttempts = 1
 	}
 	return restart

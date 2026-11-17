@@ -134,17 +134,31 @@ var _ = Describe("Spec", func() {
 		})
 	})
 
-	Describe("with default restart policy", func() {
+	Describe("with empty restart policy", func() {
 		BeforeEach(func() {
 			svc.Secrets = nil
 			svc.Restart = ""
 		})
 
-		It("disables restarts", func() {
+		It("projects the empty condition without a fallback or special error", func() {
 			Expect(err).NotTo(HaveOccurred())
+			Expect(body.TaskTemplate.RestartPolicy.Condition).To(BeEmpty())
+			Expect(wireRestartPolicy(body)).To(HaveKeyWithValue("Condition", ""))
+		})
+	})
 
-			restart := body.TaskTemplate.RestartPolicy
-			Expect(restart).To(Equal(swarm.RestartPolicy{Condition: "none"}))
+	Describe("with any restart policy", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Restart = jed.RestartAny
+		})
+
+		It("uses the runtime defaults for direct construction", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{
+				Condition: "any", Delay: 5000000000, MaxAttempts: 5, Window: 120000000000,
+			}))
+			Expect(wireRestartPolicy(body)).To(HaveKeyWithValue("Window", float64(120000000000)))
 		})
 	})
 
@@ -161,6 +175,19 @@ var _ = Describe("Spec", func() {
 			Expect(restart.Condition).To(Equal("on-failure"))
 			Expect(restart.Delay).To(Equal(int64(5000000000)))
 			Expect(restart.MaxAttempts).To(Equal(1))
+			Expect(wireRestartPolicy(body)).NotTo(HaveKey("Window"))
+		})
+	})
+
+	Describe("with none restart policy", func() {
+		BeforeEach(func() {
+			svc.Secrets = nil
+			svc.Restart = jed.RestartNone
+		})
+
+		It("omits timing and retry fields", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(wireRestartPolicy(body)).To(Equal(map[string]any{"Condition": "none"}))
 		})
 	})
 
