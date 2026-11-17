@@ -1,6 +1,6 @@
 # Jed Design Decisions
 
-Jed is organized around one shared service model, store-backed desired state, explicit rendering, and small Docker runtime packages.
+Jed is organized around one shared service model, store-backed desired state, explicit rendering, and a Docker Swarm runtime.
 
 This document records design decisions and tradeoffs. Usage details live in the package READMEs and [service-yaml.md](service-yaml.md).
 
@@ -12,14 +12,11 @@ store         Store contract tests and helpers
 store/bbolt   persistent Store implementation
 store/memo    in-memory Store implementation
 swarm         Docker Swarm runtime
-container     standalone Docker container runtime
 cmd/jed       CLI for editing stored desired state
 cmd/transship CLI for operating swarm state
 ```
 
-The root `jed` package is intentionally runtime-neutral. It contains the shared service model, store contract, and rendering helpers. Runtime packages such as `swarm` and `container` own Docker API details and deployment mechanics.
-
-The standalone runtime lives in `container`, making it a peer of `swarm` while keeping `jed.Service` as the central downstream API.
+The root `jed` package is intentionally runtime-neutral. It contains the shared service model, store contract, and rendering helpers. The `swarm` package owns Docker Swarm API details and deployment mechanics; Swarm is the supported deployment runtime.
 
 ## Desired State vs Rendered Specs
 
@@ -100,18 +97,6 @@ Tradeoff: `Swarm.Spec` is an introspection method, but it still contacts Docker 
 The swarm runtime currently supplies defaults and constraints such as resource defaults, read-only root filesystem, default user, restart mapping, update behavior, and log driver settings. These are documented in [swarm/README.md](swarm/README.md) rather than repeated here.
 
 Traefik support is modeled on `jed.Service` as high-level routing intent. Swarm projects that intent into Docker-provider labels. If another runtime is added later, it can project the same intent differently, such as Kubernetes ingress resources.
-
-## Standalone Container Runtime
-
-The standalone Docker runtime lives in `container`. It names deployed containers with a random suffix, e.g. `postgres-k7m9x2n`, and labels them with `managed_by=jed`.
-
-Why random suffixes?
-
-- Avoids name collisions when containers linger after failed undeploy.
-- Keeps the service name readable in Docker listings.
-- Requires no persisted sequence state.
-
-Limitation: multiple deployments of the same service are still rejected by Jed and would often conflict on ports, volumes, and network aliases anyway.
 
 ## Known Limitations
 

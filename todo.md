@@ -7,7 +7,7 @@
 - Todo: consider tmpfs mount (for grafana)
 - Todo: improve deploy UX with an optional rendered-intent preview before deploy; avoid plan/apply abstractions until there is a concrete need
 - Todo: add a store/data migration path, perhaps explicit `jed export > services.yaml` and `jed import services.yaml` commands
-- Todo: add focused coverage where it buys confidence, e.g. `internal/dockerlog`, swarm restart `any`, and cmd smoke-ish behavior
+- Todo: add focused coverage where it buys confidence, e.g. swarm restart `any` and cmd smoke-ish behavior (`Swarm.TaskLogs` decoder coverage is now in place)
 - Todo: cut back on nil checks, lets rely on New instead
 - Todo: add store HTTP routes for intents if/when the HTTP API needs parity
 - Todo: add CLI intent commands only if the CLI becomes active again
@@ -20,7 +20,7 @@ Captured from branch review; these are future work, not implemented changes.
 
 - [ ] A-and fix the garbo user docs generated in this branch, sigh
 - [x] A-and fix the superpower planning docs botched in this branch (tasks not marked as done)
-- [ ] **Remove the deprecated standalone container runtime.** Standalone is deprecated; the direction is removal, not adding NetworkVolumes support or a new rejection guard. Inventory callers, CLI paths, tests, and documentation before removing `container/` and updating affected references. Current risk until removal: standalone Deploy ignores NetworkVolumes because it only consumes Volumes; Redeploy removes the existing container before calling Deploy. Do not use standalone for services declaring network storage.
+- [x] **Remove the deprecated standalone container runtime.** Standalone is deprecated; the direction is removal, not adding NetworkVolumes support or a new rejection guard. Inventory callers, CLI paths, tests, and documentation before removing `container/` and updating affected references. Current risk until removal: standalone Deploy ignores NetworkVolumes because it only consumes Volumes; Redeploy removes the existing container before calling Deploy. Do not use standalone for services declaring network storage.
 - [x] **Revisit test-style consistency only if worthwhile.** `network_volume_test.go` uses same-package stdlib table tests for private helpers, as prescribed by the implementation plan. This is not the first such test: `spec_render_test.go` predates this feature. Existing tests stay for now; any future style cleanup should preserve helper and clone-isolation coverage without exporting internals merely for tests.
 - [ ] **Consider simplifying server validation.** Current validation covers hostname labels and bracketed IPv6 as well as mount-option injection prevention. Decide whether that full input contract is still desired before simplifying; preserve safe option construction, whitespace/delimiter rejection, and intentional IPv6 parsing behavior. This is optional cleanup, not a confirmed defect.
 - [x] **Verify the fixed NFS options on the first real deployment.** The convention emits `nfsvers=3,rw`, with neither `nolock` nor `soft`. Mock tests verify the outgoing payload, not successful NAS mounts. Confirm worker/NAS prerequisites, NFSv3 locking support (including lockd/statd where required), permissions, and representative workload behavior on eligible workers. If the environment needs `nolock`, revisit the convention and its locking implications explicitly; do not add `soft` casually because of its data-integrity risks.

@@ -9,7 +9,7 @@ Remove the deprecated standalone Docker deployment API and keep Docker log decod
 Selected: delete `container/` outright and move the decoder into Swarm as an unexported implementation detail. A compatibility stub would retain the unwanted deployment API. A top-level `dockerlog` package would expose a reusable abstraction with only one remaining consumer. Neither is needed.
 
 ## Scope
-- Delete the six tracked files in `container/`, including runtime tests and generated mocks.
+- Delete the five tracked files in `container/` plus its ignored generated mock, including the runtime tests.
 - Move `internal/dockerlog/decoder.go` to `swarm/dockerlog.go`; change its package to `swarm` and rename `Decode(src io.Reader) io.Reader` to unexported `decodeDockerLogs(src io.Reader) io.Reader` (implementation naming is the builder's call).
 - Update `swarm/task.go` to use the local helper. Preserve existing decoding behavior, framing errors, and the 65536-byte frame limit.
 - Preserve the real-log fixture regression from the deleted container tests in public `Swarm.TaskLogs` coverage, alongside focused framing/error regressions.

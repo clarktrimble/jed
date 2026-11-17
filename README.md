@@ -1,6 +1,6 @@
 # Jed
 
-Just Enough Docker: shared service definitions, stores, and Docker runtimes.
+Just Enough Docker: shared service definitions, stores, and a Docker Swarm runtime.
 
 ## Concepts
 
@@ -11,10 +11,7 @@ Just Enough Docker: shared service definitions, stores, and Docker runtimes.
 - `jed.Store` persists services, envs, and intents.
 - `jed.Jed` loads stored state, renders specs by service name, and updates intent state.
 
-Runtime packages consume Jed model values:
-
-- `swarm` deploys rendered `jed.Spec` values to Docker Swarm.
-- `container` deploys standalone Docker containers from raw `jed.Service` and `jed.Env` values.
+The `swarm` package deploys rendered `jed.Spec` values to Docker Swarm, the supported deployment runtime.
 
 ## Quick Start: Swarm
 

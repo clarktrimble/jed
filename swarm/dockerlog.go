@@ -1,5 +1,4 @@
-// Package dockerlog decodes Docker's multiplexed container log stream.
-package dockerlog
+package swarm
 
 import (
 	"encoding/binary"
@@ -12,8 +11,8 @@ const (
 	maxFrameSize uint32 = 65536
 )
 
-// Decode wraps a Docker log stream, stripping multiplexed frame headers.
-func Decode(src io.Reader) io.Reader {
+// decodeDockerLogs wraps a Docker log stream, stripping multiplexed frame headers.
+func decodeDockerLogs(src io.Reader) io.Reader {
 	return &logDecoder{
 		src:    src,
 		header: make([]byte, 8),
