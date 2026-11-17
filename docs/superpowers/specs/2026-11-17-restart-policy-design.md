@@ -116,4 +116,4 @@ Do not change the `on-failure` retry budget or add a window to it.
 - [x] Write proposed design.
 - [x] Obtain design approval.
 - [x] Write implementation plan using the writing-plans skill.
-- [ ] Implement and verify through the normal Superpowers workflow.
+- [x] Implement and verify through the normal Superpowers workflow.

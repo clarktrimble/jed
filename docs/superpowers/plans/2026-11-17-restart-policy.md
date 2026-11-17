@@ -56,7 +56,7 @@
 - Preserves `(*Jed).Spec(context.Context, string) (Spec, error)` and `(*Jed).ProvisionalSpec(context.Context, Intent, Env) (Spec, error)`.
 - Produces explicit `Spec.Service.Restart == RestartAny` for empty stored definitions, without writing to the store.
 
-- [ ] **Step 1: Add failing rendering tests.**
+- [x] **Step 1: Add failing rendering tests.**
 
 In `spec_test.go`, add `Describe("restart condition rendering", ...)`, using `newFakeStore`, a valid stored service and intent, and a configured `Jed`. Exercise both public rendering paths for each row:
 
@@ -81,19 +81,19 @@ Expect(err).NotTo(HaveOccurred())
 Expect(stored.Restart).To(Equal(input))
 ```
 
-- [ ] **Step 2: Confirm the empty-input example fails.**
+- [x] **Step 2: Confirm the empty-input example fails.**
 
 Run `go test . -ginkgo.focus='restart condition rendering' -count=1`. Expected: failure because the rendered condition is empty, not `any`.
 
-- [ ] **Step 3: Implement the default and document it.**
+- [x] **Step 3: Implement the default and document it.**
 
 In `(*Jed).spec(ctx context.Context, intent Intent, env Env) (Spec, error)`, set the loaded service's empty restart to `RestartAny` before validation/rendering, alongside the existing user/network defaults. Do not modify `Service.Validate` to reject empty raw definitions. Update `Service.Restart`'s comment and the restart section of `service-yaml.md`: empty means `any` after Jed rendering; one-shot services can specify `none`. Retain the one-retry description for `on-failure`.
 
-- [ ] **Step 4: Format, diagnose, and test.**
+- [x] **Step 4: Format, diagnose, and test.**
 
 Run `gofmt -w jed.go service.go spec_test.go`, `gopls check jed.go service.go spec_test.go`, and `go test . -count=1`. Expected: no diagnostics and passing tests. Review changed expected full-spec assertions if the new explicit field legitimately affects them; do not weaken unrelated assertions.
 
-- [ ] **Step 5: Commit the rendering deliverable.**
+- [x] **Step 5: Commit the rendering deliverable.**
 
 Run `git add jed.go service.go spec_test.go service-yaml.md && git commit -m "feat: default rendered restart condition to any"` after reviewing the diff.
 
@@ -106,9 +106,9 @@ Run `git add jed.go service.go spec_test.go service-yaml.md && git commit -m "fe
 - Adds the three config fields listed in Global Constraints, with JSON names `restart_delay`, `restart_max_attempts`, and `restart_window`, default tags `5s`, `5`, and `2m`, and `split_words:"true"` tags so envconfig recognizes the documented underscore-separated environment names.
 - Preserves `(*Config).New(logger.Logger) *Swarm`, `New(Client, logger.Logger) *Swarm`, and `(*Swarm).Spec(context.Context, jed.Spec) (Spec, error)`.
 - Adds `Window int64` with JSON tag `Window,omitempty` to `swarm.RestartPolicy`.
-- Changes private helpers to `(*Swarm).buildSpec(jed.Spec) (Spec, error)` and `(*Swarm).restartPolicy(jed.Service) RestartPolicy` so projection uses instance settings.
+- Changes private helpers to `(*Swarm).buildSpec(jed.Spec, []resolvedSecret, []resolvedConfig) (Spec, error)` and `(*Swarm).restartPolicy(jed.Service) RestartPolicy` so projection uses instance settings, preserving the existing resolved-resource arguments.
 
-- [ ] **Step 1: Add failing runtime-policy tests.**
+- [x] **Step 1: Add failing runtime-policy tests.**
 
 Extend `swarm/config_test.go` using `envconfig.Process("swarm", cfg)` and `nopLogger{}`. Tests must isolate the relevant `SWARM_*` environment variables with cleanup, so external settings cannot alter default assertions. Exercise `cfg.New(...).Spec(...)` with a minimal explicit-condition spec containing no secrets/configs; this path performs no Docker requests and needs no new injection seam.
 
@@ -147,11 +147,11 @@ Expect(wirePolicy).To(HaveLen(1))           // none: Condition only
 Expect(wirePolicy["Condition"]).To(Equal("none"))
 ```
 
-- [ ] **Step 2: Confirm the tests fail before implementation.**
+- [x] **Step 2: Confirm the tests fail before implementation.**
 
 Run `go test ./swarm -ginkgo.focus='Config|restart policy' -count=1`. Expected initially: compile errors for missing config/Window fields; after those declarations, assertions must expose missing configuration wiring/defaults. Do not count unrelated failures as the red test.
 
-- [ ] **Step 3: Implement config storage and condition-specific projection.**
+- [x] **Step 3: Implement config storage and condition-specific projection.**
 
 Add private `restartDelay time.Duration`, `restartMaxAttempts int`, and `restartWindow time.Duration` fields to `Swarm`. Retained `New(client Client, logger logger.Logger) *Swarm` initializes them to five seconds, five attempts, and two minutes. `Config.New` retains existing client creation, then copies all three config values into the instance returned by `New`, including zeros. Copy values rather than retain a mutable config pointer.
 
@@ -159,15 +159,15 @@ Convert `buildSpec` and `restartPolicy` to the receiver methods defined in Inter
 
 Before changing Go symbols, run `gopls symbols` on the three production files and semantic references for the helpers and public types being changed. The planning pass found only one production caller each for `buildSpec` and `restartPolicy`; confirm before editing.
 
-- [ ] **Step 4: Format, diagnose, and run Swarm tests.**
+- [x] **Step 4: Format, diagnose, and run Swarm tests.**
 
 Run `gofmt -w swarm/config.go swarm/swarm.go swarm/spec.go swarm/config_test.go swarm/spec_test.go`, `gopls check swarm/config.go swarm/swarm.go swarm/spec.go swarm/config_test.go swarm/spec_test.go`, and `go test ./swarm -count=1`. Expected: no diagnostics and passing tests, including the unchanged manual-restart tests. No Docker daemon or live deployment is required.
 
-- [ ] **Step 5: Document the complete policy.**
+- [x] **Step 5: Document the complete policy.**
 
 Update `swarm/README.md` with a configuration table showing `SWARM_RESTART_DELAY=5s`, `SWARM_RESTART_MAX_ATTEMPTS=5`, and `SWARM_RESTART_WINDOW=2m`, explicitly distinguishing `any` from the preserved `on-failure` budget/window. Update `service-yaml.md` and `design.md` to explain Jed's rendering default, explicit `none` for one-shot services, and the intentional redeploy-time behavior changes for empty and explicit `any`. Explain that the two-minute lookback does not guarantee two minutes of retries or automatic resumption after exhaustion. Keep manual restart documentation distinct. Make no claim about how Docker handles a directly supplied empty condition.
 
-- [ ] **Step 6: Review, verify, and commit the runtime deliverable.**
+- [x] **Step 6: Review, verify, and commit the runtime deliverable.**
 
 Run `git diff --check`, `go test ./... -count=1`, `go vet ./...`, `staticcheck ./...`, and `go test -race ./... -count=1`. Expected: all pass; report any tool/environment limitation instead of claiming success. Search active docs/comments for stale statements that empty restart means `none` or `any` is always unlimited; do not rewrite historical design/plan documents. Review the diff against all five Review Focus entries.
 
@@ -175,6 +175,14 @@ Commit only the Task 2 files with message `feat: configure swarm restart policy`
 
 ## Completion and review
 
-- [ ] Check both tasks against the approved design and record actual verification results.
-- [ ] Obtain whole-change review using available review tools; if no independent reviewer is available, state that limitation and perform a self-review without presenting it as independent.
-- [ ] Do not implement deferred constructor cleanup, add a test-only export, change the store schema, or alter manual restart semantics.
+- [x] Check both tasks against the approved design and record actual verification results.
+- [x] Obtain whole-change review using available review tools; if no independent reviewer is available, state that limitation and perform a self-review without presenting it as independent.
+- [x] Do not implement deferred constructor cleanup, add a test-only export, change the store schema, or alter manual restart semantics.
+
+## Execution results
+
+- Task 1: `10ac96e`; the empty-condition test failed as expected, then root tests and diagnostics passed.
+- Task 2: `feb988d`; missing-field and runtime-policy assertions failed as expected before implementation, then Swarm and full tests passed.
+- Verification passed: `go test ./... -count=1`, `go test -race ./... -count=1`, `go vet ./...`, `staticcheck ./...`, changed-file `gopls check`, and `git diff --check`.
+- Whole-change author self-review found no blocking or minor findings. No independent reviewer tool was available; no live Docker deployment was performed.
+- Ruling: the original plan accidentally omitted the existing resolved-secret/config arguments from the proposed `buildSpec` signature. Keep those arguments when adding the receiver, avoiding unrelated secret/config projection regressions. The Interfaces block above is corrected accordingly.
