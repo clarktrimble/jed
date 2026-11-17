@@ -99,4 +99,16 @@ available repository lint checks before claiming completion.
 - [x] Write the proposed design.
 - [x] Obtain design approval.
 - [x] Write the implementation plan.
-- [ ] Implement, review, and verify.
+- [x] Implement, review, and verify.
+
+## Verification record
+
+Implementation commits: `5dfb22e` and `2b547c8`.
+
+- Observed failing unit regressions before implementing classification.
+- Observed the bulk API regression fail before preserving timestamps.
+- Passed Go formatting/diagnostics, `go test ./... -count=1`,
+  `go test -race ./swarm -count=1`, `go vet ./...`, `staticcheck ./...`,
+  and `git diff --check`.
+- Whole-change self-review (no subagent tool available): no findings or
+  deviations from the approved design. No live Docker experiment performed.
