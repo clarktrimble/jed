@@ -25,7 +25,7 @@ err = sw.Restart(ctx, "myapp")
 services, err := sw.ListServices(ctx)
 tasks, err := sw.ServiceTasks(ctx, "myapp")
 logs, err := sw.TaskLogs(ctx, tasks[0].ID, "100")
-state, err := sw.Status(ctx, "myapp") // "stopped", "running", "pending", or "error"
+state, err := sw.Status(ctx, "myapp") // "stopped", "running", "exited", "pending", or "error"
 
 // Teardown
 err = sw.DeleteService(ctx, "myapp")

@@ -119,6 +119,38 @@ Why Go values over templates?
 - There is no placeholder convention to keep in sync.
 - Runtime-specific mapping stays inside the swarm package.
 
+## Service Status
+
+`Swarm.Status` and `Swarm.Statuses` report observed runtime state, separately
+from the desired replica count:
+
+| Status | Meaning |
+| --- | --- |
+| `stopped` | No replicas wanted; none running. |
+| `running` | All wanted replicas running. |
+| `exited` | Replicas wanted, no active task, latest task completed cleanly. |
+| `error` | Update/rollback failed, or no active task and the latest task failed or was rejected. |
+| `pending` | Transitioning, or no conclusive outcome yet. |
+
+Existing stop/stopping decisions take priority, followed by update/rollback
+state and then fully running counts. Only when these do not settle the status
+does task history decide: any active task means `pending`; otherwise the latest
+task's outcome determines `exited`, `error`, or the default `pending`. No tasks
+also means `pending`.
+
+Latest means newest parsed Docker status timestamp, not task-list order or
+string order. Missing or malformed timestamps count as zero time; ties retain
+the first task encountered. An older failure does not override a newer clean
+completion. A newer task in another state, such as `shutdown`, likewise does
+not inherit an older failure.
+
+`exited` is not an explicit stop, a healthy running service, or a request for
+recovery. It distinguishes clean completion from ongoing convergence without
+changing restart policy. Downstream callers must accept this fifth status.
+Partly exited multi-replica services with an active task still report `pending`
+when the wanted count is not met; per-slot classification and job modes are not
+covered by this model.
+
 ## Versioned Swarm Resources
 
 Docker Swarm secrets and configs are immutable. Jed treats names in

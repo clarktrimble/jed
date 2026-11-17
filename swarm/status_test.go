@@ -182,6 +182,25 @@ var _ = Describe("Status", func() {
 			})
 		})
 
+		Context("clean exit after an older failure", func() {
+			BeforeEach(func() {
+				tasks := []map[string]any{
+					{"Status": map[string]any{"State": "failed", "Timestamp": "2026-11-17T12:00:00.9Z"}},
+					{"Status": map[string]any{"State": "complete", "Timestamp": "2026-11-17T12:00:00.91Z"}},
+				}
+				client.SendObjectFunc = respond(serviceWith(1, 0, "completed", ""), tasks)
+			})
+
+			JustBeforeEach(func() {
+				status, err = sw.Status(ctx, "myservice")
+			})
+
+			It("should return exited rather than a historical error", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(status).To(Equal(swarm.StatusExited))
+			})
+		})
+
 		Context("old rejected task but a new one trying", func() {
 			BeforeEach(func() {
 				client.SendObjectFunc = respond(serviceWith(1, 0, "", ""), tasksWith("rejected", "preparing"))
@@ -215,10 +234,18 @@ var _ = Describe("Status", func() {
 					"ServiceStatus": map[string]any{"DesiredTasks": 1, "RunningTasks": 0},
 					"UpdateStatus":  map[string]any{"State": ""},
 				},
+				{
+					"ID":            "svc-exited",
+					"Spec":          map[string]any{"Name": "exited"},
+					"ServiceStatus": map[string]any{"DesiredTasks": 1, "RunningTasks": 0},
+					"UpdateStatus":  map[string]any{"State": "completed"},
+				},
 			}
 			tasks := []map[string]any{
+				{"ServiceID": "svc-exited", "Status": map[string]any{"State": "failed", "Timestamp": "2026-11-17T12:00:00.9Z"}},
 				{"ServiceID": "svc-good", "Status": map[string]any{"State": "running"}},
 				{"ServiceID": "svc-bad", "Status": map[string]any{"State": "rejected"}},
+				{"ServiceID": "svc-exited", "Status": map[string]any{"State": "complete", "Timestamp": "2026-11-17T12:00:00.91Z"}},
 			}
 			client.SendObjectFunc = respond(svcs, tasks)
 		})
@@ -230,8 +257,9 @@ var _ = Describe("Status", func() {
 		It("groups tasks by service and reports each status", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(Equal(map[string]swarm.Status{
-				"good": swarm.StatusRunning,
-				"bad":  swarm.StatusError,
+				"good":   swarm.StatusRunning,
+				"bad":    swarm.StatusError,
+				"exited": swarm.StatusExited,
 			}))
 		})
 	})

@@ -19,7 +19,8 @@ const (
 	StatusExited Status = "exited"
 	// StatusPending means a service is deploying, updating, stopping, or converging.
 	StatusPending Status = "pending"
-	// StatusError means Docker reports that a service update or rollback failed.
+	// StatusError means an update or rollback failed, or no task is active and
+	// the latest task failed or was rejected.
 	StatusError Status = "error"
 )
 
@@ -48,8 +49,8 @@ func (d *Swarm) Statuses(ctx context.Context) (map[string]Status, error) {
 		return nil, errors.Wrap(err, "failed to list services")
 	}
 
-	// Tasks are only needed to tell a converging service from a failed one, so
-	// this call could be skipped when every service's status is already decided
+	// Tasks distinguish converging services from failed or cleanly exited ones.
+	// This call could be skipped when every service's status is already decided
 	// by counts and update state alone.
 	var tasks []taskResponse
 	err = d.client.SendObject(ctx, "GET", "/v1.52/tasks", nil, &tasks)
@@ -59,7 +60,10 @@ func (d *Swarm) Statuses(ctx context.Context) (map[string]Status, error) {
 
 	byService := make(map[string][]Task, len(svcs))
 	for _, t := range tasks {
-		byService[t.ServiceID] = append(byService[t.ServiceID], Task{State: t.Status.State})
+		byService[t.ServiceID] = append(byService[t.ServiceID], Task{
+			State:     t.Status.State,
+			Timestamp: t.Status.Timestamp,
+		})
 	}
 
 	result := make(map[string]Status, len(svcs))
@@ -75,8 +79,9 @@ func (d *Swarm) Statuses(ctx context.Context) (map[string]Status, error) {
 // Returns status:
 //   - StatusStopped - DesiredTasks == 0 and no tasks running
 //   - StatusPending - transitioning, converging, deploying, or stopping
-//   - StatusError   - deploy or rollback failed (paused)
+//   - StatusError   - deploy/rollback failed (paused), or latest task failed/rejected with none active
 //   - StatusRunning - healthy, all desired tasks running
+//   - StatusExited  - replicas desired, no active task, latest task completed cleanly
 //
 // Note: Job mode services (replicated-job, global-job) would need different logic.
 // Todo: consider rollback, how hard will this be to support from a ux sanity perspective?
