@@ -37,7 +37,7 @@
 
 **Interfaces:** Preserve `computeStatus(ss ServiceStatus, us UpdateStatus, tasks []Task) Status` and `isActive(state string) bool`. Add exported `StatusExited Status = "exited"`; remove private `hasFailed(tasks []Task) bool`. No caller signatures change.
 
-- [ ] **Write `TestComputeStatus` in `swarm/status_internal_test.go` (package `swarm`).** Use a standard table with `name`, `ss`, `us`, `tasks`, and `want`. Initially express the new expected value as `Status("exited")` so the regression fails behaviorally before the constant exists. For every row assert:
+- [x] **Write `TestComputeStatus` in `swarm/status_internal_test.go` (package `swarm`).** Use a standard table with `name`, `ss`, `us`, `tasks`, and `want`. Initially express the new expected value as `Status("exited")` so the regression fails behaviorally before the constant exists. For every row assert:
 
   ```go
   if got := computeStatus(tt.ss, tt.us, tt.tasks); got != tt.want {
@@ -71,10 +71,10 @@
 
   Active states: `new`, `pending`, `assigned`, `accepted`, `preparing`, `ready`, `starting`, `running`.
 
-- [ ] **Run the red test:** `go test ./swarm -run '^TestComputeStatus$' -count=1`. Expect failures for completed/latest-outcome cases, not build errors.
-- [ ] **Implement classification in `swarm/status.go`.** Add the documented constant. Keep the existing switch through the fully-running branch, then scan tasks for activity and the newest parsed timestamp. Return pending for activity or no tasks; otherwise map the newest state to exited/error/pending. Treat parse errors explicitly as zero time and retain the first candidate on ties. Remove `hasFailed`, preserve `isActive`, and do not sort/mutate the task slice.
-- [ ] **Verify green:** `gofmt -w swarm/status.go swarm/status_internal_test.go`, `gopls check swarm/status.go swarm/status_internal_test.go`, then `go test ./swarm -run '^TestComputeStatus$' -count=1` and `go test ./swarm -count=1`. Expect no diagnostics and passing tests.
-- [ ] **Commit:** `git add swarm/status.go swarm/status_internal_test.go && git commit -m "feat: classify cleanly completed services as exited"`.
+- [x] **Run the red test:** `go test ./swarm -run '^TestComputeStatus$' -count=1`. Expect failures for completed/latest-outcome cases, not build errors.
+- [x] **Implement classification in `swarm/status.go`.** Add the documented constant. Keep the existing switch through the fully-running branch, then scan tasks for activity and the newest parsed timestamp. Return pending for activity or no tasks; otherwise map the newest state to exited/error/pending. Treat parse errors explicitly as zero time and retain the first candidate on ties. Remove `hasFailed`, preserve `isActive`, and do not sort/mutate the task slice.
+- [x] **Verify green:** `gofmt -w swarm/status.go swarm/status_internal_test.go`, `gopls check swarm/status.go swarm/status_internal_test.go`, then `go test ./swarm -run '^TestComputeStatus$' -count=1` and `go test ./swarm -count=1`. Expect no diagnostics and passing tests.
+- [x] **Commit:** `git add swarm/status.go swarm/status_internal_test.go && git commit -m "feat: classify cleanly completed services as exited"`.
 
 ### Task 2: Expose the contract consistently through both APIs
 

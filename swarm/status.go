@@ -15,6 +15,8 @@ const (
 	StatusRunning Status = "running"
 	// StatusStopped means a service has no desired or running tasks.
 	StatusStopped Status = "stopped"
+	// StatusExited means replicas are desired, no task is active, and the latest task completed cleanly.
+	StatusExited Status = "exited"
 	// StatusPending means a service is deploying, updating, stopping, or converging.
 	StatusPending Status = "pending"
 	// StatusError means Docker reports that a service update or rollback failed.
@@ -106,34 +108,34 @@ func computeStatus(ss ServiceStatus, us UpdateStatus, tasks []Task) Status {
 		return StatusError // deploy or rollback failed
 	case ss.RunningTasks == ss.DesiredTasks:
 		return StatusRunning
-	case hasFailed(tasks):
-		return StatusError // running != desired, nothing active, a task failed
-	default:
-		return StatusPending // still converging
 	}
-}
 
-// hasFailed reports whether no task is active and at least one is rejected or
-// failed. An active task means the service is still converging, so older failed
-// tasks are ignored.
-//
-// An alternative rule is to look only at the most recent task by timestamp.
-// That is equivalent for a single replica but more eager to flag failure with
-// several: a stuck slot surfaces even while others run, at the cost of picking
-// one task somewhat arbitrarily. Worth revisiting if multi-replica services
-// need a failed slot surfaced.
-func hasFailed(tasks []Task) bool {
-	failed := false
-	for _, t := range tasks {
+	var latest Task
+	var latestAt time.Time
+	for i, t := range tasks {
 		if isActive(t.State) {
-			return false
+			return StatusPending // still converging, regardless of task history
 		}
-		if t.State == "rejected" || t.State == "failed" {
-			failed = true
+
+		timestamp, err := time.Parse(time.RFC3339Nano, t.Timestamp)
+		if err != nil {
+			timestamp = time.Time{}
+		}
+		// Missing or malformed timestamps count as zero; ties keep the first task.
+		if i == 0 || timestamp.After(latestAt) {
+			latest = t
+			latestAt = timestamp
 		}
 	}
 
-	return failed
+	switch latest.State {
+	case "failed", "rejected":
+		return StatusError
+	case "complete":
+		return StatusExited
+	default:
+		return StatusPending // no tasks yet, or no conclusive outcome
+	}
 }
 
 // isActive reports whether a task state is working toward running.
