@@ -11,9 +11,7 @@ sw := swarm.New(client, logger) // client implements swarm.Client
 sw.CreateNetwork(ctx, "svc-net", true, true)         // attachable, encrypted
 sw.CreateSecret(ctx, "db_password", []byte("hunter2")) // creates db_password_v1
 
-// Deploy from stored Jed state
-store, err := (&bbolt.Config{Path: "jed.db"}).New()
-j, err := jed.New(ctx, store, "deploy-vars", logger)
+// Deploy a spec rendered by Jed (setup in the top-level README)
 spec, err := j.Spec(ctx, "myapp")
 body, err := sw.Spec(ctx, spec) // optional: inspect exact Docker service payload
 _ = body
@@ -43,9 +41,14 @@ Swarm deploy consumes a rendered `jed.Spec`:
 id, created, err := sw.Deploy(ctx, spec)
 ```
 
-`Swarm.Deploy` does not perform template expansion. It validates the rendered service, resolves swarm secrets/configs, builds the Docker service payload, and creates or updates the Docker service. See [service-yaml.md](../service-yaml.md#template-expansion) for render-template behavior.
+`Swarm.Deploy` does not perform template expansion. It validates the rendered
+service, resolves swarm secrets/configs, builds the Docker service payload, and
+creates or updates the Docker service. See
+[service-yaml.md](../service-yaml.md#template-expansion) for render-template
+behavior.
 
-Use `Swarm.Spec` to inspect the exact Docker service payload without creating or updating the service:
+Use `Swarm.Spec` to inspect the exact Docker service payload without creating or
+updating the service:
 
 ```go
 body, err := sw.Spec(ctx, spec) // body has type swarm.Spec
@@ -59,24 +62,26 @@ Return values:
 - `created == true`: a new service was created.
 - `created == false`: an existing service was updated.
 
-To build a spec from stored state, load render vars from whichever env name your application uses:
-
-```go
-j, err := jed.New(ctx, store, "deploy-vars", logger)
-spec, err := j.Spec(ctx, "myapp")
-```
-
 ## Network Volumes
 
-`Swarm.Spec`/`Swarm.Deploy` turns the `NetworkMounts` resolved by `Jed.Spec()` or `Jed.ProvisionalSpec()` into NFSv3 volume driver config, which Docker mounts on the worker. Passing a service with unresolved `NetworkVolumes` directly to the adapter is rejected. Prepare the NAS shares, permissions, and worker NFS support outside Jed.
+Jed resolves network volumes into `NetworkMounts` while rendering. Swarm turns
+those into NFSv3 volume driver config, and Docker mounts them on the worker.
+Swarm rejects a spec with unresolved `NetworkVolumes`.
 
-See [network-volume configuration and naming](../service-yaml.md#network-volumes).
+Prepare the NAS shares, permissions, and worker NFS support outside Jed.
+
+See
+[network-volume configuration and naming](../service-yaml.md#network-volumes).
 
 ## Restarting Services
 
-`Swarm.Restart(ctx, name)` forces Docker Swarm to roll an existing service's tasks without changing `jed.Service` or persisted store state. It reads the current Docker service spec, increments Docker's `TaskTemplate.ForceUpdate`, and updates the service with the current Docker service version.
+`Swarm.Restart(ctx, name)` forces Docker Swarm to roll an existing service's
+tasks without changing `jed.Service` or persisted store state. It reads the
+current Docker service spec, increments Docker's `TaskTemplate.ForceUpdate`, and
+updates the service with the current Docker service version.
 
-Normal `Swarm.Deploy` updates preserve Docker's existing `ForceUpdate` value so a later deploy does not accidentally reset the restart counter.
+Normal `Swarm.Deploy` updates preserve Docker's existing `ForceUpdate` value so
+a later deploy does not accidentally reset the restart counter.
 
 ```go
 err := sw.Restart(ctx, "myapp")
@@ -93,15 +98,15 @@ sw.CreateSecret(ctx, "db_password", []byte("hunter3"))  // creates db_password_v
 sw.CreateConfig(ctx, "app_config", []byte("key=value")) // creates app_config_v1
 ```
 
-In `jed.Service`, list secret base names in `Secrets` and map config base names to mount paths in `Configs`. Deploy resolves both to the latest version automatically.
+In `jed.Service`, list secret base names in `Secrets` and map config base names
+to mount paths in `Configs`. Deploy resolves both to the latest version
+automatically.
 
 ## Defaults and Constraints
 
 | Setting          | Value                                          | Kind      |
 |------------------|------------------------------------------------|-----------|
 | Resources        | 0.5 CPU / 128MB limit, 0.1 CPU / 64MB reserve  | default   |
-| User             | 1001:1001                                      | default   |
-| Replicas         | 0 (stopped)                                    | default   |
 | Root filesystem  | Read-only                                      | hardcoded |
 | Restart          | none by default; optional condition, 5s delay  | default   |
 | Update order     | stop-first, pause on failure                   | hardcoded |

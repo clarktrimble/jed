@@ -64,14 +64,22 @@ resources:
 | `resources` | no | CPU and memory limits/reservations |
 | `restart` | no | Restart policy (`none`, `on-failure`, `any`) |
 | `publish_mode` | no | Port publish mode: `host` for direct binding; default is ingress |
-| `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1001` |
+| `user` | no | Container user, e.g. `1001` or `1000:967`; default is `1000` |
+| `groups` | no | Supplementary group GIDs, e.g. `967` |
 | `traefik` | no | Traefik routing config; generates labels automatically |
 
 ## Integration
 
-`integration` identifies the integration name and versions shared by related services. `name` must be an integration slug using lower-case letters, digits, and single hyphens, e.g. `aruba` or `reauth-acp`. `versions` must contain one or more full semantic versions with leading `v`, e.g. `v1.2.3`. Duplicates are rejected.
+`integration` identifies the integration name and versions shared by related
+services. `name` must be an integration slug using lower-case letters, digits,
+and single hyphens, e.g. `aruba` or `reauth-acp`. `versions` must contain one or
+more full semantic versions with leading `v`, e.g. `v1.2.3`. Duplicates are
+rejected.
 
-`desc` is an optional human-readable description of the integration, distinct from `about.desc`, which describes the individual service. Empty descriptions are omitted when serialized. Like the other integration fields, `desc` is literal metadata and is not template-expanded. Descriptions are stored per service; consistency across services with the same integration name is not enforced.
+`desc` is an optional human-readable description of the integration, distinct
+from `about.desc`, which describes the individual service. Empty descriptions
+are omitted when serialized. Descriptions are stored per service; consistency
+across services with the same integration name is not enforced.
 
 ```yaml
 integration:
@@ -83,7 +91,9 @@ integration:
 
 ## Template Expansion
 
-String values in a service definition may contain `{{VAR}}` placeholders. They are rendered by `jed.Jed.Spec` before runtime deploy. Integration fields are literal metadata: they are validated before rendering and are not template-expanded.
+String values in a service definition may contain `{{VAR}}` placeholders. They
+are rendered before deploy. Integration fields are validated before rendering
+and are not template-expanded.
 
 ```yaml
 command:
@@ -93,13 +103,19 @@ labels:
   prometheus_host: "{{PROM_HOST}}"
 ```
 
-Service values render from caller-supplied vars plus the service env. Service env wins on collisions. Env values render from caller-supplied vars only; env vars do not template each other. Caller-supplied render vars are not added to the container environment.
-
-Expansion is single-pass. Missing variables fail spec rendering. CLI-specific render-var conventions are documented with the CLIs.
+- The global env is `_global` by default.
+- Service values render from the global env plus the service env.
+- Service env wins on collisions.
+- Templates in service env values are filled from the global env, not from the
+  service env itself.
+- Global env vars are not added to the container environment.
+- Expansion is single-pass.
+- Missing variables fail spec rendering.
 
 ## Restart
 
-Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`. For swarm, `on-failure` uses one restart attempt.
+Restart condition is one of `none`, `on-failure`, or `any`. Empty means `none`.
+For swarm, `on-failure` uses one restart attempt.
 
 ```yaml
 restart: on-failure
@@ -107,7 +123,8 @@ restart: on-failure
 
 ## Resources
 
-CPU values are decimal strings, e.g. `"0.5"` for half a CPU or `"2.0"` for two CPUs.
+CPU values are decimal strings, e.g. `"0.5"` for half a CPU or `"2.0"` for two
+CPUs.
 
 Memory values are strings with an `M` suffix, e.g. `"128M"`.
 
@@ -128,7 +145,8 @@ ports:
   53/udp: "5353"
 ```
 
-Set `publish_mode: host` for direct host-mode publishing. Empty or omitted uses Docker Swarm ingress/routing mesh behavior.
+Set `publish_mode: host` for direct host-mode publishing. Empty or omitted uses
+Docker Swarm ingress/routing mesh behavior.
 
 ## Volumes
 
@@ -140,16 +158,17 @@ volumes:
   /host/path: /container   # bind mount
 ```
 
-`local_volumes` lists absolute container paths whose host-side bind paths are derived from the global `LOCAL_ROOT` render var, service name, and a flattened container path:
+`local_volumes` lists absolute container paths whose host-side bind paths are
+derived from `LOCAL_ROOT` in the global env, service name, and a flattened
+container path:
 
 ```yaml
+name: qkview
 local_volumes:
   - /qkview-history        # ${LOCAL_ROOT}/qkview/_qkview-history:/qkview-history
   - /qkview-sites          # ${LOCAL_ROOT}/qkview/_qkview-sites:/qkview-sites
   - /var/lib/app           # ${LOCAL_ROOT}/qkview/_var_lib_app:/var/lib/app
 ```
-
-If an explicit `volumes` entry already mounts the same container path, the explicit volume wins and Jed logs an error.
 
 ### Network volumes
 
@@ -185,9 +204,17 @@ Docker volumes and NAS shares use the same name, at most 32 ASCII characters:
 <service_lastdir, truncated to 25 characters>_<6 hex hash>
 ```
 
+### Conflicts
+
+- An explicit `volumes` entry wins over a local or network volume at the same
+  container path. Jed logs the conflict.
+- The same path in both `local_volumes` and `network_volumes` fails rendering.
+
 ## Secrets
 
-List swarm secret base names. The latest version, e.g. `aruba_client_secret_v3`, is resolved at deploy time and mounted using the base name as the secret filename.
+List swarm secret base names. The latest version, e.g. `aruba_client_secret_v3`,
+is resolved at deploy time and mounted using the base name as the secret
+filename.
 
 ```yaml
 secrets:
@@ -197,7 +224,8 @@ secrets:
 
 ## Configs
 
-Map swarm config base names to target mount paths. The latest version, e.g. `myapp_config_v2`, is resolved at deploy time and mounted at the specified path.
+Map swarm config base names to target mount paths. The latest version, e.g.
+`myapp_config_v2`, is resolved at deploy time and mounted at the specified path.
 
 ```yaml
 configs:
@@ -206,7 +234,8 @@ configs:
 
 ## User
 
-`user` may be a UID or `UID:GID`. If omitted, swarm deploy uses `1001:1001`.
+`user` may be a UID or `UID:GID`. A bare UID is also used as the GID. If
+omitted, Jed uses `1000` from `Config.DefaultUid`.
 
 ```yaml
 user: "1000:967"
@@ -214,7 +243,8 @@ user: "1000:967"
 
 ## Traefik
 
-When `traefik` is present, routing labels are generated automatically for PathPrefix routing at `/{service name}` with TLS on the `websecure` entrypoint.
+When `traefik` is present, routing labels are generated automatically for
+PathPrefix routing at `/{service name}` with TLS on the `websecure` entrypoint.
 
 ```yaml
 traefik:
@@ -234,7 +264,9 @@ labels:
   traefik.http.services.{name}.loadbalancer.server.port: "{port}"
 ```
 
-`ingress-auth` is a shared middleware declared by Traefik; jed only references it. By default, jed strips the matched path prefix after applying auth. To preserve it instead:
+`ingress-auth` is a shared middleware declared by Traefik; jed only references
+it. By default, jed strips the matched path prefix after applying auth. To
+preserve it instead:
 
 ```yaml
 traefik:
@@ -242,7 +274,8 @@ traefik:
   preserve_path_prefix: true
 ```
 
-When preserving the prefix, the router middleware label is `ingress-auth` and no strip middleware is generated.
+When preserving the prefix, the router middleware label is `ingress-auth` and no
+strip middleware is generated.
 
 To bypass the shared ingress authentication middleware:
 
@@ -252,6 +285,9 @@ traefik:
   bypass_auth: true
 ```
 
-This still generates the strip middleware unless `preserve_path_prefix` is also true.
+This still generates the strip middleware unless `preserve_path_prefix` is also
+true.
 
-Explicit labels in `labels:` take precedence over generated Traefik labels. Set `traefik.http.routers.{name}.middlewares` explicitly (including to an empty value) to supply custom middleware.
+Explicit labels in `labels:` take precedence over generated Traefik labels. Set
+`traefik.http.routers.{name}.middlewares` explicitly (including to an empty
+value) to supply custom middleware.

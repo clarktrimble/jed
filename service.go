@@ -24,9 +24,9 @@ const (
 const (
 	// RestartNone disables runtime restarts.
 	RestartNone = "none"
-	// RestartOnFailure restarts tasks or containers that fail.
+	// RestartOnFailure restarts tasks that fail.
 	RestartOnFailure = "on-failure"
-	// RestartAny restarts tasks or containers after any exit.
+	// RestartAny restarts tasks after any exit.
 	RestartAny = "any"
 )
 
@@ -76,7 +76,8 @@ func (r Resources) WithDefaults() Resources {
 type Link struct {
 	// Text is the human-readable link label.
 	Text string `json:"text"`
-	// Url is the target URL. It may contain {{template}} variables rendered from Env.
+	// Url is the target URL. It may contain {{template}} variables rendered from the
+	// global env and service env.
 	Url string `json:"url"`
 }
 
@@ -191,7 +192,7 @@ type Service struct {
 	Ports map[string]string `json:"ports"`
 	// Labels are Docker container labels.
 	Labels map[string]string `json:"labels"`
-	// Volumes maps host paths to container paths.
+	// Volumes maps named volumes or host paths to container paths.
 	Volumes map[string]string `json:"volumes"`
 	// LocalVolumes lists container paths backed by convention-derived local bind mounts.
 	LocalVolumes []string `json:"local_volumes,omitempty"`

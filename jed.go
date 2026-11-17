@@ -1,9 +1,9 @@
 // Package jed defines service configuration and persistence contracts for Just Enough Docker.
 //
-// The root package is intentionally runtime-neutral. It contains the shared
-// service model used by runtime packages such as swarm and container, the
-// Store interface used to persist desired service state, and Jed helpers for
-// loading rendered specs from a store.
+// The root package is intentionally runtime-neutral. It contains:
+//   - the shared service model used by runtime packages such as swarm
+//   - the Store interface used to persist desired service state
+//   - Jed helpers for loading rendered specs from a store
 package jed
 
 import (
@@ -18,10 +18,9 @@ import (
 // Bump this when changing the store schema in a backwards-incompatible way.
 const DBSchemaVersion = "4"
 
-// Store persists services, images, and environment variables.
+// Store persists services, envs, intents, and scanned images.
 //
-// Implementations must be safe for concurrent use. The Store is the source
-// of truth for service definitions, scanned images, and environment variables.
+// Implementations must be safe for concurrent use.
 type Store interface {
 	// GetService retrieves a service definition by name and image.
 	// Returns NotFoundError if the service does not exist.
@@ -239,8 +238,8 @@ func (j *Jed) Scale(ctx context.Context, name string, count int) (err error) {
 	return
 }
 
-// Spec loads the service, its env, and the current render vars from the store
-// and returns a rendered spec.
+// Spec loads the service, its env, and the global env from the store and
+// returns a rendered spec.
 func (j *Jed) Spec(ctx context.Context, name string) (Spec, error) {
 	env, err := j.store.GetEnv(ctx, name)
 	if err != nil {

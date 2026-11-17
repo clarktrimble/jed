@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Scanner lists images in a container registry.
 type Scanner struct {
 	client   Client
 	logger   logger.Logger
@@ -17,6 +18,7 @@ type Scanner struct {
 	registry string
 }
 
+// New creates a Scanner for the registry at client.Uri().
 func New(client Client, logger logger.Logger) (scanner *Scanner, err error) {
 
 	uri := client.Uri()

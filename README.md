@@ -6,7 +6,7 @@ Just Enough Docker: shared service definitions, stores, and a Docker Swarm runti
 
 - `jed.Service` is editable service configuration for one runnable image. Most service string values may contain `{{VAR}}` templates.
 - `jed.Intent` is desired state for a logical service: selected image plus replica count. Missing intent means disabled.
-- `jed.Env` is the container/runtime environment for a service. Env values may template render vars.
+- `jed.Env` is the container/runtime environment for a service. Env values may contain templates filled from the global env.
 - `jed.Spec` is rendered, runtime-neutral intended state: `Service + Env + Intent` after template expansion.
 - `jed.Store` persists services, envs, and intents.
 - `jed.Jed` loads stored state, renders specs by service name, and updates intent state.
@@ -21,14 +21,27 @@ if err != nil {
     // handle error
 }
 
-sw := swarm.New(dockerClient, logger)
-
-// Select the image to run, scale it, then render the named service from the store.
-j := (&jed.Config{VarsEnvName: "_global"}).New(store, logger)
-if err := j.Enable(ctx, "postgres", "postgres:16"); err != nil {
+// Store a service definition; Enable selects among stored definitions.
+err = store.SetService(ctx, jed.Service{Name: "postgres", Image: "postgres:16"})
+if err != nil {
     // handle error
 }
-if err := j.Scale(ctx, "postgres", 1); err != nil {
+
+swCfg := &swarm.Config{}
+_ = envconfig.Process("swarm", swCfg)
+sw := swCfg.New(logger)
+
+jedCfg := &jed.Config{}
+_ = envconfig.Process("jed", jedCfg)
+j := jedCfg.New(store, logger)
+
+// Select the image to run, scale it, then render the named service from the store.
+err = j.Enable(ctx, "postgres", "postgres:16")
+if err != nil {
+    // handle error
+}
+err = j.Scale(ctx, "postgres", 1)
+if err != nil {
     // handle error
 }
 
@@ -48,7 +61,7 @@ if created {
 }
 
 // or to preview an unsaved intent and env:
-spec, err := j.ProvisionalSpec(ctx,
+preview, err := j.ProvisionalSpec(ctx,
     jed.Intent{Name: "postgres", Image: "postgres:16", Replicas: 1},
     jed.Env{Name: "postgres", Vars: map[string]string{"POSTGRES_DB": "app"}},
 )
@@ -57,10 +70,12 @@ spec, err := j.ProvisionalSpec(ctx,
 ## CLIs
 
 Note: these have not been maintained, much
+
 Todo: resuscitate or remove please
 
 - [`cmd/jed`](cmd/jed/README.md): edit service and env definitions in the store.
 - [`cmd/transship`](cmd/transship/README.md): deploy and operate stored services on Docker Swarm.
+- cmd/scan-registry
 
 ## Documentation
 

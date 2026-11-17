@@ -5,8 +5,8 @@
 //   - Create, update, and delete services
 //   - Versioned secrets and configs (e.g., "db_pass_v3")
 //   - Host or ingress port publishing
-//   - Bind mounts and named volumes
-//   - Configurable UID:GID (defaults to 1001)
+//   - Bind mounts, named volumes, and NFSv3 network volumes
+//   - Configurable UID:GID and supplementary groups
 //   - Resource limits (CPU as decimal, memory with M suffix)
 //   - Extra hosts (/etc/hosts entries)
 //   - Custom command override

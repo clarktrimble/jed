@@ -10,7 +10,7 @@ import (
 
 // Spec is rendered, runtime-neutral intended service state.
 type Spec struct {
-	// Service is the rendered service definition ready for a runtime adapter.
+	// Service is the rendered service definition ready for a runtime.
 	Service Service `json:"service"`
 	// Env is the service environment used to render the spec.
 	Env Env `json:"env"`

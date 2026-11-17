@@ -1,77 +1,117 @@
 # Jed Design Decisions
 
-Jed is organized around one shared service model, store-backed desired state, explicit rendering, and a Docker Swarm runtime.
+Jed is organized around one shared service model, store-backed desired state,
+explicit rendering, and a Docker Swarm runtime.
 
-This document records design decisions and tradeoffs. Usage details live in the package READMEs and [service-yaml.md](service-yaml.md).
+This document records design decisions and tradeoffs. Usage details live in the
+package READMEs and [service-yaml.md](service-yaml.md).
 
 ## Package Boundaries
 
-```text
-jed           service model, Store interface, spec rendering
-store         Store contract tests and helpers
-store/bbolt   persistent Store implementation
-store/memo    in-memory Store implementation
-swarm         Docker Swarm runtime
-cmd/jed       CLI for editing stored desired state
-cmd/transship CLI for operating swarm state
-```
-
-The root `jed` package is intentionally runtime-neutral. It contains the shared service model, store contract, and rendering helpers. The `swarm` package owns Docker Swarm API details and deployment mechanics; Swarm is the supported deployment runtime.
+- `jed`: runtime-neutral service model, Store interface, spec rendering
+- `store`: Store contract tests and helpers
+- `store/bbolt`: persistent Store implementation
+- `store/memo`: in-memory Store implementation
+- `swarm`: Docker Swarm runtime
+- `scanner`: registry image listing and config
+- `extractor`: file extraction from Docker images
+- `logger`: logging interface
 
 ## Desired State vs Rendered Specs
 
-`jed.Service` is editable and persisted service definition. It describes what can run: image, command, ports, volumes, labels, secrets, configs, resources, user, and related metadata. Any string value in the service may contain templates.
+`jed.Service` is the service definition as stored and edited. Any string value
+in it may contain templates.
 
-`jed.Env` holds container/runtime environment variables separately from the service definition.
+`jed.Env` holds container/runtime environment variables separately from the
+service definition.
 
-`jed.Spec` is rendered intended state: a `Service`, `Env`, and `Intent` after Jed-level template expansion. It is still runtime-neutral.
+`jed.Spec` is what a runtime deploys. Jed resolves its own conventions first:
+templates, default user and network, and volumes.
 
 Why separate raw desired state from rendered runtime input?
 
 - Store implementations persist editable definitions, not deployment artifacts.
-- Missing render variables fail before runtime deployment.
+- Missing template variables fail before runtime deployment.
 - Runtime packages do not need to know about Jed render context.
-- Downstream callers can compose workflows from stable steps: load, render, inspect, deploy.
+- Downstream callers can compose workflows from stable steps: load, render,
+  inspect, deploy.
 
 ## Store Decisions
 
-`jed.Store` persists service definitions, environment variable sets, and intents. Service definitions are keyed by logical service name and image, so one logical service can have multiple runnable image definitions. It is an interface so production can use `store/bbolt`, tests and embedded users can use `store/memo`, and store behavior can be checked with `store.RunStoreContractTests`.
+`jed.Store` persists service definitions, environment variable sets, and
+intents. Service definitions are keyed by logical service name and image, so one
+logical service can have multiple runnable image definitions.
 
-`Store.GetEnv` returns an empty `Env` with an initialized `Vars` map when no env has been stored for a service. A service with no environment variables is valid, and deploy code does not need to special-case missing env. Store failures remain distinguishable as errors.
+`Store.GetEnv` returns an empty `Env` with an initialized `Vars` map when no env
+has been stored for a service. A service with no environment variables is valid,
+and deploy code does not need to special-case missing env. Store failures remain
+distinguishable as errors.
 
-Tradeoff: callers cannot distinguish “no env exists” from “empty env exists” without additional store-level conventions.
+Tradeoff: callers cannot distinguish “no env exists” from “empty env exists”
+without additional store-level conventions.
 
-The store does not enforce referential integrity. Env can exist without a matching service, and deleting a service does not inherently delete env unless a caller chooses to do both. This keeps the store simple and flexible, but stricter applications must enforce their own policy.
+The store does not enforce referential integrity. Env can exist without a
+matching service, and deleting a service does not inherently delete env unless a
+caller chooses to do both. This keeps the store simple and flexible, but
+stricter applications must enforce their own policy.
 
-`jed.Intent` is persisted desired state for a logical service. It records the selected service image and desired replica count; no intent means disabled.
+`jed.Intent` is persisted desired state for a logical service. It records the
+selected service image and desired replica count; no intent means disabled.
 
-`Jed.Enable(ctx, name, image)` records the active image intent, `Jed.Disable(ctx, name)` removes it, and `Jed.Scale(ctx, name, count)` updates the intent replica count. These change desired state only; runtimes still apply the new count on a later deploy.
+Switching images or disabling requires zero replicas. The service definition an
+intent selects cannot be deleted.
 
 ## Rendering Decisions
 
-The primary rendering entry point is `j.Spec(ctx, name)`, which loads the current intent, selected service image, env, and render vars from a store and renders by logical service name.
+Rendering works from stored state by logical service name. An unsaved intent
+and env can also be rendered against stored state to preview before saving.
 
-`Config.New(store, logger)` records the named env to use for render vars, and `j.Spec(ctx, name)` reloads that env when rendering so store edits are visible to existing `Jed` values. The env name is explicit. `_global` is a `cmd/transship` CLI convention, not a magic library default.
+The global env is the store env named by `Config.VarsEnvName`.
 
 Rendering rules:
 
-- Caller-supplied vars and `env.Vars` participate in rendering service values.
+- The global env and `env.Vars` participate in rendering service values.
 - `env.Vars` wins on key collisions when rendering service values.
-- Env values render from caller-supplied vars only; env vars do not template each other.
-- Render vars are not added to `Spec.Env`.
+- Templates in service env values are filled from the global env, not from the
+  service env itself.
+- Global env vars are not added to `Spec.Env`.
 - Expansion is single-pass.
 - Missing vars fail before runtime deploy.
-- All string values in `Service` participate in rendering, including nested structs, slices, maps, and map keys.
+- All string values in `Service` participate in rendering, including nested
+  structs, slices, maps, and map keys.
+
+## Volume Conventions
+
+Services declare container paths only. Jed derives where the data lives:
+
+- Local volumes become bind mounts under `LOCAL_ROOT`.
+- Network volumes become Docker-managed NFSv3 volumes on `NFS_HOST` under
+  `NFS_ROOT`.
+
+This keeps service definitions short and avoids a volume inventory. Derived
+mounts exist only in rendered specs and are never stored.
+
+Jed does not create NAS shares or host directories. Something else must
+provision them with usable permissions.
+
+Network volume names are a readable stem plus a hash of the service name and
+container path. The same name serves as the Docker volume and the NAS share.
+The naming scheme is a storage contract. Changing it strands existing data.
+
+An explicit volume wins over a derived one at the same target. Local and network
+volumes cannot share a target.
 
 ## Swarm Runtime Projection
 
-`swarm.Swarm` consumes rendered `jed.Spec` values. It does not perform Jed-level template expansion.
+`swarm.Swarm` consumes rendered `jed.Spec` values. It does not perform Jed-level
+template expansion.
 
-`Swarm.Spec(ctx, spec)` validates the rendered service, resolves latest versioned swarm secrets/configs, and returns the Docker service payload as `swarm.Spec` without creating or updating anything. This is the introspection seam for dry-run/preview-style consumers.
+Projecting a spec into a Docker service payload is separate from applying it,
+so callers can inspect the exact payload. Deploy creates the service or updates
+it in place.
 
-`Swarm.Deploy(ctx, spec)` uses the same projection and then creates the service if it does not exist or updates it if it does. It returns the Docker service ID for both creates and updates, and returns `created=true` only for creates. Missing service detection uses `swarm.ErrServiceNotFound` and `errors.Is` rather than string matching.
-
-The swarm package builds Docker API payloads from assembled Go values rather than JSON templates.
+The swarm package builds Docker API payloads from assembled Go values rather
+than JSON templates.
 
 Why Go values over templates?
 
@@ -81,35 +121,56 @@ Why Go values over templates?
 
 ## Versioned Swarm Resources
 
-Docker Swarm secrets and configs are immutable. Jed treats names in `Service.Secrets` and `Service.Configs` as base names and resolves them to the latest versioned swarm resource at spec/deploy time:
+Docker Swarm secrets and configs are immutable. Jed treats names in
+`Service.Secrets` and `Service.Configs` as base names and resolves them to the
+latest versioned swarm resource at spec/deploy time:
 
 ```text
 s3_secret_key -> s3_secret_key_v1, s3_secret_key_v2, ...
 app_config    -> app_config_v1, app_config_v2, ...
 ```
 
-Creating a secret or config creates the next version. Deploying resolves the highest version.
+Creating a secret or config creates the next version. Deploying resolves the
+highest version.
 
-Tradeoff: `Swarm.Spec` is an introspection method, but it still contacts Docker to resolve current secret/config versions.
+Tradeoff: inspecting a payload still contacts Docker to resolve current
+secret/config versions.
 
 ## Runtime Defaults and Policy
 
-The swarm runtime currently supplies defaults and constraints such as resource defaults, read-only root filesystem, default user, restart mapping, update behavior, and log driver settings. These are documented in [swarm/README.md](swarm/README.md) rather than repeated here.
+The swarm runtime supplies its own defaults and constraints. These are
+documented in [swarm/README.md](swarm/README.md).
 
-Traefik support is modeled on `jed.Service` as high-level routing intent. Swarm projects that intent into Docker-provider labels. If another runtime is added later, it can project the same intent differently, such as Kubernetes ingress resources.
+Traefik support is modeled on `jed.Service` as high-level routing intent. Swarm
+projects that intent into Docker-provider labels. If another runtime is added
+later, it can project the same intent differently, such as Kubernetes ingress
+resources.
 
 ## Known Limitations
 
 ### Service Model Still Has Runtime-Specific Fields
 
-`jed.Service` remains the shared desired-state model. Some fields are only used by one runtime today, such as swarm secrets/configs and port publish mode. Keeping them on the shared model is pragmatic while the project remains small.
+`jed.Service` remains the shared desired-state model. Some fields are only used
+by one runtime today, such as swarm secrets/configs and port publish mode.
+Keeping them on the shared model is pragmatic while the project remains small.
 
 ### No Full Runtime Abstraction Yet
 
-There is no broad runtime interface, plan/apply abstraction, or runtime-neutral deploy result. Current APIs expose concrete building blocks (`jed.Spec`, `swarm.Spec`, `Swarm.Deploy`) and leave orchestration to callers.
+There is no broad runtime interface, plan/apply abstraction, or runtime-neutral
+deploy result. Current APIs expose concrete building blocks and leave
+orchestration to callers.
 
-This avoids over-design while there is only one primary deployment runtime. If another runtime appears, the existing render/projection seams should provide useful pressure points.
+This avoids over-design while there is only one primary deployment runtime. If
+another runtime appears, the existing render/projection seams should provide
+useful pressure points.
 
 ### Service and Env Changes Are Applied at Deploy Time
 
-Runtimes do not watch the store. Updating stored service/env data only affects a running deployment when a caller deploys or redeploys the service.
+Runtimes do not watch the store. Updating stored service/env data only affects a
+running deployment when a caller deploys or redeploys the service.
+
+### Existing Network Volumes May Not Be Retargeted
+
+Docker likely reuses an existing named volume and ignores new driver options.
+Changing `NFS_HOST` or `NFS_ROOT` may leave services on the old export. This is
+unverified. Jed does not detect or replace mismatched volumes.

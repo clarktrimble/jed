@@ -16,6 +16,7 @@ const (
 	dockerManifestMt = "application/vnd.docker.distribution.manifest.v2+json"
 )
 
+// Client is an HTTP client for the registry API.
 type Client interface {
 	SendObject(ctx context.Context, method, path string, snd, rcv any) (err error)
 	Uri() string
