@@ -105,16 +105,21 @@ means unlimited retries. Zero window counts all retries rather than a bounded
 lookback. Zero-valued timing fields are omitted from the Docker payload.
 `swarm.New(client, logger)` remains available and uses the defaults above.
 
-The default window is two minutes per service slot. `any` allows five restart
-attempts; `on-failure` allows one and leaves successful completion alone.
-Both use the configured delay. Rapid failures can exhaust the budget before the
-window expires. The window is not a cooldown: an exhausted service does not
-automatically resume when it expires.
+With the defaults, `any` allows five restart attempts within a two-minute
+lookback period per service slot. Rapid failures can exhaust those attempts
+before two minutes elapse. The window is not a cooldown: an exhausted service
+does not automatically resume when the window expires.
 
-`none` disables automatic restart and omits timing and retry fields.
+`on-failure` retains one restart attempt with the configured delay and window.
+`none` disables automatic restart and omits delay, attempts,
+and window. Use explicit `none` for one-shot services that must not repeat after
+successful completion.
 
-**Compatibility:** existing `on-failure` services acquire the configured window
-on their next deployment. Service YAML and the store schema are unchanged.
+**Compatibility:** existing empty conditions now render as `any`; existing
+explicit `any` conditions now use the bounded retry policy. Both changes take
+effect on the next deployment, not immediately on running services. Service
+YAML and the store schema are unchanged.
+The `on-failure` window setting takes effect on the next deployment.
 
 ## Restarting Services Manually
 

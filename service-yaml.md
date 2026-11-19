@@ -119,10 +119,12 @@ value as `any`. Use explicit `none` for one-shot services that must not run agai
 after successful completion. Stored definitions are not rewritten when Jed
 resolves the default.
 
-Swarm defaults to a five-second delay and a two-minute retry window.
-`any` allows five restart attempts per service slot. `on-failure` allows one
-and leaves successful completion alone. `none` has no automatic retries.
-An exhausted service does not automatically resume when the window expires.
+Swarm applies the same runtime-wide policy to explicit and defaulted `any`:
+by default, a five-second delay and five restart attempts within a two-minute
+lookback period per service slot. Rapid failures can exhaust attempts before two
+minutes elapse; retries do not automatically resume when the window expires.
+`on-failure` retains one restart attempt with the configured delay and window.
+`none` has no automatic retries.
 
 ```yaml
 restart: none
@@ -132,8 +134,10 @@ Delay, attempts, and window are configured on `swarm.Config`, not in service
 YAML. See [Swarm automatic restart policy](swarm/README.md#automatic-restart-policy)
 for fields, environment variables, and zero-value behavior.
 
-Existing `on-failure` services acquire the configured window on their next
-deployment. The service YAML shape and store schema are unchanged.
+On the next deployment, existing empty settings change from no restart to `any`,
+and existing explicit `any` settings change from unlimited retries to the
+configured retry budget. Running services are unaffected until redeployed. The
+service YAML shape and store schema are unchanged.
 
 ## Resources
 
