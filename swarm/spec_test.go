@@ -175,7 +175,8 @@ var _ = Describe("Spec", func() {
 			Expect(restart.Condition).To(Equal("on-failure"))
 			Expect(restart.Delay).To(Equal(int64(5000000000)))
 			Expect(restart.MaxAttempts).To(Equal(1))
-			Expect(wireRestartPolicy(body)).NotTo(HaveKey("Window"))
+			Expect(restart.Window).To(Equal(int64(120000000000)))
+			Expect(wireRestartPolicy(body)).To(HaveKeyWithValue("Window", float64(120000000000)))
 		})
 	})
 

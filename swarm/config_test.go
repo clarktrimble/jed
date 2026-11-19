@@ -47,6 +47,13 @@ var _ = Describe("Config", func() {
 			Condition: "any", Delay: 5000000000, MaxAttempts: 5, Window: 120000000000,
 		}))
 		Expect(wireRestartPolicy(body)).To(HaveKeyWithValue("Window", float64(120000000000)))
+
+		body, err = cfg.New(nopLogger{}).Spec(context.Background(), restartSpec(jed.RestartOnFailure))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{
+			Condition: "on-failure", Delay: 5000000000, MaxAttempts: 1, Window: 120000000000,
+		}))
+		Expect(wireRestartPolicy(body)).To(HaveKeyWithValue("Window", float64(120000000000)))
 	})
 
 	It("projects restart settings supplied through the environment", func() {
@@ -61,6 +68,13 @@ var _ = Describe("Config", func() {
 		Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{
 			Condition: "any", Delay: 1500000000, MaxAttempts: 3, Window: 90000000000,
 		}))
+
+		body, err = cfg.New(nopLogger{}).Spec(context.Background(), restartSpec(jed.RestartOnFailure))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{
+			Condition: "on-failure", Delay: 1500000000, MaxAttempts: 1, Window: 90000000000,
+		}))
+		Expect(wireRestartPolicy(body)).To(HaveKeyWithValue("Window", float64(90000000000)))
 	})
 
 	Describe("custom restart policy", func() {
@@ -86,13 +100,16 @@ var _ = Describe("Config", func() {
 			}))
 		})
 
-		It("keeps one retry and no window for on-failure", func() {
+		It("keeps one retry with the configured window for on-failure", func() {
 			body, err := cfg.New(nopLogger{}).Spec(context.Background(), restartSpec(jed.RestartOnFailure))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{
-				Condition: "on-failure", Delay: 1500000007, MaxAttempts: 1,
+				Condition: "on-failure", Delay: 1500000007, MaxAttempts: 1, Window: 90000000011,
 			}))
-			Expect(wireRestartPolicy(body)).NotTo(HaveKey("Window"))
+			Expect(wireRestartPolicy(body)).To(Equal(map[string]any{
+				"Condition": "on-failure", "Delay": float64(1500000007),
+				"MaxAttempts": float64(1), "Window": float64(90000000011),
+			}))
 		})
 
 		It("omits timing and retry fields for none", func() {
@@ -108,6 +125,18 @@ var _ = Describe("Config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{Condition: "any"}))
 		Expect(wireRestartPolicy(body)).To(Equal(map[string]any{"Condition": "any"}))
+	})
+
+	It("keeps one retry with an explicit zero window for on-failure", func() {
+		body, err := (&swarm.Config{Socket: "/tmp/docker.sock"}).New(nopLogger{}).
+			Spec(context.Background(), restartSpec(jed.RestartOnFailure))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(body.TaskTemplate.RestartPolicy).To(Equal(swarm.RestartPolicy{
+			Condition: "on-failure", MaxAttempts: 1,
+		}))
+		Expect(wireRestartPolicy(body)).To(Equal(map[string]any{
+			"Condition": "on-failure", "MaxAttempts": float64(1),
+		}))
 	})
 })
 

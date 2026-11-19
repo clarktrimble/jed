@@ -449,6 +449,7 @@ func (d *Swarm) restartPolicy(service jed.Service) RestartPolicy {
 		restart.Window = int64(d.restartWindow)
 	case jed.RestartOnFailure:
 		restart.MaxAttempts = 1
+		restart.Window = int64(d.restartWindow)
 	}
 	return restart
 }

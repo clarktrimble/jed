@@ -164,20 +164,19 @@ empty condition as `any` during spec rendering, without rewriting the stored
 service. Swarm projects the supplied condition without an empty-value fallback
 or a new empty-value validation error.
 
-Delay and retry budgeting are runtime-wide policy on `swarm.Config`. The defaults
-are a five-second delay and, for `any`, five attempts within a two-minute
-lookback period per service slot. Explicit and defaulted `any` are treated
-identically. `on-failure` retains one retry and no explicit window, with the
-configured delay; `none` disables automatic restart. One-shot services can use
-explicit `none` to avoid repeating after successful completion.
+Delay and retry budgeting are runtime-wide policy on `swarm.Config`. Both `any`
+and `on-failure` use the configured delay and window. The defaults are five
+seconds and two minutes. `any` allows five retries per service slot;
+`on-failure` allows one and leaves successful completion alone. The window
+prevents old failures from exhausting the retry budget. `none` disables
+automatic restart.
 
 The window does not ensure two minutes of retries or resume an exhausted service
 automatically. This favors bounded crash-loop recovery over unlimited retries.
 Manual `Swarm.Restart` remains a separate rollout operation.
 
-These changes apply on deployment: existing empty settings acquire `any`, and
-explicit `any` acquires the configured retry budget. Running services do not
-change immediately. No service-format or store-schema migration is required.
+Policy changes apply on deployment. No service-format or store-schema migration
+is required.
 
 Traefik support is modeled on `jed.Service` as high-level routing intent. Swarm
 projects that intent into Docker-provider labels. If another runtime is added

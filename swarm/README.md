@@ -86,7 +86,7 @@ definitions:
 | --- | --- | --- | --- |
 | `RestartDelay` | `SWARM_RESTART_DELAY` | `5s` | `any` and `on-failure` |
 | `RestartMaxAttempts` | `SWARM_RESTART_MAX_ATTEMPTS` | `5` | `any` only |
-| `RestartWindow` | `SWARM_RESTART_WINDOW` | `2m` | `any` only |
+| `RestartWindow` | `SWARM_RESTART_WINDOW` | `2m` | `any` and `on-failure` |
 
 For example, populate default tags and environment overrides before construction:
 
@@ -105,20 +105,16 @@ means unlimited retries. Zero window counts all retries rather than a bounded
 lookback. Zero-valued timing fields are omitted from the Docker payload.
 `swarm.New(client, logger)` remains available and uses the defaults above.
 
-With the defaults, `any` allows five restart attempts within a two-minute
-lookback period per service slot. Rapid failures can exhaust those attempts
-before two minutes elapse. The window is not a cooldown: an exhausted service
-does not automatically resume when the window expires.
+The default window is two minutes per service slot. `any` allows five restart
+attempts; `on-failure` allows one and leaves successful completion alone.
+Both use the configured delay. Rapid failures can exhaust the budget before the
+window expires. The window is not a cooldown: an exhausted service does not
+automatically resume when it expires.
 
-`on-failure` retains one restart attempt and no explicit window, using only the
-configured delay. `none` disables automatic restart and omits delay, attempts,
-and window. Use explicit `none` for one-shot services that must not repeat after
-successful completion.
+`none` disables automatic restart and omits timing and retry fields.
 
-**Compatibility:** existing empty conditions now render as `any`; existing
-explicit `any` conditions now use the bounded retry policy. Both changes take
-effect on the next deployment, not immediately on running services. Service
-YAML and the store schema are unchanged.
+**Compatibility:** existing `on-failure` services acquire the configured window
+on their next deployment. Service YAML and the store schema are unchanged.
 
 ## Restarting Services Manually
 
